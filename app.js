@@ -9,6 +9,8 @@ let watchId = null;
 let lastPos = null;
 let currentHeading = null;
 let lineVisible = false;
+let posReady = false;
+let headingReady = false;
 
 const startBtn = document.getElementById('startBtn');
 const statusEl = document.getElementById('status');
@@ -65,6 +67,7 @@ function handleOrientationEvent(e){
   // adjust for screen orientation
   const screenAngle = (screen.orientation && screen.orientation.angle) || 0;
   heading = -((heading - screenAngle + 360) % 360);
+  currentHeading = heading;
   if (lastPos) updateLine(lastPos, heading);
 }
 
