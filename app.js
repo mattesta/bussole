@@ -13,6 +13,7 @@ let lastPos = null;
 let currentHeading = null;
 let lineVisible = false;
 let lineLocked = false;
+let line = null;
 
 const startBtn = document.getElementById('startBtn');
 const statusEl = document.getElementById('status');
@@ -60,32 +61,19 @@ async function requestDeviceOrientationPermission(){
 }
 
 function handleOrientationEvent(e){
+  if (lineLocked) return; // ← BLOCCA SUBITO
 
-  let heading = null;
+  let heading = e.alpha;
+  if (typeof heading !== 'number') return;
 
-  // iOS — usa la bussola nativa
-  if (typeof e.webkitCompassHeading === "number") {
-    heading = e.webkitCompassHeading; 
-  }
+  const screenAngle =
+    (screen.orientation && screen.orientation.angle) || 0;
 
-  // Android — ricava il Nord dal device yaw
-  else if (typeof e.alpha === "number") {
-    // alpha = rotazione rispetto al Nord ma dipende dallo schermo
-    // convertiamo in bearing
-    heading = 360 - e.alpha;
-  }
+  heading = (heading - screenAngle + 360) % 360;
 
-  if (heading == null || isNaN(heading)) return;
+  currentHeading = heading;   // <<<<<< salva l’heading
 
-  // normalizza
-  heading = (heading + 360) % 360;
-
-  currentHeading = heading;
-
-  // Se linea NON è ancora fissata, aggiorna anteprima
-  if (lastPos && lineVisible && !lineLocked) {
-    updateLine(lastPos, currentHeading);
-  }
+  if (lastPos) updateLine(lastPos, heading);
 }
 
 function start() {
