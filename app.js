@@ -49,12 +49,24 @@ async function requestDeviceOrientationPermission(){
 }
 
 function handleOrientationEvent(e){
-  // alpha is rotation around Z axis (degrees). Might need calibration per device.
-  let heading = -e.alpha;
-  if (typeof heading !== 'number') return;
-  // adjust for screen orientation
+  let heading = null;
+
+  // iOS
+  if (typeof e.webkitCompassHeading === "number") {
+    heading = e.webkitCompassHeading; // già in gradi, 0 = Nord
+  } 
+  // Android / altri
+  else if (typeof e.alpha === "number") {
+    heading = e.alpha; // usa alpha direttamente
+  } 
+  else return;
+
+  // compensa rotazione schermo
   const screenAngle = (screen.orientation && screen.orientation.angle) || 0;
   heading = (heading - screenAngle + 360) % 360;
+
+  currentHeading = heading;
+
   if (lastPos) updateLine(lastPos, heading);
 }
 
