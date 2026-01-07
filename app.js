@@ -7,6 +7,7 @@ let userMarker = null;
 let headingLine = null;
 let watchId = null;
 let lastPos = null;
+let currentHeading = null; // aggiungi questa variabile globale
 
 const startBtn = document.getElementById('startBtn');
 const statusEl = document.getElementById('status');
@@ -55,6 +56,8 @@ function handleOrientationEvent(e){
   // adjust for screen orientation
   const screenAngle = (screen.orientation && screen.orientation.angle) || 0;
   heading = - ((heading - screenAngle + 360) % 360);
+  currentHeading = heading; // salva l'heading corrente
+
   if (lastPos) updateLine(lastPos, heading);
 }
 
