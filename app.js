@@ -61,18 +61,12 @@ async function requestDeviceOrientationPermission(){
 }
 
 function handleOrientationEvent(e){
-  if (lineLocked) return; // ← BLOCCA SUBITO
-
+  // alpha is rotation around Z axis (degrees). Might need calibration per device.
   let heading = e.alpha;
   if (typeof heading !== 'number') return;
-
-  const screenAngle =
-    (screen.orientation && screen.orientation.angle) || 0;
-
+  // adjust for screen orientation
+  const screenAngle = (screen.orientation && screen.orientation.angle) || 0;
   heading = (heading - screenAngle + 360) % 360;
-
-  currentHeading = heading;   // <<<<<< salva l’heading
-
   if (lastPos) updateLine(lastPos, heading);
 }
 
