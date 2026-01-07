@@ -66,7 +66,9 @@ function handleOrientationEvent(e){
   // adjust for screen orientation
   const screenAngle = (screen.orientation && screen.orientation.angle) || 0;
   heading = (heading - screenAngle + 360) % 360;
-  if (lastPos && lineVisible && !lineLocked) updateLine(lastPos, heading);
+  if (lastPos && lineVisible && !lineLocked) {
+    updateLine(lastPos, currentHeading);
+  }
 }
 
 function start() {
