@@ -60,12 +60,29 @@ async function requestDeviceOrientationPermission(){
 }
 
 function handleOrientationEvent(e){
-  // alpha is rotation around Z axis (degrees). Might need calibration per device.
-  let heading = e.alpha;
-  if (typeof heading !== 'number') return;
-  // adjust for screen orientation
-  const screenAngle = (screen.orientation && screen.orientation.angle) || 0;
-  heading = (heading - screenAngle + 360) % 360;
+
+  let heading = null;
+
+  // iOS — usa la bussola nativa
+  if (typeof e.webkitCompassHeading === "number") {
+    heading = e.webkitCompassHeading; 
+  }
+
+  // Android — ricava il Nord dal device yaw
+  else if (typeof e.alpha === "number") {
+    // alpha = rotazione rispetto al Nord ma dipende dallo schermo
+    // convertiamo in bearing
+    heading = 360 - e.alpha;
+  }
+
+  if (heading == null || isNaN(heading)) return;
+
+  // normalizza
+  heading = (heading + 360) % 360;
+
+  currentHeading = heading;
+
+  // Se linea NON è ancora fissata, aggiorna anteprima
   if (lastPos && lineVisible && !lineLocked) {
     updateLine(lastPos, currentHeading);
   }
