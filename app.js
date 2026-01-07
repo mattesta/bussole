@@ -12,6 +12,7 @@ let watchId = null;
 let lastPos = null;
 let currentHeading = null;
 let lineVisible = false;
+let lineLocked = false;
 
 const startBtn = document.getElementById('startBtn');
 const statusEl = document.getElementById('status');
@@ -59,13 +60,25 @@ async function requestDeviceOrientationPermission(){
 }
 
 function handleOrientationEvent(e){
-  // alpha is rotation around Z axis (degrees). Might need calibration per device.
-  let heading = -e.alpha;
-  if (typeof heading !== 'number') return;
-  // adjust for screen orientation
-  const screenAngle = (screen.orientation && screen.orientation.angle) || 0;
-  heading = (heading - screenAngle + 360) % 360;
-  if (lastPos) updateLine(lastPos, heading);
+
+  let heading;
+
+  if (typeof e.webkitCompassHeading === "number") {
+    heading = e.webkitCompassHeading;
+  } 
+  else if (typeof e.alpha === "number") {
+    heading = 360 - e.alpha;
+  } 
+  else return;
+
+  heading = (heading + 360) % 360;
+
+  currentHeading = heading;
+
+  // SOLO se linea non bloccata
+  if (lastPos && lineVisible && !lineLocked) {
+    updateLine(lastPos, currentHeading);
+  }
 }
 
 function start() {
@@ -105,17 +118,25 @@ showBtn.addEventListener('click', ()=>{
     setStatus("Aspetto posizione & bussola…");
     return;
   }
+
   lineVisible = true;
+  lineLocked = true;   // <<<<< BLOCCO QUI
+
   updateLine(lastPos, currentHeading);
+
+  setStatus("Linea fissata sulla mappa.");
 });
 
 resetBtn.addEventListener('click', ()=>{
   lineVisible = false;
+  lineLocked = false;
+
   if (headingLine) {
     map.removeLayer(headingLine);
     headingLine = null;
   }
-  setStatus("Linea nascosta. Puoi premere 'Mostra linea' di nuovo.");
+
+  setStatus("Reset. Puoi premere di nuovo 'Mostra linea'.");
 });
 
 
