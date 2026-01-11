@@ -27,7 +27,7 @@ function destLatLng(lat, lon, bearingDeg, distanceMeters){
 function updateLine(position, heading){
   const lat = position.coords.latitude;
   const lon = position.coords.longitude;
-  const distance = 20000; // meters: adjust line length
+  const distance = 30000; // meters: adjust line length
   const dest = destLatLng(lat, lon, heading, distance);
   if (userMarker) userMarker.setLatLng([lat, lon]);
   else userMarker = L.marker([lat, lon]).addTo(map);
@@ -50,11 +50,13 @@ async function requestDeviceOrientationPermission(){
 
 function handleOrientationEvent(e){
   // alpha is rotation around Z axis (degrees). Might need calibration per device.
-  let heading = e.alpha;
+  let heading = null;
+  heading = e.webkitCompassHeading;
   if (typeof heading !== 'number') return;
   // adjust for screen orientation
   const screenAngle = (screen.orientation && screen.orientation.angle) || 0;
   heading = - ((heading - screenAngle + 360) % 360);
+  if (heading === null) return;
   if (lastPos) updateLine(lastPos, heading);
 }
 
