@@ -28,7 +28,7 @@ function greatCirclePoints(lat, lon, bearing, distance, steps){
   const points = [];
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
-    const f = t * t; // ease-in
+    const f = t * t * t; // cubic ease-in
     const d = distance * f;
     points.push(destLatLng(lat, lon, bearing, d));
   }
@@ -38,7 +38,7 @@ function greatCirclePoints(lat, lon, bearing, distance, steps){
 function updateLine(position, heading){
   const lat = position.coords.latitude;
   const lon = position.coords.longitude;
-  const distance = 6000000; // prova 2.000 km
+  const distance = 10000000; // prova 2.000 km
   const points = greatCirclePoints(lat, lon, heading, distance, 120);
   if (userMarker) userMarker.setLatLng([lat, lon]);
   else userMarker = L.marker([lat, lon]).addTo(map);
