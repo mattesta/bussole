@@ -11,11 +11,14 @@ let lineVisible = false;
 let lineLocked = false;
 let lockedPoints = null;
 let lastHeading = null;
-
+let targetMarker = null;
+let targetLatLng = null;
 
 const startBtn = document.getElementById('startBtn');
 const statusEl = document.getElementById('status');
 const showLineBtn = document.getElementById('showLineBtn');
+const searchBtn = document.getElementById('searchBtn');
+const searchBox = document.getElementById('searchBox');
 
 function setStatus(s){ statusEl.textContent = s; }
 
@@ -64,6 +67,26 @@ async function requestDeviceOrientationPermission(){
     }
   }
   return true; // non-iOS or already allowed
+}
+
+function distance(lat1, lon1, lat2, lon2){
+  const R = 6378137;
+  const dLat = (lat2-lat1)*Math.PI/180;
+  const dLon = (lon2-lon1)*Math.PI/180;
+  const a =
+    Math.sin(dLat/2)**2 +
+    Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180) *
+    Math.sin(dLon/2)**2;
+  return 2*R*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function distanceToLine(point, linePoints){
+  let min = Infinity;
+  for (const [lat, lon] of linePoints){
+    const d = distance(point[0], point[1], lat, lon);
+    if (d < min) min = d;
+  }
+  return min;
 }
 
 function handleOrientationEvent(e){
@@ -139,3 +162,26 @@ window.addEventListener('beforeunload', ()=> {
   if (watchId) navigator.geolocation.clearWatch(watchId);
   window.removeEventListener('deviceorientation', handleOrientationEvent);
 });
+
+searchBtn.addEventListener('click', async () => {
+  const q = searchBox.value;
+  if (!q) return;
+
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!data.length) return;
+
+  const lat = parseFloat(data[0].lat);
+  const lon = parseFloat(data[0].lon);
+
+  targetLatLng = [lat, lon];
+
+  if (targetMarker) targetMarker.setLatLng(targetLatLng);
+  else targetMarker = L.marker(targetLatLng).addTo(map);
+
+  map.panTo(targetLatLng);
+});
+
+const d = distanceToLine(targetLatLng, lockedPoints);
+setStatus(`Distanza dalla rotta: ${(d/1000).toFixed(1)} km`);
