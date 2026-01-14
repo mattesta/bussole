@@ -7,10 +7,15 @@ let userMarker = null;
 let headingLine = null;
 let watchId = null;
 let lastPos = null;
+let lineVisible = false;
+let lineLocked = false;
+let lockedPoints = null;
+let lastHeading = null;
 
 
 const startBtn = document.getElementById('startBtn');
 const statusEl = document.getElementById('status');
+const showLineBtn = document.getElementById('showLineBtn');
 
 function setStatus(s){ statusEl.textContent = s; }
 
@@ -37,6 +42,8 @@ function greatCirclePoints(lat, lon, bearing, distance, steps){
 }
 
 function updateLine(position, heading){
+  if (!lineVisible) return;
+  if (lineLocked) return;
   const lat = position.coords.latitude;
   const lon = position.coords.longitude;
   const distance = 10000000; // prova 2.000 km
@@ -67,8 +74,11 @@ function handleOrientationEvent(e){
   // adjust for screen orientation
   const screenAngle = (screen.orientation && screen.orientation.angle) || 0;
   heading = ((heading - screenAngle + 360) % 360);
-  if (heading === null) return;
-  if (lastPos) updateLine(lastPos, heading);
+  lastHeading = heading;
+  // if (heading === null) return; // togliere?
+  if (lastPos && lineVisible && !lineLocked) {
+    updateLine(lastPos, heading);
+  }
 }
 
 function start() {
@@ -102,6 +112,27 @@ function start() {
 }
 
 startBtn.addEventListener('click', start);
+
+showLineBtn.addEventListener('click', () => {
+  if (!lastPos) return;
+
+  lineVisible = true;
+  lineLocked = true;
+
+  const lat = lastPos.coords.latitude;
+  const lon = lastPos.coords.longitude;
+
+  const points = greatCirclePoints(lat, lon, lastHeading, 10000000, 120);
+  lockedPoints = points;
+
+  if (headingLine) {
+    headingLine.setLatLngs(points);
+  } else {
+    headingLine = L.polyline(points, { color: 'red', weight: 3 }).addTo(map);
+  }
+
+  setStatus('Linea fissata');
+});
 
 // cleanup if needed
 window.addEventListener('beforeunload', ()=> {
