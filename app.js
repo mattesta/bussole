@@ -8,6 +8,7 @@ let headingLine = null;
 let watchId = null;
 let lastPos = null;
 
+
 const startBtn = document.getElementById('startBtn');
 const statusEl = document.getElementById('status');
 
@@ -44,7 +45,6 @@ function updateLine(position, heading){
   else userMarker = L.marker([lat, lon]).addTo(map);
   if (headingLine) headingLine.setLatLngs(points);
   else headingLine = L.polyline(points, { color: 'red', weight: 2 }).addTo(map);
-  if (!map.getBounds().contains([lat, lon])) map.setView([lat, lon], 16);
 }
 
 async function requestDeviceOrientationPermission(){
