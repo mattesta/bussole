@@ -14,9 +14,6 @@ let lastHeading = null;
 let targetMarker = null;
 let targetLatLng = null;
 let searchTimeout = null;
-let mapZoomBeforeSearch = null;
-let mapCenterBeforeSearch = null;
-
 
 const startBtn = document.getElementById('startBtn');
 const showLineBtn = document.getElementById('showLineBtn');
@@ -203,16 +200,9 @@ function selectSuggestion(r) {
   if (targetMarker) targetMarker.setLatLng(targetLatLng);
   else targetMarker = L.marker(targetLatLng).addTo(map);
 
+  //map.panTo(targetLatLng);
+
   updateDistanceToTarget();
-
-  restoreMapView();
-  searchBox.blur();
-}
-
-function restoreMapView() {
-  if (mapZoomBeforeSearch !== null && mapCenterBeforeSearch) {
-    map.setView(mapCenterBeforeSearch, mapZoomBeforeSearch, { animate: false });
-  }
 }
 
 document.addEventListener('click', (e) => {
@@ -298,29 +288,5 @@ searchBox.addEventListener('input', () => {
     return;
   }
 
-  searchTimeout = setTimeout(() => {
-    fetchSuggestions(q);
-  }, 300);
-});
-
-
-searchBox.addEventListener('focus', () => {
-  mapZoomBeforeSearch = map.getZoom();
-  mapCenterBeforeSearch = map.getCenter();
-});
-
-div.addEventListener('click', () => {
-  searchBox.value = place.display_name;
-  suggestions.style.display = 'none';
-
-  targetLatLng = [lat, lon];
-  ...
-});
-
-
-
   searchTimeout = setTimeout(() => fetchSuggestions(q), 300);
 });
-
-
-
