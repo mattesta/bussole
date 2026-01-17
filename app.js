@@ -18,6 +18,7 @@ let lastHeading = null;
 let targetMarker = null;
 let targetLatLng = null;
 let searchTimeout = null;
+let smoothHeading = null;
 
 const startBtn = document.getElementById('startBtn');
 const showLineBtn = document.getElementById('showLineBtn');
@@ -26,6 +27,7 @@ const searchBtn = document.getElementById('searchBtn');
 const searchBox = document.getElementById('searchBox');
 const statusEl = document.getElementById('status');
 const suggestionsEl = document.getElementById('suggestions');
+const SMOOTHING = 0.15; // 0.05 = molto fluido, 0.3 = reattivo
 
 function setStatus(s) { statusEl.textContent = s; }
 
@@ -39,6 +41,18 @@ function destLatLng(lat, lon, bearingDeg, distanceMeters){
   const lat2 = Math.asin(Math.sin(lat1)*Math.cos(d/R)+Math.cos(lat1)*Math.sin(d/R)*Math.cos(brng));
   const lon2 = lon1 + Math.atan2(Math.sin(brng)*Math.sin(d/R)*Math.cos(lat1), Math.cos(d/R)-Math.sin(lat1)*Math.sin(lat2));
   return [lat2*180/Math.PI, lon2*180/Math.PI];
+}
+
+function smoothAngle(prev, next, alpha) {
+  if (prev === null) return next;
+
+  const prevRad = prev * Math.PI / 180;
+  const nextRad = next * Math.PI / 180;
+
+  const x = (1 - alpha) * Math.cos(prevRad) + alpha * Math.cos(nextRad);
+  const y = (1 - alpha) * Math.sin(prevRad) + alpha * Math.sin(nextRad);
+
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
 // genera punti lungo la grande circonferenza, con cubic easing per maggiore curvatura visibile
@@ -128,9 +142,11 @@ function handleOrientationEvent(e){
   if (typeof heading !== 'number') return;
   const screenAngle = (screen.orientation && screen.orientation.angle) || 0;
   heading = ((heading - screenAngle + 360) % 360);
-  lastHeading = heading;
+  smoothHeading = smoothAngle(smoothHeading, heading, SMOOTHING);
+  lastHeading = smoothHeading;
+  
   if (lastPos && lineVisible && !lineLocked) {
-    updateLine(lastPos, heading);
+    updateLine(lastPos, smoothHeading);
   }
 }
 
