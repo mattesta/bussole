@@ -14,6 +14,9 @@ let lastHeading = null;
 let targetMarker = null;
 let targetLatLng = null;
 
+let movingLine = null;   // linea che segue il telefono
+let lockedLine = null;   // linea fissata
+
 const startBtn = document.getElementById('startBtn');
 const showLineBtn = document.getElementById('showLineBtn');
 const resetBtn = document.getElementById('resetBtn');
@@ -49,7 +52,7 @@ function greatCirclePoints(lat, lon, bearing, distance, steps){
 
 // aggiorna la linea in movimento (solo se lineVisible e non bloccata)
 function updateLine(position, heading){
-  if (!lineVisible || lineLocked) return;
+  if (!lineVisible) return;
   const lat = position.coords.latitude;
   const lon = position.coords.longitude;
   const distance = 10000000; // 10.000 km
@@ -158,21 +161,25 @@ startBtn.addEventListener('click', start);
 showLineBtn.addEventListener('click', () => {
   if (!lastPos || lastHeading === null) return;
 
-  lineVisible = true;
-  lineLocked = true;
-
   const lat = lastPos.coords.latitude;
   const lon = lastPos.coords.longitude;
 
   const points = greatCirclePoints(lat, lon, lastHeading, 10000000, 120);
   lockedPoints = points;
 
-  if (headingLine) headingLine.setLatLngs(points);
-  else headingLine = L.polyline(points, { color: 'red', weight: 3 }).addTo(map);
+  if (lockedLine) lockedLine.setLatLngs(points);
+  else lockedLine = L.polyline(points, { color: 'red', weight: 3 }).addTo(map);
+
+  // rimuovo la linea in movimento
+  if (movingLine) {
+    map.removeLayer(movingLine);
+    movingLine = null;
+  }
+
+  lineVisible = false;   // la linea in movimento non deve più apparire
+  lineLocked = true;
 
   setStatus('Linea fissata');
-
-  // aggiorna distanza se target già selezionato
   updateDistanceToTarget();
 });
 
