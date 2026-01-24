@@ -28,45 +28,6 @@ const searchBox = document.getElementById('searchBox');
 const statusEl = document.getElementById('status');
 const suggestionsEl = document.getElementById('suggestions');
 const SMOOTHING = 0.15; // 0.05 = molto fluido, 0.3 = reattivo
-// ====== WEBSOCKET ======
-const socket = new WebSocket("ws://localhost:8080");
-
-socket.onopen = () => {
-  console.log("🟢 Connected to server");
-};
-
-socket.onmessage = e => {
-  const data = JSON.parse(e.data);
-
-  if (data.type === "round-start") {
-    onRoundStart(data);
-  }
-
-  if (data.type === "round-end") {
-    onRoundEnd(data);
-  }
-};
-
-
-function onRoundStart(data) {
-  document.getElementById("status").innerHTML =
-    `🎯 Target: <b>${data.cityName}</b> (${data.country})`;
-
-  // reset UI
-  clearLine();
-  enableCompass();
-}
-function onRoundEnd(data) {
-  const { city, lat, lon } = data.target;
-
-  L.marker([lat, lon]).addTo(map)
-    .bindPopup(`🎯 ${city}`)
-    .openPopup();
-
-  document.getElementById("status").innerHTML +=
-    "<br>📍 Posizione rivelata!";
-}
-////////
 
 function setStatus(s) { statusEl.textContent = s; }
 
@@ -293,11 +254,6 @@ showLineBtn.addEventListener('click', () => {
 
   // aggiorna distanza se target già selezionato
   updateDistanceToTarget();
-  socket.send(JSON.stringify({
-  type: "lock-line",
-  bearing: currentBearing
-}));
-
 });
 
 // reset linea
