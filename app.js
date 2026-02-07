@@ -28,6 +28,8 @@ const searchBox = document.getElementById('searchBox');
 const statusEl = document.getElementById('status');
 const suggestionsEl = document.getElementById('suggestions');
 const SMOOTHING = 0.15; // 0.05 = molto fluido, 0.3 = reattivo
+const distanceEl = document.getElementById('distance');
+
 
 function setStatus(s) { statusEl.textContent = s; }
 
@@ -133,7 +135,8 @@ function distanceToLine(point, linePoints){
 function updateDistanceToTarget() {
   if (!targetLatLng || !lockedPoints) return;
   const d = distanceToLine(targetLatLng, lockedPoints);
-  setStatus(`Distanza dalla rotta: ${(d/1000).toFixed(1)} km`);
+  distanceEl.textContent =
+    `Distanza dalla rotta: ${(d/1000).toFixed(1)} km`;
 }
 
 // gestione evento bussola
@@ -266,6 +269,7 @@ resetBtn.addEventListener('click', () => {
   lockedPoints = null;
   lineVisible = false;
   setStatus('Linea nascosta. Premi "Mostra linea" per fissarla di nuovo.');
+  distanceEl.textContent = '';
 });
 
 // ricerca target
