@@ -2,49 +2,59 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <title>Bussole!</title>
 
-  <!-- Leaflet -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
-
-  <!-- Tuo CSS -->
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="style.css"/>
 </head>
 
 <body>
-  <!-- Mappa -->
+
+  <!-- ================= MENU INIZIALE ================= -->
+  <div id="menu">
+    <h2>🧭 Bussole!</h2>
+
+    <p>
+      Punta il telefono verso la città indicata e traccia la rotta più precisa possibile.
+      Vince chi sbaglia meno!
+    </p>
+
+    <button class="modeBtn" data-mode="easy">Facile (bussola visibile)</button>
+    <button class="modeBtn" data-mode="medium">Medio</button>
+    <button class="modeBtn" data-mode="hard">Difficile (direzione + distanza)</button>
+  </div>
+
+
+  <!-- ================= MAPPA ================= -->
   <div id="map"></div>
 
-  <!-- HUD -->
-  <div id="hud">
-    <!-- Ricerca città -->
+
+  <!-- ================= HUD ================= -->
+  <div id="hud" style="display:none;">
+
     <input id="searchBox" placeholder="Cerca una città..." />
     <div id="suggestions"></div>
     <button id="searchBtn">Cerca</button>
 
-    <hr />
+    <hr/>
 
-    <!-- Controlli -->
-    <button id="startBtn">Start (ask permissions)</button>
+    <button id="startBtn">Start</button>
     <button id="showLineBtn" disabled>Show line</button>
     <button id="resetBtn" disabled>Reset</button>
 
-    <!-- Stato -->
+    <!-- SOLO modalità hard -->
+    <div id="distanceInputWrap" style="display:none;">
+      <input id="distanceInput" type="number" placeholder="Distanza km"/>
+    </div>
+
     <div id="status">Bussole! ↑→↓←</div>
     <div id="distance"></div>
+
   </div>
 
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Tuo JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
