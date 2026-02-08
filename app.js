@@ -20,6 +20,30 @@ let targetLatLng = null;
 let searchTimeout = null;
 let smoothHeading = null;
 
+let gameMode = "medium"; // default
+
+const menuEl = document.getElementById('menu');
+const hudEl = document.getElementById('hud');
+const distanceInputWrap = document.getElementById('distanceInputWrap');
+const distanceInput = document.getElementById('distanceInput');
+
+document.querySelectorAll('.modeBtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+
+    gameMode = btn.dataset.mode;
+
+    menuEl.style.display = 'none';
+    hudEl.style.display = 'block';
+
+    if (gameMode === 'hard') {
+      distanceInputWrap.style.display = 'block';
+    }
+
+    setStatus('Modalità: ' + gameMode);
+  });
+});
+
+
 const startBtn = document.getElementById('startBtn');
 const showLineBtn = document.getElementById('showLineBtn');
 const resetBtn = document.getElementById('resetBtn');
@@ -141,6 +165,9 @@ function updateDistanceToTarget() {
 
 // gestione evento bussola
 function handleOrientationEvent(e){
+  if (gameMode === 'easy') {
+    setStatus('Direzione: ' + Math.round(lastHeading) + '°');
+  }
   let heading = e.webkitCompassHeading || e.alpha; // alpha fallback
   if (typeof heading !== 'number') return;
   const screenAngle = (screen.orientation && screen.orientation.angle) || 0;
@@ -247,15 +274,26 @@ showLineBtn.addEventListener('click', () => {
   const lat = lastPos.coords.latitude;
   const lon = lastPos.coords.longitude;
 
-  const points = greatCirclePoints(lat, lon, lastHeading, 20000000, 400);
+  let distanceMeters = 20000000;
+
+  // 🔴 HARD → usa distanza inserita
+  if (gameMode === 'hard') {
+    const km = parseFloat(distanceInput.value);
+    if (!km) {
+      alert("Inserisci una distanza!");
+      return;
+    }
+    distanceMeters = km * 1000;
+  }
+
+  const points = greatCirclePoints(lat, lon, lastHeading, distanceMeters, 400);
   lockedPoints = points;
 
   if (headingLine) headingLine.setLatLngs(points);
-  else headingLine = L.polyline(points, { color: 'red', weight: 3 }).addTo(map);
+  else headingLine = L.polyline(points, { color: 'red', weight: 3, noClip:true }).addTo(map);
 
   setStatus('Linea fissata');
 
-  // aggiorna distanza se target già selezionato
   updateDistanceToTarget();
 });
 
