@@ -192,7 +192,7 @@ function updateDistanceToTarget() {
     d = distanceToLine(targetLatLng, lockedPoints);
 
     distanceEl.textContent =
-      `Distanza dalla rotta: ${(d/1000).toFixed(1)} km`;
+      `Distance from target: ${(d/1000).toFixed(1)} km`;
   }
 }
 
@@ -344,7 +344,7 @@ resetBtn.addEventListener('click', () => {
   lineLocked = false;
   lockedPoints = null;
   lineVisible = false;
-  setStatus('Linea nascosta. Premi "Mostra linea" per fissarla di nuovo.');
+  setStatus('The line was hidden. Press "Show line" to plot a new one.');
   distanceEl.textContent = '';
 });
 
