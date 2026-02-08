@@ -16,13 +16,12 @@
     <h2>🧭 Bussole!</h2>
 
     <p>
-      Punta il telefono verso la città indicata e traccia la rotta più precisa possibile.
-      Vince chi sbaglia meno!
+      Point your phone towards the target, and plot the most precise route possible. Whoever gets closer wins.
     </p>
 
-    <button class="modeBtn" data-mode="easy">Facile (bussola visibile)</button>
-    <button class="modeBtn" data-mode="medium">Medio</button>
-    <button class="modeBtn" data-mode="hard">Difficile (direzione + distanza)</button>
+    <button class="modeBtn" data-mode="easy">Easy (with compass)</button>
+    <button class="modeBtn" data-mode="medium">Medium </button>
+    <button class="modeBtn" data-mode="hard">Difficult (guess the distance too)</button>
   </div>
 
 
@@ -33,9 +32,9 @@
   <!-- ================= HUD ================= -->
   <div id="hud" style="display:none;">
 
-    <input id="searchBox" placeholder="Cerca una città..." />
+    <input id="searchBox" placeholder="Pick any place..." />
     <div id="suggestions"></div>
-    <button id="searchBtn">Cerca</button>
+    <button id="searchBtn">Search</button>
 
     <hr/>
 
@@ -45,7 +44,7 @@
 
     <!-- SOLO modalità hard -->
     <div id="distanceInputWrap" style="display:none;">
-      <input id="distanceInput" type="number" placeholder="Distanza km"/>
+      <input id="distanceInput" type="number" placeholder="Distance (km)"/>
     </div>
 
     <div id="status">Bussole! ↑→↓←</div>
