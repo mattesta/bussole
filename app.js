@@ -67,6 +67,15 @@ const distanceEl = document.getElementById('distance');
 const compassEl = document.getElementById('compassDial');
 const compassContainer = document.getElementById('compass');
 
+function showCompass() {
+  compassEl.classList.remove('hidden');
+}
+
+function hideCompass() {
+  compassEl.classList.add('hidden');
+}
+compassEl.style.display = difficulty === 'easy' ? 'block' : 'none';
+
 
 function setStatus(s) { statusEl.textContent = s; }
 
