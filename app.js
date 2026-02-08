@@ -247,7 +247,7 @@ showLineBtn.addEventListener('click', () => {
   const lat = lastPos.coords.latitude;
   const lon = lastPos.coords.longitude;
 
-  const points = greatCirclePoints(lat, lon, lastHeading, 10000000, 120);
+  const points = greatCirclePoints(lat, lon, lastHeading, 10000000, 4000);
   lockedPoints = points;
 
   if (headingLine) headingLine.setLatLngs(points);
