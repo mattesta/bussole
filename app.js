@@ -35,13 +35,24 @@ document.querySelectorAll('.modeBtn').forEach(btn => {
     menuEl.style.display = 'none';
     hudEl.style.display = 'block';
 
+    // HARD → mostra input distanza
     if (gameMode === 'hard') {
       distanceInputWrap.style.display = 'block';
+    } else {
+      distanceInputWrap.style.display = 'none';
+    }
+
+    // 🧭 BUSSOLA solo EASY
+    if (gameMode === 'easy') {
+      compassContainer.classList.remove('hidden');
+    } else {
+      compassContainer.classList.add('hidden');
     }
 
     setStatus('Modalità: ' + gameMode);
   });
 });
+
 
 
 const startBtn = document.getElementById('startBtn');
@@ -53,6 +64,8 @@ const statusEl = document.getElementById('status');
 const suggestionsEl = document.getElementById('suggestions');
 const SMOOTHING = 0.15; // 0.05 = molto fluido, 0.3 = reattivo
 const distanceEl = document.getElementById('distance');
+const compassEl = document.getElementById('compassDial');
+const compassContainer = document.getElementById('compass');
 
 
 function setStatus(s) { statusEl.textContent = s; }
@@ -195,6 +208,10 @@ function handleOrientationEvent(e){
   heading = ((heading - screenAngle + 360) % 360);
   smoothHeading = smoothAngle(smoothHeading, heading, SMOOTHING);
   lastHeading = smoothHeading;
+  // ruota bussola (modalità facile)
+  if (gameMode === 'easy') {
+    compassEl.style.transform = `rotate(${-smoothHeading}deg)`;
+  }
   
   if (lastPos && lineVisible && !lineLocked) {
     updateLine(lastPos, smoothHeading);
