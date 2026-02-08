@@ -74,8 +74,8 @@ function updateLine(position, heading){
   if (!lineVisible || lineLocked) return;
   const lat = position.coords.latitude;
   const lon = position.coords.longitude;
-  const distance = 10000000; // 10.000 km
-  const points = greatCirclePoints(lat, lon, heading, distance, 120);
+  const distance = 20000000; // 10.000 km
+  const points = greatCirclePoints(lat, lon, heading, distance, 400);
 
   if (userMarker) userMarker.setLatLng([lat, lon]);
   else userMarker = L.marker([lat, lon]).addTo(map);
@@ -247,7 +247,7 @@ showLineBtn.addEventListener('click', () => {
   const lat = lastPos.coords.latitude;
   const lon = lastPos.coords.longitude;
 
-  const points = greatCirclePoints(lat, lon, lastHeading, 10000000, 4000);
+  const points = greatCirclePoints(lat, lon, lastHeading, 20000000, 400);
   lockedPoints = points;
 
   if (headingLine) headingLine.setLatLngs(points);
