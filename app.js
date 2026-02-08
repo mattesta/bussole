@@ -158,10 +158,31 @@ function distanceToLine(point, linePoints){
 // aggiorna la distanza del target dalla linea
 function updateDistanceToTarget() {
   if (!targetLatLng || !lockedPoints) return;
-  const d = distanceToLine(targetLatLng, lockedPoints);
-  distanceEl.textContent =
-    `Distanza dalla rotta: ${(d/1000).toFixed(1)} km`;
+
+  let d;
+
+  // 🔴 HARD → distanza dal punto finale
+  if (gameMode === 'hard') {
+    const lastPoint = lockedPoints[lockedPoints.length - 1];
+
+    d = distance(
+      targetLatLng[0], targetLatLng[1],
+      lastPoint[0], lastPoint[1]
+    );
+
+    distanceEl.textContent =
+      `Errore finale: ${(d/1000).toFixed(1)} km`;
+  }
+
+  // 🟡 MEDIO / 🟢 FACILE → distanza dalla rotta
+  else {
+    d = distanceToLine(targetLatLng, lockedPoints);
+
+    distanceEl.textContent =
+      `Distanza dalla rotta: ${(d/1000).toFixed(1)} km`;
+  }
 }
+
 
 // gestione evento bussola
 function handleOrientationEvent(e){
