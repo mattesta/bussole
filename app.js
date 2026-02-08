@@ -199,9 +199,9 @@ function updateDistanceToTarget() {
 
 // gestione evento bussola
 function handleOrientationEvent(e){
-  if (gameMode === 'easy') {
-    setStatus('Direzione: ' + Math.round(lastHeading) + '°');
-  }
+  //if (gameMode === 'easy') {
+    //setStatus('Direzione: ' + Math.round(lastHeading) + '°');
+  //}
   let heading = e.webkitCompassHeading || e.alpha; // alpha fallback
   if (typeof heading !== 'number') return;
   const screenAngle = (screen.orientation && screen.orientation.angle) || 0;
