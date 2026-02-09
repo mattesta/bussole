@@ -77,17 +77,20 @@ html,body,#map{ height:100%; margin:0; padding:0; }
   transition: transform 0.05s linear;
 }
 
-.dir {
+/* lettere bussola */
+#compassDial .dir {
   position: absolute;
-  font-size: 13px;
-  font-weight: bold;
+  top: 50%;
+  left: 50%;
+  transform-origin: center;
+  font-size: 14px;
 }
 
-/* posizioni + rotazione verso centro */
-.north { top: 6px; left: 50%; transform: translateX(-50%) rotate(180deg); }
-.south { bottom: 6px; left: 50%; transform: translateX(-50%) rotate(0deg); }
-.east  { right: 6px; top: 50%; transform: translateY(-50%) rotate(270deg); }
-.west  { left: 6px; top: 50%; transform: translateY(-50%) rotate(90deg); }
+/* posizionamento radiale */
+.n { transform: rotate(0deg)   translateY(-34px); }
+.e { transform: rotate(90deg)  translateY(-34px); }
+.s { transform: rotate(180deg) translateY(-34px); }
+.w { transform: rotate(270deg) translateY(-34px); }
 
 
 
