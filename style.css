@@ -82,13 +82,13 @@ html,body,#map{ height:100%; margin:0; padding:0; }
   top: 50%;
   left: 50%;
   transform-origin: center;
-  font-size: 14px;
+  transform: translate(-50%, -50%); /* ← QUESTO SISTEMA TUTTO */
 }
 
-.n { transform: rotate(0deg); }
-.e { transform: rotate(90deg); }
-.s { transform: rotate(180deg); }
-.w { transform: rotate(270deg); }
+.n { transform: translate(-50%, -50%) rotate(0deg)   translateY(-34px); }
+.e { transform: translate(-50%, -50%) rotate(90deg)  translateY(-34px); }
+.s { transform: translate(-50%, -50%) rotate(180deg) translateY(-34px); }
+.w { transform: translate(-50%, -50%) rotate(270deg) translateY(-34px); }
 
 
 #compassArrow {
