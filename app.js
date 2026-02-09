@@ -62,7 +62,7 @@ const searchBtn = document.getElementById('searchBtn');
 const searchBox = document.getElementById('searchBox');
 const statusEl = document.getElementById('status');
 const suggestionsEl = document.getElementById('suggestions');
-const SMOOTHING = 0.15; // 0.05 = molto fluido, 0.3 = reattivo
+const SMOOTHING = 0.07; // 0.05 = molto fluido, 0.3 = reattivo
 const distanceEl = document.getElementById('distance');
 const compassEl = document.getElementById('compassDial');
 const compassContainer = document.getElementById('compass');
