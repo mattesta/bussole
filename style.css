@@ -87,10 +87,10 @@ html,body,#map{ height:100%; margin:0; padding:0; }
 }
 
 /* posizionamento radiale */
-.n { transform: rotate(0deg)   translate(-3, -40px); }
-.e { transform: rotate(90deg)  translate(-3, -40px); }
-.s { transform: rotate(180deg) translate(10, -40px); }
-.w { transform: rotate(270deg) translate(0, -40px); }
+.n { transform: rotate(0deg)   translate(5, -50px); }
+.e { transform: rotate(90deg)  translate(5, -50px); }
+.s { transform: rotate(180deg) translate(5, -50px); }
+.w { transform: rotate(270deg) translate(5, -50px); }
 
 
 
