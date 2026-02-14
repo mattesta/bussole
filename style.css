@@ -108,17 +108,15 @@ html,body,#map{ height:100%; margin:0; padding:0; }
 
 .blur-circle {
   position: absolute;
-  width: 30px;   /* JS will update */
-  height: 30px;  /* JS will update */
+  width: 150px;
+  height: 150px;
   border-radius: 50%;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  background: rgba(255,255,255,0.1); /* VERY IMPORTANT */
   pointer-events: none;
-  z-index: 350;
   transform: translate(-50%, -50%);
-
-  /* just a semi-transparent background + blur */
-  background: rgba(255, 255, 255, 0.2); 
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  z-index: 1000;
 }
 
 #timerBox {
