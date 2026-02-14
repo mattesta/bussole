@@ -319,25 +319,18 @@ function handleOrientationEvent(e) {
 
   let heading = null;
 
-  // ----- iOS (Safari) -----
+  // --- iOS ---
   if (typeof e.webkitCompassHeading === "number") {
     heading = e.webkitCompassHeading;
 
-  // ----- Android / others -----
+  // --- Android ---
   } else if (typeof e.alpha === "number") {
-
-    // Android alpha increases clockwise but is device-frame based.
-    // Convert to compass heading:
-    heading = 360 - e.alpha;
-
-    // Some Android devices report alpha relative to screen orientation.
-    // If absolute flag exists and is false, ignore reading.
-    if (e.absolute === false) return;
+    heading = 360 - e.alpha; // Android correction
   }
 
-  if (heading === null) return;
+  if (typeof heading !== "number") return;
 
-  // ----- Screen orientation compensation -----
+  // Adjust for screen rotation
   const screenAngle =
     (screen.orientation && screen.orientation.angle) ||
     window.orientation ||
@@ -345,14 +338,11 @@ function handleOrientationEvent(e) {
 
   heading = (heading - screenAngle + 360) % 360;
 
-  // ----- Normalize -----
-  heading = (heading + 360) % 360;
-
-  // ----- Smooth shortest path -----
-  smoothHeading = smoothAngleShortest(smoothHeading, heading, SMOOTHING);
+  // Smooth
+  smoothHeading = smoothAngle(smoothHeading, heading, SMOOTHING);
   lastHeading = smoothHeading;
 
-  // ----- UI update -----
+  // Rotate compass (easy mode)
   if (gameMode === "easy") {
     compassEl.style.transform = `rotate(${-smoothHeading}deg)`;
   }
