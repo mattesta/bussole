@@ -315,21 +315,38 @@ function updateDistanceToTarget() {
 
 
 // gestione evento bussola
-function handleOrientationEvent(e){
-  //if (gameMode === 'easy') {
-    //setStatus('Direzione: ' + Math.round(lastHeading) + '°');
-  //}
-  let heading = e.webkitCompassHeading || e.alpha; // alpha fallback
-  if (typeof heading !== 'number') return;
-  const screenAngle = (screen.orientation && screen.orientation.angle) || 0;
-  heading = ((heading - screenAngle + 360) % 360);
+function handleOrientationEvent(e) {
+
+  let heading = null;
+
+  // --- iOS ---
+  if (typeof e.webkitCompassHeading === "number") {
+    heading = e.webkitCompassHeading;
+
+  // --- Android ---
+  } else if (typeof e.alpha === "number") {
+    heading = 360 - e.alpha; // Android correction
+  }
+
+  if (typeof heading !== "number") return;
+
+  // Adjust for screen rotation
+  const screenAngle =
+    (screen.orientation && screen.orientation.angle) ||
+    window.orientation ||
+    0;
+
+  heading = (heading - screenAngle + 360) % 360;
+
+  // Smooth
   smoothHeading = smoothAngle(smoothHeading, heading, SMOOTHING);
   lastHeading = smoothHeading;
-  // ruota bussola (modalità facile)
-  if (gameMode === 'easy') {
+
+  // Rotate compass (easy mode)
+  if (gameMode === "easy") {
     compassEl.style.transform = `rotate(${-smoothHeading}deg)`;
   }
-  
+
   if (lastPos && lineVisible && !lineLocked) {
     updateLine(lastPos, smoothHeading);
   }
