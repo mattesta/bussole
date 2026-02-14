@@ -104,3 +104,16 @@ html,body,#map{ height:100%; margin:0; padding:0; }
   visibility: hidden;
 }
 
+/* ===== BLUR CIRCLE ===== */
+
+.blur-circle {
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: none;
+  z-index: 350;
+  transform: translate(-50%, -50%);
+}
