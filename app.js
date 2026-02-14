@@ -317,15 +317,27 @@ function updateDistanceToTarget() {
 // gestione evento bussola
 function handleOrientationEvent(e) {
 
-  // We only trust absolute orientation
-  if (!e.absolute) return;
+  let heading = null;
 
-  if (typeof e.alpha !== "number") return;
+  // ----- iOS (Safari) -----
+  if (typeof e.webkitCompassHeading === "number") {
+    heading = e.webkitCompassHeading;
 
-  // Convert alpha to compass heading
-  let heading = 360 - e.alpha;
+  // ----- Android / others -----
+  } else if (typeof e.alpha === "number") {
 
-  // Screen orientation correction
+    // Android alpha increases clockwise but is device-frame based.
+    // Convert to compass heading:
+    heading = 360 - e.alpha;
+
+    // Some Android devices report alpha relative to screen orientation.
+    // If absolute flag exists and is false, ignore reading.
+    if (e.absolute === false) return;
+  }
+
+  if (heading === null) return;
+
+  // ----- Screen orientation compensation -----
   const screenAngle =
     (screen.orientation && screen.orientation.angle) ||
     window.orientation ||
@@ -333,13 +345,14 @@ function handleOrientationEvent(e) {
 
   heading = (heading - screenAngle + 360) % 360;
 
-  // Normalize
+  // ----- Normalize -----
   heading = (heading + 360) % 360;
 
-  // Smooth using shortest path
+  // ----- Smooth shortest path -----
   smoothHeading = smoothAngleShortest(smoothHeading, heading, SMOOTHING);
   lastHeading = smoothHeading;
 
+  // ----- UI update -----
   if (gameMode === "easy") {
     compassEl.style.transform = `rotate(${-smoothHeading}deg)`;
   }
