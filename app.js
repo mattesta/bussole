@@ -128,7 +128,7 @@ function updateBlurPosition(lat, lon) {
 
   // dynamically adjust circle radius for ~2 km
   const metersPerPixel = 40075016.686 / (256 * Math.pow(2, map.getZoom()));
-  const radiusPixels = 150 / metersPerPixel;
+  const radiusPixels = 2000 / metersPerPixel;
 
   blurCircleEl.style.width = (radiusPixels * 2) + 'px';
   blurCircleEl.style.height = (radiusPixels * 2) + 'px';
