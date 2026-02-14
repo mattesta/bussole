@@ -7,6 +7,15 @@ L.tileLayer(
   }
 ).addTo(map);
 
+map.on('move', () => {
+  if (blurEnabled && blurCircleEl && lastPos) {
+    updateBlurPosition(
+      lastPos.coords.latitude,
+      lastPos.coords.longitude
+    );
+  }
+});
+
 let userMarker = null;
 let headingLine = null;
 let watchId = null;
@@ -27,6 +36,7 @@ let remainingTime = 0;
 let blurEnabled = false;
 let blurCircle = null;
 let blurOverlay = null;
+let blurCircleEl = null;
 
 const menuEl = document.getElementById('menu');
 const hudEl = document.getElementById('hud');
@@ -84,6 +94,45 @@ timerCheckbox.addEventListener('change', () => {
 });
 
 function setStatus(s) { statusEl.textContent = s; }
+
+function showBlurCircle(lat, lon) {
+
+  if (!blurEnabled) return;
+
+  if (!blurCircleEl) {
+    blurCircleEl = document.createElement('div');
+    blurCircleEl.className = 'blur-circle';
+    document.getElementById('map').appendChild(blurCircleEl);
+  }
+
+  updateBlurPosition(lat, lon);
+}
+
+function updateBlurPosition(lat, lon) {
+
+  if (!blurCircleEl) return;
+
+  const point = map.latLngToContainerPoint([lat, lon]);
+
+  blurCircleEl.style.left = point.x + 'px';
+  blurCircleEl.style.top = point.y + 'px';
+
+  // Adjust size dynamically to approximate 2km
+  const metersPerPixel =
+    40075016.686 / (256 * Math.pow(2, map.getZoom()));
+
+  const radiusPixels = 2000 / metersPerPixel;
+
+  blurCircleEl.style.width = (radiusPixels * 2) + 'px';
+  blurCircleEl.style.height = (radiusPixels * 2) + 'px';
+}
+
+function hideBlurCircle() {
+  if (blurCircleEl) {
+    blurCircleEl.remove();
+    blurCircleEl = null;
+  }
+}
 
 function lockMap() {
   map.dragging.disable();
@@ -316,7 +365,7 @@ function start() {
           else userMarker = L.marker([lat, lon]).addTo(map);
           map.setView([lat, lon], 16);
           if (blurEnabled) {
-            createBlur(lat, lon);
+            showBlurCircle(lat, lon);
           }
         }
       }, err=>{
@@ -431,6 +480,7 @@ showLineBtn.addEventListener('click', () => {
 
   updateDistanceToTarget();
   unlockMap();
+  hideBlurCircle();
 });
 
 // reset linea
@@ -445,6 +495,12 @@ resetBtn.addEventListener('click', () => {
   setStatus('The line was hidden. Press "Show line" to plot a new one.');
   distanceEl.textContent = '';
   lockMap();
+  if (blurEnabled && lastPos) {
+    showBlurCircle(
+      lastPos.coords.latitude,
+      lastPos.coords.longitude
+    );
+  }
 });
 
 // ricerca target
