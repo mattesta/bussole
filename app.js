@@ -119,7 +119,6 @@ function showBlurCircle(lat, lon) {
 }
 
 function updateBlurPosition(lat, lon) {
-
   if (!blurCircleEl) return;
 
   const point = map.latLngToContainerPoint([lat, lon]);
@@ -127,11 +126,9 @@ function updateBlurPosition(lat, lon) {
   blurCircleEl.style.left = point.x + 'px';
   blurCircleEl.style.top = point.y + 'px';
 
-  // Adjust size dynamically to approximate 2km
-  const metersPerPixel =
-    40075016.686 / (256 * Math.pow(2, map.getZoom()));
-
-  const radiusPixels = 2000 / metersPerPixel;
+  // dynamically adjust circle radius for ~2 km
+  const metersPerPixel = 40075016.686 / (256 * Math.pow(2, map.getZoom()));
+  const radiusPixels = 150 / metersPerPixel;
 
   blurCircleEl.style.width = (radiusPixels * 2) + 'px';
   blurCircleEl.style.height = (radiusPixels * 2) + 'px';
