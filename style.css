@@ -106,18 +106,27 @@ html,body,#map{ height:100%; margin:0; padding:0; }
 
 /* ===== BLUR CIRCLE ===== */
 
-
 .blur-circle {
   position: absolute;
-  width: 150px;
-  height: 150px;
+  width: 150px;   /* will update dynamically via JS */
+  height: 150px;  /* same */
   border-radius: 50%;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  background: rgba(255,255,255,0.1); /* VERY IMPORTANT */
   pointer-events: none;
-  transform: translate(-50%, -50%);
   z-index: 1000;
+  transform: translate(-50%, -50%);
+
+  /* tiny transparent background to make backdrop-filter work */
+  background: rgba(255,255,255,0.01);
+
+  /* smooth blur effect */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+
+  /* radial gradient for smooth falloff */
+  mask-image: radial-gradient(circle, rgba(0,0,0,1) 0%, rgba(0,0,0,0.7) 40%, rgba(0,0,0,0.3) 70%, rgba(0,0,0,0) 100%);
+  -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,1) 0%, rgba(0,0,0,0.7) 40%, rgba(0,0,0,0.3) 70%, rgba(0,0,0,0) 100%);
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
 }
 
 
