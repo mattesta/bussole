@@ -34,8 +34,6 @@ let timerDuration = 0;
 let timerInterval = null;
 let remainingTime = 0;
 let blurEnabled = false;
-let blurCircle = null;
-let blurOverlay = null;
 let blurCircleEl = null;
 
 const menuEl = document.getElementById('menu');
@@ -88,6 +86,7 @@ const timerCheckbox = document.getElementById('timerCheckbox');
 const timerSettings = document.getElementById('timerSettings');
 const timerDurationInput = document.getElementById('timerDuration');
 const blurCheckbox = document.getElementById('blurCheckbox');
+const timerBox = document.getElementById('timerBox');
 
 timerCheckbox.addEventListener('change', () => {
   timerSettings.style.display = timerCheckbox.checked ? 'block' : 'none';
@@ -153,22 +152,32 @@ function unlockMap() {
 }
 
 function startTimer() {
+
   if (!timerEnabled || timerDuration <= 0) return;
 
   remainingTime = timerDuration;
-  setStatus("Time left: " + remainingTime + "s");
+  timerBox.style.display = 'block';
+  timerBox.textContent = remainingTime + "s";
+
+  clearInterval(timerInterval);
 
   timerInterval = setInterval(() => {
+
     remainingTime--;
-    setStatus("Time left: " + remainingTime + "s");
+    timerBox.textContent = remainingTime + "s";
 
     if (remainingTime <= 0) {
+
       clearInterval(timerInterval);
-      setStatus("Time's up!");
-      showLineBtn.click(); // automatically lock line
+      timerBox.textContent = "0s";
+
+      showLineBtn.click();
+      hideBlurCircle();
     }
+
   }, 1000);
 }
+
 
 function createBlur(lat, lon) {
 
@@ -353,7 +362,9 @@ function start() {
       watchId = navigator.geolocation.watchPosition(pos=>{
         lastPos = pos;
         setStatus('Position acquired. Move phone to set direction.');
-
+        if (timerEnabled && !timerInterval) {
+          startTimer();
+        }
         // abilita i pulsanti quando la posizione è pronta
         showLineBtn.disabled = false;
         resetBtn.disabled = false;
@@ -440,8 +451,6 @@ startBtn.addEventListener('click', () => {
         return;
       }
     }
-
-    startTimer();
   }
   lockMap();
   start();
@@ -500,6 +509,13 @@ resetBtn.addEventListener('click', () => {
       lastPos.coords.latitude,
       lastPos.coords.longitude
     );
+  }
+  clearInterval(timerInterval);
+  timerInterval = null;
+  timerBox.style.display = 'none';
+  
+  if (timerEnabled) {
+    startTimer();
   }
 });
 
