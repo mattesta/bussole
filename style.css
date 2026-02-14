@@ -108,8 +108,8 @@ html,body,#map{ height:100%; margin:0; padding:0; }
 
 .blur-circle {
   position: absolute;
-  width: 30px;
-  height: 30px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
