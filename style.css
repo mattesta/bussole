@@ -108,15 +108,20 @@ html,body,#map{ height:100%; margin:0; padding:0; }
 
 .blur-circle {
   position: absolute;
-  width: 10px;
-  height: 10px;
+  width: 30px;   /* will update dynamically with JS */
+  height: 30px;  /* same */
   border-radius: 50%;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  background: rgba(255,255,255,0.1); /* VERY IMPORTANT */
   pointer-events: none;
+  z-index: 350;
   transform: translate(-50%, -50%);
-  z-index: 1000;
+
+  /* Smooth radial fade from center to edge */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+
+  /* Mask / gradient for smooth intensity falloff */
+  mask-image: radial-gradient(circle, rgba(0,0,0,1) 0%, rgba(0,0,0,0.7) 40%, rgba(0,0,0,0.3) 70%, rgba(0,0,0,0) 100%);
+  -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,1) 0%, rgba(0,0,0,0.7) 40%, rgba(0,0,0,0.3) 70%, rgba(0,0,0,0) 100%);
 }
 
 #timerBox {
