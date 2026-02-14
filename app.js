@@ -255,7 +255,7 @@ async function fetchSuggestions(query) {
   const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`;
 
   const res = await fetch(url, {
-    headers: { 'Accept-Language': 'it' }
+    headers: { 'Accept-Language': 'en' }
   });
   const data = await res.json();
 
