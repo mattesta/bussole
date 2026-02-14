@@ -19,8 +19,14 @@ let targetMarker = null;
 let targetLatLng = null;
 let searchTimeout = null;
 let smoothHeading = null;
-
 let gameMode = "medium"; // default
+let timerEnabled = false;
+let timerDuration = 0;
+let timerInterval = null;
+let remainingTime = 0;
+let blurEnabled = false;
+let blurCircle = null;
+let blurOverlay = null;
 
 const menuEl = document.getElementById('menu');
 const hudEl = document.getElementById('hud');
@@ -29,7 +35,9 @@ const distanceInput = document.getElementById('distanceInput');
 
 document.querySelectorAll('.modeBtn').forEach(btn => {
   btn.addEventListener('click', () => {
-
+    timerEnabled = timerCheckbox.checked;
+    timerDuration = parseInt(timerDurationInput.value) || 0;
+    blurEnabled = blurCheckbox.checked;
     gameMode = btn.dataset.mode;
 
     menuEl.style.display = 'none';
@@ -66,9 +74,72 @@ const SMOOTHING = 0.07; // 0.05 = molto fluido, 0.3 = reattivo
 const distanceEl = document.getElementById('distance');
 const compassEl = document.getElementById('compassDial');
 const compassContainer = document.getElementById('compass');
+const timerCheckbox = document.getElementById('timerCheckbox');
+const timerSettings = document.getElementById('timerSettings');
+const timerDurationInput = document.getElementById('timerDuration');
+const blurCheckbox = document.getElementById('blurCheckbox');
 
+timerCheckbox.addEventListener('change', () => {
+  timerSettings.style.display = timerCheckbox.checked ? 'block' : 'none';
+});
 
 function setStatus(s) { statusEl.textContent = s; }
+
+function lockMap() {
+  map.dragging.disable();
+  map.touchZoom.disable();
+  map.scrollWheelZoom.disable();
+  map.doubleClickZoom.disable();
+  map.boxZoom.disable();
+  map.keyboard.disable();
+}
+
+function unlockMap() {
+  map.dragging.enable();
+  map.touchZoom.enable();
+  map.scrollWheelZoom.enable();
+  map.doubleClickZoom.enable();
+  map.boxZoom.enable();
+  map.keyboard.enable();
+}
+
+function startTimer() {
+  if (!timerEnabled || timerDuration <= 0) return;
+
+  remainingTime = timerDuration;
+  setStatus("Time left: " + remainingTime + "s");
+
+  timerInterval = setInterval(() => {
+    remainingTime--;
+    setStatus("Time left: " + remainingTime + "s");
+
+    if (remainingTime <= 0) {
+      clearInterval(timerInterval);
+      setStatus("Time's up!");
+      showLineBtn.click(); // automatically lock line
+    }
+  }, 1000);
+}
+
+function createBlur(lat, lon) {
+
+  if (!blurEnabled) return;
+
+  const radius = 2000;
+
+  if (blurOverlay) {
+    map.removeLayer(blurOverlay);
+  }
+
+  blurOverlay = L.circle([lat, lon], {
+    radius: radius,
+    fillColor: 'black',
+    fillOpacity: 0.7,
+    stroke: false,
+    interactive: false
+  }).addTo(map);
+}
+
 
 // calcola nuova posizione partendo da lat, lon, bearing e distanza
 function destLatLng(lat, lon, bearingDeg, distanceMeters){
@@ -244,6 +315,9 @@ function start() {
           if (userMarker) userMarker.setLatLng([lat, lon]);
           else userMarker = L.marker([lat, lon]).addTo(map);
           map.setView([lat, lon], 16);
+          if (blurEnabled) {
+            createBlur(lat, lon);
+          }
         }
       }, err=>{
         setStatus('Geolocation error: ' + err.message);
@@ -300,7 +374,30 @@ document.addEventListener('click', (e) => {
 });
 
 
-startBtn.addEventListener('click', start);
+startBtn.addEventListener('click', () => {
+
+  // validation before starting timer
+  if (timerEnabled) {
+
+    if (!targetLatLng) {
+      alert("Select a target location first!");
+      return;
+    }
+
+    if (gameMode === 'hard') {
+      const km = parseFloat(distanceInput.value);
+      if (!km) {
+        alert("Insert distance for hard mode!");
+        return;
+      }
+    }
+
+    startTimer();
+  }
+  lockMap();
+  start();
+});
+
 
 // mostra linea fissata
 showLineBtn.addEventListener('click', () => {
@@ -330,9 +427,10 @@ showLineBtn.addEventListener('click', () => {
   if (headingLine) headingLine.setLatLngs(points);
   else headingLine = L.polyline(points, { color: 'red', weight: 3, noClip:true }).addTo(map);
 
-  setStatus('Linea fissata');
+  setStatus('Plotted line');
 
   updateDistanceToTarget();
+  unlockMap();
 });
 
 // reset linea
@@ -346,6 +444,7 @@ resetBtn.addEventListener('click', () => {
   lineVisible = false;
   setStatus('The line was hidden. Press "Show line" to plot a new one.');
   distanceEl.textContent = '';
+  lockMap();
 });
 
 // ricerca target
