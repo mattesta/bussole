@@ -33,6 +33,7 @@ let timerEnabled = false;
 let timerDuration = 0;
 let timerInterval = null;
 let remainingTime = 0;
+let roundActive = false;
 let blurEnabled = false;
 let blurCircleEl = null;
 
@@ -349,7 +350,7 @@ function start() {
       watchId = navigator.geolocation.watchPosition(pos=>{
         lastPos = pos;
         setStatus('Position acquired. Move phone to set direction.');
-        if (timerEnabled && !timerInterval) {
+        if (timerEnabled && roundActive && !timerInterval) {
           startTimer();
         }
         // abilita i pulsanti quando la posizione è pronta
@@ -439,6 +440,7 @@ startBtn.addEventListener('click', () => {
       }
     }
   }
+  roundActive = true;
   lockMap();
   start();
 });
@@ -447,6 +449,7 @@ startBtn.addEventListener('click', () => {
 // mostra linea fissata
 showLineBtn.addEventListener('click', () => {
   if (lineLocked) return;
+  roundActive = false;
   // Stop timer if running
   if (timerInterval) {
     clearInterval(timerInterval);
