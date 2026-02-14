@@ -44,8 +44,19 @@ const distanceInput = document.getElementById('distanceInput');
 document.querySelectorAll('.modeBtn').forEach(btn => {
   btn.addEventListener('click', () => {
     timerEnabled = timerCheckbox.checked;
-    timerDuration = parseInt(timerDurationInput.value) || 0;
     blurEnabled = blurCheckbox.checked;
+    
+    if (timerEnabled) {
+      const value = parseInt(timerDurationInput.value);
+    
+      if (!value || value <= 0) {
+        alert("Insert a valid timer duration in seconds.");
+        return;
+      }
+    
+      timerDuration = value;
+    }
+        
     gameMode = btn.dataset.mode;
 
     menuEl.style.display = 'none';
@@ -177,27 +188,6 @@ function startTimer() {
 
   }, 1000);
 }
-
-
-function createBlur(lat, lon) {
-
-  if (!blurEnabled) return;
-
-  const radius = 2000;
-
-  if (blurOverlay) {
-    map.removeLayer(blurOverlay);
-  }
-
-  blurOverlay = L.circle([lat, lon], {
-    radius: radius,
-    fillColor: 'black',
-    fillOpacity: 0.7,
-    stroke: false,
-    interactive: false
-  }).addTo(map);
-}
-
 
 // calcola nuova posizione partendo da lat, lon, bearing e distanza
 function destLatLng(lat, lon, bearingDeg, distanceMeters){
@@ -459,6 +449,13 @@ startBtn.addEventListener('click', () => {
 
 // mostra linea fissata
 showLineBtn.addEventListener('click', () => {
+  if (lineLocked) return;
+  // Stop timer if running
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+    timerBox.style.display = 'none';
+  }
   if (!lastPos || lastHeading === null) return;
 
   lineVisible = true;
