@@ -1,4 +1,8 @@
 html,body,#map{ height:100%; margin:0; padding:0; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
 #map { position:fixed; inset:0; }
 #hud {
   position: absolute; left:10px; top:10px; z-index:400;
