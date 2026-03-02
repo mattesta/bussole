@@ -1,4 +1,24 @@
-const map = L.map('map', { zoomControl: true });
+const map = L.map('map', {
+  zoomControl: true,
+
+  // smooth dragging
+  inertia: true,
+  inertiaDeceleration: 2000,   // lower = more glide
+  inertiaMaxSpeed: 3000,
+
+  // smooth zoom
+  zoomAnimation: true,
+  zoomAnimationThreshold: 4,
+  fadeAnimation: true,
+  markerZoomAnimation: true,
+
+  // allow fractional zoom
+  zoomSnap: 0,
+  zoomDelta: 0.25,
+});
+map.touchZoom.enable();
+map.options.touchZoom = 'center';
+
 L.tileLayer(
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
   {
