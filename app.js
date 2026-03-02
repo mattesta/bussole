@@ -252,6 +252,20 @@ async function requestDeviceOrientationPermission(){
 }
 
 async function fetchSuggestions(query) {
+
+  // Per i miei simpatici amici
+  if (query.toLowerCase().includes("fanculo")) {
+
+    const fakeResult = [{
+      display_name: "Fanculo",
+      lat: null,
+      lon: null,
+      isEasterEgg: true
+    }];
+
+    showSuggestions(fakeResult);
+    return;
+  }
   const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`;
 
   const res = await fetch(url, {
@@ -272,6 +286,12 @@ function distance(lat1, lon1, lat2, lon2){
             Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180) *
             Math.sin(dLon/2)**2;
   return 2*R*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function getRandomEarthCoordinates() {
+  const lat = Math.random() * 180 - 90;     // -90 to +90
+  const lon = Math.random() * 360 - 180;    // -180 to +180
+  return [lat, lon];
 }
 
 // distanza minima di un punto dalla linea
@@ -417,8 +437,18 @@ function showSuggestions(results) {
 }
 
 function selectSuggestion(r) {
-  const lat = parseFloat(r.lat);
-  const lon = parseFloat(r.lon);
+
+  let lat, lon;
+
+  // Still for my friends
+  if (r.isEasterEgg) {
+    const coords = getRandomEarthCoordinates();
+    lat = coords[0];
+    lon = coords[1];
+  } else {
+    lat = parseFloat(r.lat);
+    lon = parseFloat(r.lon);
+  }
 
   targetLatLng = [lat, lon];
   searchBox.value = r.display_name;
@@ -426,8 +456,6 @@ function selectSuggestion(r) {
 
   if (targetMarker) targetMarker.setLatLng(targetLatLng);
   else targetMarker = L.marker(targetLatLng).addTo(map);
-
-  //map.panTo(targetLatLng);
 
   updateDistanceToTarget();
 }
