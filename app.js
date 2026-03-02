@@ -8,16 +8,18 @@ const map = L.map('map', {
 
   // smooth zoom
   zoomAnimation: true,
-  zoomAnimationThreshold: 4,
+  zoomAnimationThreshold: 10,
   fadeAnimation: true,
   markerZoomAnimation: true,
 
   // allow fractional zoom
   zoomSnap: 0,
-  zoomDelta: 0.25,
+  zoomDelta: 1,
 });
 map.touchZoom.enable();
 map.options.touchZoom = 'center';
+map.doubleClickZoom.enable();
+map.options.doubleClickZoom = 'center';
 
 L.tileLayer(
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
