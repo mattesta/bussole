@@ -425,15 +425,18 @@ function start() {
         if (!headingLine) {
           const lat = pos.coords.latitude;
           const lon = pos.coords.longitude;
-          if (userMarker) userMarker.setLatLng([lat, lon]);
-          else userMarker = L.marker([lat, lon]).addTo(map);
-          if (roundActive) {
-            map.setView([lat, lon], map.getZoom(), {
-              animate: false
-            });
-          } else if (!headingLine) {
-            map.setView([lat, lon], 16);
+        
+          if (userMarker) {
+            userMarker.setLatLng([lat, lon]);
+          } else {
+            userMarker = L.marker([lat, lon]).addTo(map);
           }
+        
+          // Keep player centered and use a sensible game zoom
+          map.setView([lat, lon], 16, {
+            animate: false
+          });
+        
           if (blurEnabled) {
             showBlurCircle(lat, lon);
           }
