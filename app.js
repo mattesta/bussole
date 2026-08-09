@@ -1,18 +1,19 @@
 const map = L.map('map', {
   zoomControl: true,
 
-  // smooth dragging
+  rotate: true,
+  bearing: 0,
+  touchRotate: false,
+
   inertia: true,
-  inertiaDeceleration: 2000,   // lower = more glide
+  inertiaDeceleration: 2000,
   inertiaMaxSpeed: 3000,
 
-  // smooth zoom
   zoomAnimation: true,
   zoomAnimationThreshold: 10,
   fadeAnimation: true,
   markerZoomAnimation: true,
 
-  // allow fractional zoom
   zoomSnap: 0,
   zoomDelta: 1,
 });
@@ -384,6 +385,11 @@ function handleOrientationEvent(e) {
   smoothHeading = smoothAngle(smoothHeading, heading, SMOOTHING);
   lastHeading = smoothHeading;
 
+  // Rotate map so phone direction is always towards top
+  if (roundActive) {
+    map.setBearing(smoothHeading);
+  }
+
   // Rotate compass (easy mode)
   if (gameMode === "easy") {
     compassEl.style.transform = `rotate(${-smoothHeading}deg)`;
@@ -421,7 +427,13 @@ function start() {
           const lon = pos.coords.longitude;
           if (userMarker) userMarker.setLatLng([lat, lon]);
           else userMarker = L.marker([lat, lon]).addTo(map);
-          map.setView([lat, lon], 16);
+          if (roundActive) {
+            map.setView([lat, lon], map.getZoom(), {
+              animate: false
+            });
+          } else if (!headingLine) {
+            map.setView([lat, lon], 16);
+          }
           if (blurEnabled) {
             showBlurCircle(lat, lon);
           }
