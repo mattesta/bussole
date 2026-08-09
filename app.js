@@ -234,6 +234,36 @@ function smoothAngle(prev, next, alpha) {
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
+function animateMapBearingTo(targetBearing, duration = 700) {
+  const startBearing = map.getBearing();
+  const startTime = performance.now();
+
+  // shortest rotation direction
+  let delta = ((targetBearing - startBearing + 540) % 360) - 180;
+
+  function animate(now) {
+    const t = Math.min((now - startTime) / duration, 1);
+
+    // ease-in-out
+    const eased = t < 0.5
+      ? 2 * t * t
+      : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+    const bearing = startBearing + delta * eased;
+
+    map.setBearing(bearing);
+
+    if (t < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      map.setBearing(targetBearing);
+    }
+  }
+
+  requestAnimationFrame(animate);
+}
+
+
 // genera punti lungo la grande circonferenza, con cubic easing per maggiore curvatura visibile
 function greatCirclePoints(lat, lon, bearing, distance, steps){
   const points = [];
@@ -387,7 +417,7 @@ function handleOrientationEvent(e) {
 
   // Rotate map so phone direction is always towards top
   if (roundActive) {
-    map.setBearing(smoothHeading);
+    map.setBearing((360 - smoothHeading) % 360);
   }
 
   // Rotate compass (easy mode)
@@ -532,6 +562,10 @@ startBtn.addEventListener('click', () => {
 showLineBtn.addEventListener('click', () => {
   if (lineLocked) return;
   roundActive = false;
+
+  // Smoothly return to north-up
+  animateMapBearingTo(0);
+  
   // Stop timer if running
   if (timerInterval) {
     clearInterval(timerInterval);
@@ -573,6 +607,14 @@ showLineBtn.addEventListener('click', () => {
 
 // reset linea
 resetBtn.addEventListener('click', () => {
+  // Start a new aiming round
+  roundActive = true;
+
+  // Immediately rotate map according to current phone direction
+  if (smoothHeading !== null) {
+    map.setBearing((360 - smoothHeading) % 360);
+  }
+  
   if (headingLine) {
     map.removeLayer(headingLine);
     headingLine = null;
