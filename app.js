@@ -59,6 +59,9 @@ let remainingTime = 0;
 let roundActive = false;
 let blurEnabled = false;
 let blurCircleEl = null;
+let errorLine = null;
+let orientationTrackingStarted = false;
+let lastAbsoluteOrientationAt = 0;
 
 const menuEl = document.getElementById('menu');
 const hudEl = document.getElementById('hud');
@@ -86,21 +89,21 @@ document.querySelectorAll('.modeBtn').forEach(btn => {
     menuEl.style.display = 'none';
     hudEl.style.display = 'block';
 
-    // HARD → mostra input distanza
+    // HARD → show distance input
     if (gameMode === 'hard') {
       distanceInputWrap.style.display = 'block';
     } else {
       distanceInputWrap.style.display = 'none';
     }
 
-    // 🧭 BUSSOLA solo EASY
+    // 🧭 COMPASS in EASY only
     if (gameMode === 'easy') {
       compassContainer.classList.remove('hidden');
     } else {
       compassContainer.classList.add('hidden');
     }
 
-    setStatus('Modalità: ' + gameMode);
+    setStatus('Mode: ' + gameMode);
   });
 });
 
@@ -113,7 +116,7 @@ const searchBtn = document.getElementById('searchBtn');
 const searchBox = document.getElementById('searchBox');
 const statusEl = document.getElementById('status');
 const suggestionsEl = document.getElementById('suggestions');
-const SMOOTHING = 0.07; // 0.05 = molto fluido, 0.3 = reattivo
+const SMOOTHING = 0.07; // 0.05 = very smooth, 0.3 = responsive
 const distanceEl = document.getElementById('distance');
 const compassEl = document.getElementById('compassDial');
 const compassContainer = document.getElementById('compass');
@@ -210,7 +213,7 @@ function startTimer() {
   }, 1000);
 }
 
-// calcola nuova posizione partendo da lat, lon, bearing e distanza
+// Calculate a destination from latitude, longitude, bearing and distance.
 function destLatLng(lat, lon, bearingDeg, distanceMeters){
   const R = 6378137;
   const brng = bearingDeg * Math.PI/180;
@@ -264,7 +267,7 @@ function animateMapBearingTo(targetBearing, duration = 700) {
 }
 
 
-// genera punti lungo la grande circonferenza, con cubic easing per maggiore curvatura visibile
+// Generate points along a great circle, with cubic easing for more visible curvature.
 function greatCirclePoints(lat, lon, bearing, distance, steps){
   const points = [];
   for (let i = 0; i <= steps; i++) {
@@ -276,7 +279,7 @@ function greatCirclePoints(lat, lon, bearing, distance, steps){
   return points;
 }
 
-// aggiorna la linea in movimento (solo se lineVisible e non bloccata)
+// Update the moving line (only while it is visible and unlocked).
 function updateLine(position, heading){
   if (!lineVisible || lineLocked) return;
   const lat = position.coords.latitude;
@@ -291,7 +294,7 @@ function updateLine(position, heading){
   else headingLine = L.polyline(points, { color: 'red', weight: 2 }).addTo(map);
 }
 
-// richiesta permesso per bussola su iOS
+// Request compass permission on iOS.
 async function requestDeviceOrientationPermission(){
   if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
     try {
@@ -306,7 +309,7 @@ async function requestDeviceOrientationPermission(){
 
 async function fetchSuggestions(query) {
 
-  // Per i miei simpatici amici
+  // For my funny friends.
   if (query.toLowerCase().includes("fanculo")) {
 
     const fakeResult = [{
@@ -330,7 +333,7 @@ async function fetchSuggestions(query) {
 }
 
 
-// calcola distanza tra due punti sulla sfera
+// Calculate the distance between two points on the sphere.
 function distance(lat1, lon1, lat2, lon2){
   const R = 6378137;
   const dLat = (lat2-lat1)*Math.PI/180;
@@ -347,24 +350,134 @@ function getRandomEarthCoordinates() {
   return [lat, lon];
 }
 
-// distanza minima di un punto dalla linea
-function distanceToLine(point, linePoints){
-  if (!point || !linePoints) return null;
-  let min = Infinity;
-  for (const [lat, lon] of linePoints){
-    const d = distance(point[0], point[1], lat, lon);
-    if (d < min) min = d;
-  }
-  return min;
+function toUnitVector([lat, lon]) {
+  const phi = lat * Math.PI / 180;
+  const lambda = lon * Math.PI / 180;
+  const cosPhi = Math.cos(phi);
+  return [
+    cosPhi * Math.cos(lambda),
+    cosPhi * Math.sin(lambda),
+    Math.sin(phi)
+  ];
 }
 
-// aggiorna la distanza del target dalla linea
+function dot(a, b) {
+  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+function cross(a, b) {
+  return [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0]
+  ];
+}
+
+function vectorLength(v) {
+  return Math.hypot(v[0], v[1], v[2]);
+}
+
+function normalizeVector(v) {
+  const length = vectorLength(v);
+  if (length < 1e-12) return null;
+  return v.map(value => value / length);
+}
+
+function angleBetween(a, b) {
+  return Math.acos(Math.max(-1, Math.min(1, dot(a, b))));
+}
+
+function vectorToLatLng(v) {
+  return [
+    Math.atan2(v[2], Math.hypot(v[0], v[1])) * 180 / Math.PI,
+    Math.atan2(v[1], v[0]) * 180 / Math.PI
+  ];
+}
+
+// Return the nearest point on a polyline made of great-circle segments.
+// The target-to-route segment is therefore perpendicular to the route on the globe.
+function nearestPointOnLine(point, linePoints) {
+  if (!point || !linePoints || linePoints.length < 2) return null;
+
+  const earthRadius = 6378137;
+  const targetVector = toUnitVector(point);
+  let bestVector = null;
+  let bestAngle = Infinity;
+
+  const consider = candidate => {
+    const candidateAngle = angleBetween(targetVector, candidate);
+    if (candidateAngle < bestAngle) {
+      bestAngle = candidateAngle;
+      bestVector = candidate;
+    }
+  };
+
+  for (let i = 0; i < linePoints.length - 1; i++) {
+    const start = toUnitVector(linePoints[i]);
+    const end = toUnitVector(linePoints[i + 1]);
+    consider(start);
+    consider(end);
+
+    const normal = normalizeVector(cross(start, end));
+    if (!normal) continue;
+
+    const projected = normalizeVector([
+      targetVector[0] - normal[0] * dot(targetVector, normal),
+      targetVector[1] - normal[1] * dot(targetVector, normal),
+      targetVector[2] - normal[2] * dot(targetVector, normal)
+    ]);
+    if (!projected) continue;
+
+    const candidate = dot(targetVector, projected) >= 0
+      ? projected
+      : projected.map(value => -value);
+
+    const segmentAngle = angleBetween(start, end);
+    const candidateIsOnSegment = Math.abs(
+      angleBetween(start, candidate) + angleBetween(candidate, end) - segmentAngle
+    ) < 1e-7;
+
+    if (candidateIsOnSegment) consider(candidate);
+  }
+
+  if (!bestVector) return null;
+  return {
+    point: vectorToLatLng(bestVector),
+    distance: bestAngle * earthRadius
+  };
+}
+
+function drawErrorLine(from, to) {
+  const points = [from, to];
+  if (errorLine) {
+    errorLine.setLatLngs(points);
+  } else {
+    errorLine = L.polyline(points, {
+      color: '#facf0a',
+      weight: 4,
+      opacity: 0.95,
+      interactive: false
+    }).addTo(map);
+  }
+  errorLine.bringToFront();
+}
+
+function removeErrorLine() {
+  if (!errorLine) return;
+  map.removeLayer(errorLine);
+  errorLine = null;
+}
+
+// Update the target's distance from the plotted route.
 function updateDistanceToTarget() {
-  if (!targetLatLng || !lockedPoints) return;
+  if (!targetLatLng || !lockedPoints) {
+    removeErrorLine();
+    return;
+  }
 
   let d;
 
-  // 🔴 HARD → distanza dal punto finale
+  // HARD → distance from the plotted endpoint.
   if (gameMode === 'hard') {
     const lastPoint = lockedPoints[lockedPoints.length - 1];
 
@@ -374,20 +487,35 @@ function updateDistanceToTarget() {
     );
 
     distanceEl.textContent =
-      `Errore finale: ${(d/1000).toFixed(1)} km`;
+      `Final error: ${(d/1000).toFixed(1)} km`;
+    drawErrorLine(targetLatLng, lastPoint);
   }
 
-  // 🟡 MEDIO / 🟢 FACILE → distanza dalla rotta
+  // MEDIUM / EASY → perpendicular distance from the route.
   else {
-    d = distanceToLine(targetLatLng, lockedPoints);
+    const nearest = nearestPointOnLine(targetLatLng, lockedPoints);
+    if (!nearest) return;
+    d = nearest.distance;
 
     distanceEl.textContent =
       `Distance from target: ${(d/1000).toFixed(1)} km`;
+    drawErrorLine(targetLatLng, nearest.point);
   }
 }
 
+function normalizeHeading(value) {
+  return (value % 360 + 360) % 360;
+}
 
-// gestione evento bussola
+function getScreenOrientationAngle() {
+  const angle = screen.orientation && typeof screen.orientation.angle === 'number'
+    ? screen.orientation.angle
+    : (typeof window.orientation === 'number' ? window.orientation : 0);
+  return angle || 0;
+}
+
+// Handle compass data. Absolute orientation is preferred on Android because
+// ordinary deviceorientation may use an arbitrary reference and visibly jump.
 function handleOrientationEvent(e) {
 
   let heading = null;
@@ -398,18 +526,13 @@ function handleOrientationEvent(e) {
 
   // --- Android ---
   } else if (typeof e.alpha === "number") {
-    heading = 360 - e.alpha; // Android correction
+    heading = 360 - e.alpha;
   }
 
   if (typeof heading !== "number") return;
 
   // Adjust for screen rotation
-  const screenAngle =
-    (screen.orientation && screen.orientation.angle) ||
-    window.orientation ||
-    0;
-
-  heading = (heading - screenAngle + 360) % 360;
+  heading = normalizeHeading(heading + getScreenOrientationAngle());
 
   // Smooth
   smoothHeading = smoothAngle(smoothHeading, heading, SMOOTHING);
@@ -430,7 +553,25 @@ function handleOrientationEvent(e) {
   }
 }
 
-// avvio del tracking
+function handleAbsoluteOrientationEvent(e) {
+  if (typeof e.webkitCompassHeading !== 'number' && typeof e.alpha !== 'number') return;
+  lastAbsoluteOrientationAt = performance.now();
+  handleOrientationEvent(e);
+}
+
+function handleFallbackOrientationEvent(e) {
+  if (performance.now() - lastAbsoluteOrientationAt < 1000) return;
+  handleOrientationEvent(e);
+}
+
+function startOrientationTracking() {
+  if (orientationTrackingStarted) return;
+  orientationTrackingStarted = true;
+  window.addEventListener('deviceorientationabsolute', handleAbsoluteOrientationEvent, true);
+  window.addEventListener('deviceorientation', handleFallbackOrientationEvent, true);
+}
+
+// Start tracking.
 function start() {
   startBtn.disabled = true;
   setStatus('Requesting permissions...');
@@ -439,7 +580,7 @@ function start() {
     if (!ok) setStatus('Device orientation permission denied (compass may not work).');
     else setStatus('Waiting for location & orientation...');
 
-    window.addEventListener('deviceorientation', handleOrientationEvent, true);
+    startOrientationTracking();
 
     if (navigator.geolocation) {
       watchId = navigator.geolocation.watchPosition(pos=>{
@@ -448,7 +589,7 @@ function start() {
         if (timerEnabled && roundActive && !timerInterval) {
           startTimer();
         }
-        // abilita i pulsanti quando la posizione è pronta
+        // Enable controls when the position is ready.
         showLineBtn.disabled = false;
         resetBtn.disabled = false;
 
@@ -558,12 +699,12 @@ startBtn.addEventListener('click', () => {
 });
 
 
-// mostra linea fissata
+// Show the locked line.
 showLineBtn.addEventListener('click', () => {
   if (lineLocked) return;
   roundActive = false;
 
-  // Smoothly return to north-up
+  // Smoothly return to north-up.
   animateMapBearingTo(0);
   
   // Stop timer if running
@@ -582,11 +723,11 @@ showLineBtn.addEventListener('click', () => {
 
   let distanceMeters = 20000000;
 
-  // 🔴 HARD → usa distanza inserita
+  // HARD → use the entered distance.
   if (gameMode === 'hard') {
     const km = parseFloat(distanceInput.value);
     if (!km) {
-      alert("Inserisci una distanza!");
+      alert("Enter a distance!");
       return;
     }
     distanceMeters = km * 1000;
@@ -605,7 +746,7 @@ showLineBtn.addEventListener('click', () => {
   hideBlurCircle();
 });
 
-// reset linea
+// Reset the line.
 resetBtn.addEventListener('click', () => {
   // Start a new aiming round
   roundActive = true;
@@ -622,6 +763,7 @@ resetBtn.addEventListener('click', () => {
   lineLocked = false;
   lockedPoints = null;
   lineVisible = false;
+  removeErrorLine();
   setStatus('The line was hidden. Press "Show line" to plot a new one.');
   distanceEl.textContent = '';
   lockMap();
@@ -640,7 +782,7 @@ resetBtn.addEventListener('click', () => {
   }
 });
 
-// ricerca target
+// Search for a target.
 searchBtn.addEventListener('click', async () => {
   const q = searchBox.value;
   if (!q) return;
@@ -660,14 +802,15 @@ searchBtn.addEventListener('click', async () => {
 
   //map.panTo(targetLatLng);
 
-  // aggiorna distanza se linea fissata
+  // Update the distance if the line is locked.
   updateDistanceToTarget();
 });
 
 // cleanup on unload
 window.addEventListener('beforeunload', ()=> {
   if (watchId) navigator.geolocation.clearWatch(watchId);
-  window.removeEventListener('deviceorientation', handleOrientationEvent);
+  window.removeEventListener('deviceorientationabsolute', handleAbsoluteOrientationEvent, true);
+  window.removeEventListener('deviceorientation', handleFallbackOrientationEvent, true);
 });
 
 searchBox.addEventListener('input', () => {
