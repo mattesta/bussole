@@ -18,7 +18,8 @@ const map = L.map('map', {
   zoomDelta: 1,
 });
 map.touchZoom.enable();
-map.options.touchZoom = 'center';
+// Keep the natural pinch centre so zooming and panning can happen together.
+map.options.touchZoom = true;
 map.doubleClickZoom.enable();
 map.options.doubleClickZoom = 'center';
 
@@ -125,7 +126,6 @@ const suggestionsEl = document.getElementById('suggestions');
 const distanceEl = document.getElementById('distance');
 const compassContainer = document.getElementById('compass');
 const compassNeedle = document.getElementById('compassNeedle');
-const compassHeadingEl = document.getElementById('compassHeading');
 const timerCheckbox = document.getElementById('timerCheckbox');
 const timerSettings = document.getElementById('timerSettings');
 const timerDurationInput = document.getElementById('timerDuration');
@@ -470,7 +470,7 @@ function drawErrorLine(from, to) {
   } else {
     errorLine = L.polyline(points, {
       color: '#facf0a',
-      weight: 4,
+      weight: 3,
       opacity: 0.95,
       interactive: false
     }).addTo(map);
@@ -540,10 +540,11 @@ function fitResultView() {
   ];
   const hudHeight = hudEl.getBoundingClientRect().height || 0;
 
-  const bounds = L.latLngBounds(points);
+  const bounds = L.latLngBounds(points).pad(0.15);
+  const resultPadding = gameMode === 'easy' ? 130 : 60;
   const options = {
-    paddingTopLeft: [24, hudHeight + 24],
-    paddingBottomRight: [24, 36],
+    paddingTopLeft: [60, hudHeight + 60],
+    paddingBottomRight: [resultPadding, resultPadding],
     maxZoom: 16,
     animate: true,
     duration: 0.8
@@ -613,7 +614,6 @@ function applyOrientationFrame() {
   if (gameMode === 'easy') {
     compassNeedle.style.transform =
       `translate(-50%, -50%) rotate(${-heading}deg)`;
-    compassHeadingEl.textContent = `${Math.round(heading)}°`;
   }
 
   if (lastPos && lineVisible && !lineLocked) {
@@ -924,8 +924,28 @@ homeBtn.addEventListener('click', () => {
   resetBtn.disabled = true;
   distanceEl.textContent = '';
   compassNeedle.style.transform = 'translate(-50%, -50%) rotate(0deg)';
-  compassHeadingEl.textContent = '—°';
   compassContainer.classList.add('hidden');
+
+  if (targetMarker) {
+    map.removeLayer(targetMarker);
+    targetMarker = null;
+  }
+  targetLatLng = null;
+  searchBox.value = '';
+  distanceInput.value = '';
+  suggestionsEl.innerHTML = '';
+  suggestionsEl.style.display = 'none';
+  clearTimeout(searchTimeout);
+  updateClearSearchButton();
+
+  if (lastPos) {
+    map.setView(
+      [lastPos.coords.latitude, lastPos.coords.longitude],
+      16,
+      { animate: false }
+    );
+  }
+
   distanceInputWrap.style.display = 'none';
   hudEl.style.display = 'none';
   menuEl.style.display = 'flex';
