@@ -37,10 +37,15 @@ body {
   right: 6px;
   width: 22px;
   height: 22px;
+  min-width: 22px;
+  max-width: 22px;
+  max-height: 22px;
+  aspect-ratio: 1 / 1;
   padding: 0;
   transform: translateY(-50%);
   border: 0;
   border-radius: 50%;
+  box-sizing: border-box;
   background: #d7d7d7;
   color: #333;
   font-size: 18px;
@@ -138,7 +143,7 @@ body {
 
 #compassNeedle {
   position: absolute;
-  top: 44%;
+  top: 50%;
   left: 50%;
   width: 5px;
   height: 58px;
@@ -157,7 +162,7 @@ body {
 
 .needleNorth {
   top: 0;
-  background: #facf0a;
+  background: #e53935;
   border-radius: 5px 5px 1px 1px;
 }
 
@@ -169,7 +174,7 @@ body {
 
 #compassCenter {
   position: absolute;
-  top: 44%;
+  top: 50%;
   left: 50%;
   width: 9px;
   height: 9px;
@@ -177,18 +182,6 @@ body {
   border: 2px solid #222;
   border-radius: 50%;
   background: #fff;
-}
-
-#compassHeading {
-  position: absolute;
-  bottom: 5px;
-  left: 0;
-  width: 100%;
-  color: #fff;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  text-align: center;
 }
 
 .hidden {
@@ -209,6 +202,11 @@ body {
 
   #hud button {
     min-height: 34px;
+  }
+
+  #hud #clearSearchBtn {
+    min-height: 22px;
+    height: 22px;
   }
 
   #compass {
