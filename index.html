@@ -53,15 +53,21 @@
   <!-- ================= HUD ================= -->
   <div id="hud" style="display:none;">
 
-    <input id="searchBox" placeholder="Pick any place..." />
-    <div id="suggestions"></div>
-    <button id="searchBtn">Search</button>
+    <div id="searchRow">
+      <div id="searchInputWrap">
+        <input id="searchBox" placeholder="Pick any place..." autocomplete="off" />
+        <button id="clearSearchBtn" type="button" aria-label="Clear search">×</button>
+        <div id="suggestions"></div>
+      </div>
+      <button id="searchBtn" type="button">Search</button>
+    </div>
 
     <hr/>
 
     <button id="startBtn">Start</button>
     <button id="showLineBtn" disabled>Show line</button>
     <button id="resetBtn" disabled>Reset</button>
+    <button id="homeBtn">Home</button>
 
     <!-- Hard mode only -->
     <div id="distanceInputWrap" style="display:none;">
@@ -71,15 +77,15 @@
     <div id="status">Bussole! ↑→↓←</div>
     <div id="distance"></div>
     
-    <!-- Compass (easy mode only) -->
+    <!-- Stable needle compass (easy mode only) -->
     <div id="compass" class="hidden">
-      <div id="compassDial">
-        <span class="dir n">N</span>
-        <span class="dir e">E</span>
-        <span class="dir s">S</span>
-        <span class="dir w">W</span>
+      <div id="compassForwardMarker"></div>
+      <div id="compassNeedle" aria-hidden="true">
+        <span class="needleNorth"></span>
+        <span class="needleSouth"></span>
       </div>
-      <div id="compassArrow">▲</div>
+      <div id="compassCenter"></div>
+      <div id="compassHeading">—°</div>
     </div>
   </div>
 
