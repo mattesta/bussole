@@ -31,6 +31,13 @@ L.tileLayer(
   }
 ).addTo(map);
 
+const whiteMarkerIcon = L.icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  className: 'white-marker-icon'
+});
+
 map.on('move', () => {
   if (blurEnabled && blurCircleEl && lastPos) {
     updateBlurPosition(
@@ -95,7 +102,7 @@ document.querySelectorAll('.modeBtn').forEach(btn => {
 
     // HARD → show distance input
     if (gameMode === 'hard') {
-      distanceInputWrap.style.display = 'block';
+      distanceInputWrap.style.display = 'flex';
     } else {
       distanceInputWrap.style.display = 'none';
     }
@@ -131,12 +138,25 @@ const timerSettings = document.getElementById('timerSettings');
 const timerDurationInput = document.getElementById('timerDuration');
 const blurCheckbox = document.getElementById('blurCheckbox');
 const timerBox = document.getElementById('timerBox');
+const distanceEasterEggEl = document.getElementById('distanceEasterEgg');
 
 timerCheckbox.addEventListener('change', () => {
   timerSettings.style.display = timerCheckbox.checked ? 'block' : 'none';
 });
 
 function setStatus(s) { statusEl.textContent = s; }
+
+function showDistanceEasterEgg() {
+  distanceEasterEggEl.style.top =
+    `${hudEl.getBoundingClientRect().bottom + 18}px`;
+  distanceEasterEggEl.classList.remove('visible');
+  void distanceEasterEggEl.offsetWidth;
+  distanceEasterEggEl.classList.add('visible');
+}
+
+function hideDistanceEasterEgg() {
+  distanceEasterEggEl.classList.remove('visible');
+}
 
 function updateClearSearchButton() {
   clearSearchBtn.style.visibility = searchBox.value ? 'visible' : 'hidden';
@@ -304,7 +324,7 @@ function updateLine(position, heading){
   const points = greatCirclePoints(lat, lon, heading, distance, 400);
 
   if (userMarker) userMarker.setLatLng([lat, lon]);
-  else userMarker = L.marker([lat, lon]).addTo(map);
+  else userMarker = L.marker([lat, lon], { icon: whiteMarkerIcon }).addTo(map);
 
   if (headingLine) headingLine.setLatLngs(points);
   else headingLine = L.polyline(points, { color: 'red', weight: 2 }).addTo(map);
@@ -410,6 +430,43 @@ function vectorToLatLng(v) {
   ];
 }
 
+// Interpolate the shortest great-circle arc so the yellow error segment
+// follows the globe instead of appearing as a straight projected chord.
+function greatCircleArcBetween(from, to) {
+  const start = toUnitVector(from);
+  const end = toUnitVector(to);
+  const omega = angleBetween(start, end);
+  const sinOmega = Math.sin(omega);
+
+  if (omega < 1e-10 || Math.abs(sinOmega) < 1e-10) return [from, to];
+
+  const steps = Math.min(
+    160,
+    Math.max(16, Math.ceil(omega * 180 / Math.PI * 2))
+  );
+  const points = [];
+
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const startWeight = Math.sin((1 - t) * omega) / sinOmega;
+    const endWeight = Math.sin(t * omega) / sinOmega;
+    const point = normalizeVector([
+      startWeight * start[0] + endWeight * end[0],
+      startWeight * start[1] + endWeight * end[1],
+      startWeight * start[2] + endWeight * end[2]
+    ]);
+    const latLng = vectorToLatLng(point);
+    if (points.length) {
+      const previousLongitude = points[points.length - 1][1];
+      while (latLng[1] - previousLongitude > 180) latLng[1] -= 360;
+      while (latLng[1] - previousLongitude < -180) latLng[1] += 360;
+    }
+    points.push(latLng);
+  }
+
+  return points;
+}
+
 // Return the nearest point on a polyline made of great-circle segments.
 // The target-to-route segment is therefore perpendicular to the route on the globe.
 function nearestPointOnLine(point, linePoints) {
@@ -464,7 +521,7 @@ function nearestPointOnLine(point, linePoints) {
 }
 
 function drawErrorLine(from, to) {
-  const points = [from, to];
+  const points = greatCircleArcBetween(from, to);
   if (errorLine) {
     errorLine.setLatLngs(points);
   } else {
@@ -706,7 +763,7 @@ function start() {
           if (userMarker) {
             userMarker.setLatLng([lat, lon]);
           } else {
-            userMarker = L.marker([lat, lon]).addTo(map);
+            userMarker = L.marker([lat, lon], { icon: whiteMarkerIcon }).addTo(map);
           }
         
           // Keep player centered and use a sensible game zoom
@@ -771,7 +828,7 @@ function selectSuggestion(r) {
   dismissSearchKeyboard();
 
   if (targetMarker) targetMarker.setLatLng(targetLatLng);
-  else targetMarker = L.marker(targetLatLng).addTo(map);
+  else targetMarker = L.marker(targetLatLng, { icon: whiteMarkerIcon }).addTo(map);
 
   updateDistanceToTarget();
 }
@@ -811,6 +868,7 @@ startBtn.addEventListener('click', () => {
 showLineBtn.addEventListener('click', () => {
   if (lineLocked) return;
   roundActive = false;
+  hideDistanceEasterEgg();
 
   // Smoothly return to north-up.
   const northUpAnimation = animateMapBearingTo(0);
@@ -837,6 +895,9 @@ showLineBtn.addEventListener('click', () => {
     if (!km) {
       alert("Enter a distance!");
       return;
+    }
+    if (km > 40075) {
+      showDistanceEasterEgg();
     }
     distanceMeters = km * 1000;
   }
@@ -875,6 +936,7 @@ resetBtn.addEventListener('click', () => {
   lockedPoints = null;
   lineVisible = false;
   removeErrorLine();
+  hideDistanceEasterEgg();
   setStatus('The line was hidden. Press "Show line" to plot a new one.');
   distanceEl.textContent = '';
   lockMap();
@@ -915,6 +977,7 @@ homeBtn.addEventListener('click', () => {
     headingLine = null;
   }
   removeErrorLine();
+  hideDistanceEasterEgg();
   hideBlurCircle();
   unlockMap();
   map.setBearing(0);
@@ -971,7 +1034,7 @@ searchBtn.addEventListener('click', async () => {
   updateClearSearchButton();
 
   if (targetMarker) targetMarker.setLatLng(targetLatLng);
-  else targetMarker = L.marker(targetLatLng, { color: 'blue' }).addTo(map);
+  else targetMarker = L.marker(targetLatLng, { icon: whiteMarkerIcon }).addTo(map);
 
   //map.panTo(targetLatLng);
 

@@ -58,6 +58,19 @@ body {
 #distanceInput {
   font-size: 16px;
 }
+#distanceInputWrap {
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+#distanceInput {
+  min-width: 0;
+  flex: 1;
+}
+#distanceUnit {
+  font-size: 14px;
+  font-weight: 600;
+}
 #suggestions {
   position: absolute;
   top: calc(100% + 2px);
@@ -187,6 +200,34 @@ body {
 .hidden {
   display: none !important;
   visibility: hidden;
+}
+
+.white-marker-icon {
+  filter: grayscale(1) brightness(0) invert(1)
+    drop-shadow(0 1px 2px rgba(0,0,0,0.9));
+}
+
+#distanceEasterEgg {
+  position: fixed;
+  left: 50%;
+  z-index: 450;
+  transform: translateX(-50%);
+  opacity: 0;
+  color: white;
+  font-size: clamp(18px, 5vw, 26px);
+  font-weight: 500;
+  white-space: nowrap;
+  text-shadow: 0 2px 7px rgba(0,0,0,0.95);
+  pointer-events: none;
+}
+
+#distanceEasterEgg.visible {
+  animation: distanceEasterEggFadeIn 1.8s ease-out forwards;
+}
+
+@keyframes distanceEasterEggFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @media (max-width: 700px) {
