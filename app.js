@@ -60,8 +60,11 @@ let roundActive = false;
 let blurEnabled = false;
 let blurCircleEl = null;
 let errorLine = null;
+let errorOriginLatLng = null;
 let orientationTrackingStarted = false;
 let lastAbsoluteOrientationAt = 0;
+let pendingHeading = null;
+let orientationFrameId = null;
 
 const menuEl = document.getElementById('menu');
 const hudEl = document.getElementById('hud');
@@ -104,6 +107,7 @@ document.querySelectorAll('.modeBtn').forEach(btn => {
     }
 
     setStatus('Mode: ' + gameMode);
+    requestAnimationFrame(() => map.invalidateSize());
   });
 });
 
@@ -112,14 +116,16 @@ document.querySelectorAll('.modeBtn').forEach(btn => {
 const startBtn = document.getElementById('startBtn');
 const showLineBtn = document.getElementById('showLineBtn');
 const resetBtn = document.getElementById('resetBtn');
+const homeBtn = document.getElementById('homeBtn');
 const searchBtn = document.getElementById('searchBtn');
 const searchBox = document.getElementById('searchBox');
+const clearSearchBtn = document.getElementById('clearSearchBtn');
 const statusEl = document.getElementById('status');
 const suggestionsEl = document.getElementById('suggestions');
-const SMOOTHING = 0.07; // 0.05 = very smooth, 0.3 = responsive
 const distanceEl = document.getElementById('distance');
-const compassEl = document.getElementById('compassDial');
 const compassContainer = document.getElementById('compass');
+const compassNeedle = document.getElementById('compassNeedle');
+const compassHeadingEl = document.getElementById('compassHeading');
 const timerCheckbox = document.getElementById('timerCheckbox');
 const timerSettings = document.getElementById('timerSettings');
 const timerDurationInput = document.getElementById('timerDuration');
@@ -131,6 +137,15 @@ timerCheckbox.addEventListener('change', () => {
 });
 
 function setStatus(s) { statusEl.textContent = s; }
+
+function updateClearSearchButton() {
+  clearSearchBtn.style.visibility = searchBox.value ? 'visible' : 'hidden';
+}
+
+function dismissSearchKeyboard() {
+  searchBox.blur();
+  requestAnimationFrame(() => window.scrollTo(0, 0));
+}
 
 function showBlurCircle(lat, lon) {
 
@@ -238,32 +253,33 @@ function smoothAngle(prev, next, alpha) {
 }
 
 function animateMapBearingTo(targetBearing, duration = 700) {
-  const startBearing = map.getBearing();
-  const startTime = performance.now();
+  return new Promise(resolve => {
+    const startBearing = map.getBearing();
+    const startTime = performance.now();
 
-  // shortest rotation direction
-  let delta = ((targetBearing - startBearing + 540) % 360) - 180;
+    // Shortest rotation direction.
+    const delta = ((targetBearing - startBearing + 540) % 360) - 180;
 
-  function animate(now) {
-    const t = Math.min((now - startTime) / duration, 1);
+    function animate(now) {
+      const t = Math.min((now - startTime) / duration, 1);
 
-    // ease-in-out
-    const eased = t < 0.5
-      ? 2 * t * t
-      : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      // Ease-in-out.
+      const eased = t < 0.5
+        ? 2 * t * t
+        : 1 - Math.pow(-2 * t + 2, 2) / 2;
 
-    const bearing = startBearing + delta * eased;
+      map.setBearing(startBearing + delta * eased);
 
-    map.setBearing(bearing);
-
-    if (t < 1) {
-      requestAnimationFrame(animate);
-    } else {
-      map.setBearing(targetBearing);
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        map.setBearing(targetBearing);
+        resolve();
+      }
     }
-  }
 
-  requestAnimationFrame(animate);
+    requestAnimationFrame(animate);
+  });
 }
 
 
@@ -463,6 +479,7 @@ function drawErrorLine(from, to) {
 }
 
 function removeErrorLine() {
+  errorOriginLatLng = null;
   if (!errorLine) return;
   map.removeLayer(errorLine);
   errorLine = null;
@@ -488,6 +505,7 @@ function updateDistanceToTarget() {
 
     distanceEl.textContent =
       `Final error: ${(d/1000).toFixed(1)} km`;
+    errorOriginLatLng = lastPoint;
     drawErrorLine(targetLatLng, lastPoint);
   }
 
@@ -499,7 +517,42 @@ function updateDistanceToTarget() {
 
     distanceEl.textContent =
       `Distance from target: ${(d/1000).toFixed(1)} km`;
+    errorOriginLatLng = nearest.point;
     drawErrorLine(targetLatLng, nearest.point);
+  }
+}
+
+function unwrapLongitudeNear(referenceLongitude, [lat, lon]) {
+  while (lon - referenceLongitude > 180) lon -= 360;
+  while (lon - referenceLongitude < -180) lon += 360;
+  return [lat, lon];
+}
+
+function fitResultView() {
+  if (hudEl.style.display === 'none' || !lastPos || !targetLatLng || !errorOriginLatLng) return;
+
+  const player = [lastPos.coords.latitude, lastPos.coords.longitude];
+  const referenceLongitude = player[1];
+  const points = [
+    player,
+    unwrapLongitudeNear(referenceLongitude, targetLatLng),
+    unwrapLongitudeNear(referenceLongitude, errorOriginLatLng)
+  ];
+  const hudHeight = hudEl.getBoundingClientRect().height || 0;
+
+  const bounds = L.latLngBounds(points);
+  const options = {
+    paddingTopLeft: [24, hudHeight + 24],
+    paddingBottomRight: [24, 36],
+    maxZoom: 16,
+    animate: true,
+    duration: 0.8
+  };
+
+  if (typeof map.flyToBounds === 'function') {
+    map.flyToBounds(bounds, options);
+  } else {
+    map.fitBounds(bounds, options);
   }
 }
 
@@ -514,42 +567,82 @@ function getScreenOrientationAngle() {
   return angle || 0;
 }
 
-// Handle compass data. Absolute orientation is preferred on Android because
-// ordinary deviceorientation may use an arbitrary reference and visibly jump.
-function handleOrientationEvent(e) {
-
-  let heading = null;
-
-  // --- iOS ---
-  if (typeof e.webkitCompassHeading === "number") {
-    heading = e.webkitCompassHeading;
-
-  // --- Android ---
-  } else if (typeof e.alpha === "number") {
-    heading = 360 - e.alpha;
+// Calculate a tilt-compensated heading from absolute W3C orientation angles.
+// When the phone is flat, alpha alone is both more stable and well-defined.
+function tiltCompensatedHeading(alpha, beta, gamma) {
+  if (typeof alpha !== 'number') return null;
+  if (typeof beta !== 'number' || typeof gamma !== 'number' ||
+      (Math.abs(beta) < 0.5 && Math.abs(gamma) < 0.5)) {
+    return normalizeHeading(360 - alpha);
   }
 
-  if (typeof heading !== "number") return;
+  const toRadians = Math.PI / 180;
+  const x = beta * toRadians;
+  const y = gamma * toRadians;
+  const z = alpha * toRadians;
+  const cX = Math.cos(x);
+  const cY = Math.cos(y);
+  const cZ = Math.cos(z);
+  const sX = Math.sin(x);
+  const sY = Math.sin(y);
+  const sZ = Math.sin(z);
+  const vectorX = -cZ * sY - sZ * sX * cY;
+  const vectorY = -sZ * sY + cZ * sX * cY;
 
-  // Adjust for screen rotation
-  heading = normalizeHeading(heading + getScreenOrientationAngle());
+  return normalizeHeading(Math.atan2(vectorX, vectorY) * 180 / Math.PI);
+}
 
-  // Smooth
-  smoothHeading = smoothAngle(smoothHeading, heading, SMOOTHING);
-  lastHeading = smoothHeading;
+function angularDistance(a, b) {
+  return Math.abs(((b - a + 540) % 360) - 180);
+}
 
-  // Rotate map so phone direction is always towards top
+function applyOrientationFrame() {
+  orientationFrameId = null;
+  if (pendingHeading === null) return;
+
+  const heading = pendingHeading;
+  lastHeading = heading;
+
+  // Keep the phone's direction at the top of the map.
   if (roundActive) {
-    map.setBearing((360 - smoothHeading) % 360);
+    map.setBearing(normalizeHeading(360 - heading));
   }
 
-  // Rotate compass (easy mode)
-  if (gameMode === "easy") {
-    compassEl.style.transform = `rotate(${-smoothHeading}deg)`;
+  // Only one simple needle rotates. The labels no longer form separate,
+  // rapidly moving compositing layers in Mobile Safari.
+  if (gameMode === 'easy') {
+    compassNeedle.style.transform =
+      `translate(-50%, -50%) rotate(${-heading}deg)`;
+    compassHeadingEl.textContent = `${Math.round(heading)}°`;
   }
 
   if (lastPos && lineVisible && !lineLocked) {
-    updateLine(lastPos, smoothHeading);
+    updateLine(lastPos, heading);
+  }
+}
+
+// Handle compass data. iOS supplies a native compass heading; Android uses
+// absolute alpha/beta/gamma values with tilt compensation. Rendering is synced
+// to requestAnimationFrame so sensor bursts cannot overwhelm Safari.
+function handleOrientationEvent(e) {
+  let heading = null;
+
+  if (typeof e.webkitCompassHeading === 'number') {
+    heading = e.webkitCompassHeading;
+  } else if (typeof e.alpha === 'number') {
+    heading = tiltCompensatedHeading(e.alpha, e.beta, e.gamma);
+  }
+
+  if (heading === null || !Number.isFinite(heading)) return;
+  heading = normalizeHeading(heading + getScreenOrientationAngle());
+
+  const change = smoothHeading === null ? 180 : angularDistance(smoothHeading, heading);
+  const smoothing = change > 45 ? 0.65 : change > 15 ? 0.38 : 0.16;
+  smoothHeading = smoothAngle(smoothHeading, heading, smoothing);
+  pendingHeading = smoothHeading;
+
+  if (orientationFrameId === null) {
+    orientationFrameId = requestAnimationFrame(applyOrientationFrame);
   }
 }
 
@@ -569,6 +662,19 @@ function startOrientationTracking() {
   orientationTrackingStarted = true;
   window.addEventListener('deviceorientationabsolute', handleAbsoluteOrientationEvent, true);
   window.addEventListener('deviceorientation', handleFallbackOrientationEvent, true);
+}
+
+function stopOrientationTracking() {
+  if (!orientationTrackingStarted) return;
+  window.removeEventListener('deviceorientationabsolute', handleAbsoluteOrientationEvent, true);
+  window.removeEventListener('deviceorientation', handleFallbackOrientationEvent, true);
+  orientationTrackingStarted = false;
+  lastAbsoluteOrientationAt = 0;
+  pendingHeading = null;
+  if (orientationFrameId !== null) {
+    cancelAnimationFrame(orientationFrameId);
+    orientationFrameId = null;
+  }
 }
 
 // Start tracking.
@@ -660,7 +766,9 @@ function selectSuggestion(r) {
 
   targetLatLng = [lat, lon];
   searchBox.value = r.display_name;
+  updateClearSearchButton();
   suggestionsEl.style.display = 'none';
+  dismissSearchKeyboard();
 
   if (targetMarker) targetMarker.setLatLng(targetLatLng);
   else targetMarker = L.marker(targetLatLng).addTo(map);
@@ -705,7 +813,7 @@ showLineBtn.addEventListener('click', () => {
   roundActive = false;
 
   // Smoothly return to north-up.
-  animateMapBearingTo(0);
+  const northUpAnimation = animateMapBearingTo(0);
   
   // Stop timer if running
   if (timerInterval) {
@@ -744,6 +852,9 @@ showLineBtn.addEventListener('click', () => {
   updateDistanceToTarget();
   unlockMap();
   hideBlurCircle();
+
+  // Once north is up, frame the player, target and yellow-segment origin.
+  northUpAnimation.then(() => requestAnimationFrame(fitResultView));
 });
 
 // Reset the line.
@@ -782,10 +893,50 @@ resetBtn.addEventListener('click', () => {
   }
 });
 
+homeBtn.addEventListener('click', () => {
+  roundActive = false;
+  lineVisible = false;
+  lineLocked = false;
+  lockedPoints = null;
+  smoothHeading = null;
+  lastHeading = null;
+
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
+  stopOrientationTracking();
+  clearInterval(timerInterval);
+  timerInterval = null;
+  timerBox.style.display = 'none';
+
+  if (headingLine) {
+    map.removeLayer(headingLine);
+    headingLine = null;
+  }
+  removeErrorLine();
+  hideBlurCircle();
+  unlockMap();
+  map.setBearing(0);
+
+  startBtn.disabled = false;
+  showLineBtn.disabled = true;
+  resetBtn.disabled = true;
+  distanceEl.textContent = '';
+  compassNeedle.style.transform = 'translate(-50%, -50%) rotate(0deg)';
+  compassHeadingEl.textContent = '—°';
+  compassContainer.classList.add('hidden');
+  distanceInputWrap.style.display = 'none';
+  hudEl.style.display = 'none';
+  menuEl.style.display = 'flex';
+  dismissSearchKeyboard();
+});
+
 // Search for a target.
 searchBtn.addEventListener('click', async () => {
   const q = searchBox.value;
   if (!q) return;
+  dismissSearchKeyboard();
 
   const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`;
   const res = await fetch(url);
@@ -796,6 +947,8 @@ searchBtn.addEventListener('click', async () => {
   const lon = parseFloat(data[0].lon);
 
   targetLatLng = [lat, lon];
+  searchBox.value = data[0].display_name;
+  updateClearSearchButton();
 
   if (targetMarker) targetMarker.setLatLng(targetLatLng);
   else targetMarker = L.marker(targetLatLng, { color: 'blue' }).addTo(map);
@@ -808,13 +961,13 @@ searchBtn.addEventListener('click', async () => {
 
 // cleanup on unload
 window.addEventListener('beforeunload', ()=> {
-  if (watchId) navigator.geolocation.clearWatch(watchId);
-  window.removeEventListener('deviceorientationabsolute', handleAbsoluteOrientationEvent, true);
-  window.removeEventListener('deviceorientation', handleFallbackOrientationEvent, true);
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  stopOrientationTracking();
 });
 
 searchBox.addEventListener('input', () => {
   const q = searchBox.value.trim();
+  updateClearSearchButton();
 
   clearTimeout(searchTimeout);
 
@@ -825,3 +978,13 @@ searchBox.addEventListener('input', () => {
 
   searchTimeout = setTimeout(() => fetchSuggestions(q), 300);
 });
+
+clearSearchBtn.addEventListener('click', () => {
+  searchBox.value = '';
+  suggestionsEl.style.display = 'none';
+  clearTimeout(searchTimeout);
+  updateClearSearchButton();
+  searchBox.focus({ preventScroll: true });
+});
+
+updateClearSearchButton();
