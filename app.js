@@ -73,6 +73,11 @@ let orientationTrackingStarted = false;
 let lastAbsoluteOrientationAt = 0;
 let pendingHeading = null;
 let orientationFrameId = null;
+const randomTargets = Array.isArray(window.BUSSOLE_TARGETS)
+  ? window.BUSSOLE_TARGETS
+  : [];
+const usedRandomTargets = new Set();
+let lastRandomTargetKey = null;
 
 const menuEl = document.getElementById('menu');
 const hudEl = document.getElementById('hud');
@@ -126,6 +131,7 @@ const showLineBtn = document.getElementById('showLineBtn');
 const resetBtn = document.getElementById('resetBtn');
 const homeBtn = document.getElementById('homeBtn');
 const searchBtn = document.getElementById('searchBtn');
+const randomBtn = document.getElementById('randomBtn');
 const searchBox = document.getElementById('searchBox');
 const clearSearchBtn = document.getElementById('clearSearchBtn');
 const statusEl = document.getElementById('status');
@@ -160,6 +166,69 @@ function hideDistanceEasterEgg() {
 
 function updateClearSearchButton() {
   clearSearchBtn.style.visibility = searchBox.value ? 'visible' : 'hidden';
+}
+
+function setRandomButtonState(hasRandomTarget) {
+  randomBtn.textContent = hasRandomTarget ? 'Skip' : 'Random';
+  randomBtn.setAttribute(
+    'aria-label',
+    hasRandomTarget ? 'Skip this random target' : 'Choose a random target'
+  );
+}
+
+function targetKey(target) {
+  return `${target.name}|${target.lat}|${target.lon}`;
+}
+
+function weightedRandom(items) {
+  const totalWeight = items.reduce((sum, item) => sum + (item.weight || 1), 0);
+  let choice = Math.random() * totalWeight;
+  for (const item of items) {
+    choice -= item.weight || 1;
+    if (choice <= 0) return item;
+  }
+  return items[items.length - 1];
+}
+
+function chooseRandomTarget() {
+  if (!randomTargets.length) return null;
+
+  // Category odds are independent from catalogue size, so hundreds of UNESCO
+  // sites cannot make capitals or famous cities unnaturally rare.
+  const roll = Math.random();
+  const category = roll < 0.35 ? 'capital' : roll < 0.70 ? 'city' : 'landmark';
+  let candidates = randomTargets.filter(target =>
+    target.category === category &&
+    !usedRandomTargets.has(targetKey(target)) &&
+    targetKey(target) !== lastRandomTargetKey
+  );
+
+  if (!candidates.length) {
+    candidates = randomTargets.filter(target =>
+      !usedRandomTargets.has(targetKey(target)) &&
+      targetKey(target) !== lastRandomTargetKey
+    );
+  }
+  if (!candidates.length) {
+    usedRandomTargets.clear();
+    candidates = randomTargets.filter(target => targetKey(target) !== lastRandomTargetKey);
+  }
+
+  return weightedRandom(candidates);
+}
+
+function setTarget(lat, lon, label, isRandom = false) {
+  targetLatLng = [lat, lon];
+  searchBox.value = label;
+  updateClearSearchButton();
+  suggestionsEl.style.display = 'none';
+  dismissSearchKeyboard();
+  setRandomButtonState(isRandom);
+
+  if (targetMarker) targetMarker.setLatLng(targetLatLng);
+  else targetMarker = L.marker(targetLatLng, { icon: whiteMarkerIcon }).addTo(map);
+
+  updateDistanceToTarget();
 }
 
 function dismissSearchKeyboard() {
@@ -821,16 +890,7 @@ function selectSuggestion(r) {
     lon = parseFloat(r.lon);
   }
 
-  targetLatLng = [lat, lon];
-  searchBox.value = r.display_name;
-  updateClearSearchButton();
-  suggestionsEl.style.display = 'none';
-  dismissSearchKeyboard();
-
-  if (targetMarker) targetMarker.setLatLng(targetLatLng);
-  else targetMarker = L.marker(targetLatLng, { icon: whiteMarkerIcon }).addTo(map);
-
-  updateDistanceToTarget();
+  setTarget(lat, lon, r.display_name);
 }
 
 document.addEventListener('click', (e) => {
@@ -1000,6 +1060,7 @@ homeBtn.addEventListener('click', () => {
   suggestionsEl.style.display = 'none';
   clearTimeout(searchTimeout);
   updateClearSearchButton();
+  setRandomButtonState(false);
 
   if (lastPos) {
     map.setView(
@@ -1029,17 +1090,21 @@ searchBtn.addEventListener('click', async () => {
   const lat = parseFloat(data[0].lat);
   const lon = parseFloat(data[0].lon);
 
-  targetLatLng = [lat, lon];
-  searchBox.value = data[0].display_name;
-  updateClearSearchButton();
+  setTarget(lat, lon, data[0].display_name);
+});
 
-  if (targetMarker) targetMarker.setLatLng(targetLatLng);
-  else targetMarker = L.marker(targetLatLng, { icon: whiteMarkerIcon }).addTo(map);
+randomBtn.addEventListener('click', () => {
+  const target = chooseRandomTarget();
+  if (!target) {
+    alert('The random target catalogue is unavailable.');
+    return;
+  }
 
-  //map.panTo(targetLatLng);
-
-  // Update the distance if the line is locked.
-  updateDistanceToTarget();
+  const key = targetKey(target);
+  usedRandomTargets.add(key);
+  lastRandomTargetKey = key;
+  const label = target.country ? `${target.name}, ${target.country}` : target.name;
+  setTarget(target.lat, target.lon, label, true);
 });
 
 // cleanup on unload
@@ -1051,6 +1116,7 @@ window.addEventListener('beforeunload', ()=> {
 searchBox.addEventListener('input', () => {
   const q = searchBox.value.trim();
   updateClearSearchButton();
+  setRandomButtonState(false);
 
   clearTimeout(searchTimeout);
 
@@ -1067,7 +1133,9 @@ clearSearchBtn.addEventListener('click', () => {
   suggestionsEl.style.display = 'none';
   clearTimeout(searchTimeout);
   updateClearSearchButton();
+  setRandomButtonState(false);
   searchBox.focus({ preventScroll: true });
 });
 
 updateClearSearchButton();
+setRandomButtonState(false);

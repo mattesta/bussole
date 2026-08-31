@@ -1,36 +1,27 @@
-# My Project
+# Bussole!
 
-This project is a TypeScript application that serves as an entry point for initializing application logic, configurations, middleware, and route handling.
+A mobile geography game: aim your phone towards a target, draw a great-circle
+route and see how close you get.
 
-## Table of Contents
+The game runs as a static site on GitHub Pages:
+<https://mattesta.github.io/bussole/>
 
-- [Installation](#installation)
-- [Usage](#usage)
-- [Contributing](#contributing)
-- [License](#license)
+## Random targets
 
-## Installation
+`targets.js` contains the catalogue used by the **Random / Skip** control. It is
+generated from Wikidata and English Wikipedia and balances three categories:
+capitals and territorial administrative centres, internationally familiar
+cities, and iconic places. Selection weights favour familiar entries without
+excluding the catalogue's long tail.
 
-To install the project dependencies, run the following command:
+To refresh the catalogue:
 
-```
-npm install
-```
-
-## Usage
-
-To start the application, use the following command:
-
-```
-npm start
+```sh
+python scripts/build_targets.py
 ```
 
-Make sure to have TypeScript installed globally or as a project dependency.
+The build validates coordinates, unique identifiers, category coverage and the
+presence of remote territories such as the Pitcairn Islands.
 
-## Contributing
-
-Contributions are welcome! Please open an issue or submit a pull request for any improvements or bug fixes.
-
-## License
-
-This project is licensed under the MIT License. See the LICENSE file for more details.
+Location data is derived from [Wikidata](https://www.wikidata.org/) (CC0) and
+[Wikipedia](https://www.wikipedia.org/).
