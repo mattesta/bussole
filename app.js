@@ -1,7 +1,8 @@
 const map = L.map('map', {
-  zoomControl: true,
+  zoomControl: false,
 
   rotate: true,
+  rotateControl: false,
   bearing: 0,
   touchRotate: false,
 
