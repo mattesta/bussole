@@ -1,0 +1,40 @@
+{
+  "rules": {
+    "rooms": {
+      "$room": {
+        ".write": "auth != null && !data.exists() && newData.child('players').child(auth.uid).exists()",
+        "meta": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('rooms').child($room).child('players').child(auth.uid).exists() && (data.child('hostId').val() === auth.uid || root.child('rooms').child($room).child('meta/hostId').val() === auth.uid || root.child('rooms').child($room).child('players').child(root.child('rooms').child($room).child('meta/hostId').val()).child('connected').val() === false)",
+          ".validate": "newData.hasChildren(['hostId', 'phase', 'round']) && newData.child('phase').val().matches(/^(lobby|aiming|revealed|closed)$/)"
+        },
+        "settings": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('rooms').child($room).child('meta/hostId').val() === auth.uid",
+          ".validate": "newData.hasChildren(['mode', 'timerEnabled', 'timerDuration']) && newData.child('mode').val().matches(/^(easy|medium|hard)$/) && newData.child('timerEnabled').isBoolean() && newData.child('timerDuration').isNumber() && newData.child('timerDuration').val() >= 10 && newData.child('timerDuration').val() <= 3600"
+        },
+        "target": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('rooms').child($room).child('meta/hostId').val() === auth.uid",
+          ".validate": "newData.hasChildren(['lat', 'lon', 'label']) && newData.child('lat').isNumber() && newData.child('lat').val() >= -90 && newData.child('lat').val() <= 90 && newData.child('lon').isNumber() && newData.child('lon').val() >= -180 && newData.child('lon').val() <= 180 && newData.child('label').isString() && newData.child('label').val().length <= 300"
+        },
+        "players": {
+          ".read": "auth != null",
+          "$uid": {
+            ".write": "auth != null && (auth.uid === $uid || root.child('rooms').child($room).child('meta/hostId').val() === auth.uid)",
+            ".validate": "newData.hasChildren(['name', 'colorIndex', 'connected', 'joinedAt', 'ready', 'locked', 'wins']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 24 && newData.child('colorIndex').isNumber() && newData.child('colorIndex').val() >= 0 && newData.child('colorIndex').val() < 8 && newData.child('wins').isNumber() && newData.child('wins').val() >= 0"
+          }
+        },
+        "submissions": {
+          "$round": {
+            ".read": "auth != null && root.child('rooms').child($room).child('meta/phase').val() === 'revealed'",
+            "$uid": {
+              ".write": "auth.uid === $uid && root.child('rooms').child($room).child('meta/phase').val() === 'aiming'",
+              ".validate": "newData.hasChildren(['lat', 'lon', 'heading', 'distanceMeters']) && newData.child('lat').isNumber() && newData.child('lat').val() >= -90 && newData.child('lat').val() <= 90 && newData.child('lon').isNumber() && newData.child('lon').val() >= -180 && newData.child('lon').val() <= 180 && newData.child('heading').isNumber() && newData.child('heading').val() >= 0 && newData.child('heading').val() < 360 && newData.child('distanceMeters').isNumber() && newData.child('distanceMeters').val() > 0 && newData.child('distanceMeters').val() <= 100000000000"
+            }
+          }
+        }
+      }
+    }
+  }
+}

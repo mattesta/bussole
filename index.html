@@ -26,6 +26,7 @@
     <button class="modeBtn" data-mode="easy">Easy (with compass)</button>
     <button class="modeBtn" data-mode="medium">Medium </button>
     <button class="modeBtn" data-mode="hard">Difficult (guess the distance too)</button>
+    <button id="multiplayerBtn" type="button">Play multiplayer</button>
     <hr/>
     <label>
       <input type="checkbox" id="timerCheckbox">
@@ -41,6 +42,50 @@
       Enable blur around player
     </label>
   </div>
+
+  <div id="multiplayerPanel" class="multiplayer-panel hidden" aria-live="polite">
+    <button id="multiplayerClose" class="panel-close" type="button" aria-label="Close">×</button>
+    <section id="multiplayerEntry">
+      <h2>Multiplayer</h2>
+      <p>Create a room or join your friends.</p>
+      <button id="createRoomBtn" type="button">Create room</button>
+      <button id="showJoinRoomBtn" type="button">Join room</button>
+      <div id="joinRoomForm" class="hidden">
+        <input id="roomCodeInput" inputmode="text" maxlength="8" placeholder="XX-XX-XX" autocomplete="off">
+        <button id="joinRoomBtn" type="button">Join</button>
+      </div>
+    </section>
+    <section id="multiplayerLobby" class="hidden">
+      <div class="room-code-label">Room <strong id="roomCodeLabel"></strong></div>
+      <label class="player-name-label">Explorer name
+        <input id="playerNameInput" maxlength="24" autocomplete="off">
+      </label>
+      <ul id="roomPlayers"></ul>
+      <div id="hostControls" class="hidden">
+        <label>Difficulty
+          <select id="roomMode"><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Difficult</option></select>
+        </label>
+        <label><input id="roomTimerEnabled" type="checkbox"> Timer</label>
+        <input id="roomTimerDuration" type="number" min="10" value="60" aria-label="Timer seconds">
+        <div class="room-target-row">
+          <input id="roomTargetInput" placeholder="Choose the target…" autocomplete="off">
+          <button id="roomTargetSearch" type="button">Search</button>
+          <button id="roomTargetRandom" type="button">Random</button>
+        </div>
+        <button id="startRoomRound" type="button" disabled>Start round</button>
+      </div>
+      <p id="roomMessage">Waiting for the host…</p>
+      <button id="leaveRoomBtn" type="button">Leave room</button>
+    </section>
+    <section id="multiplayerResults" class="hidden">
+      <h2>Round results</h2>
+      <ol id="roundRanking"></ol>
+      <button id="nextRoundBtn" class="hidden" type="button">Next round</button>
+      <button id="resultsLeaveBtn" type="button">Leave room</button>
+    </section>
+  </div>
+
+  <div id="roomBadge" class="room-badge hidden"><span id="roomBadgeCode"></span><span id="roomProgress"></span></div>
   
 
 
@@ -96,5 +141,6 @@
   <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
   <script src="targets.js"></script>
   <script src="app.js"></script>
+  <script type="module" src="multiplayer.js"></script>
 </body>
 </html>

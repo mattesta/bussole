@@ -25,3 +25,17 @@ presence of remote territories such as the Pitcairn Islands.
 
 Location data is derived from [Wikidata](https://www.wikidata.org/) (CC0) and
 [Wikipedia](https://www.wikipedia.org/).
+
+## Multiplayer
+
+Rooms use Firebase Anonymous Authentication and Realtime Database. The client
+configuration is in `firebase-config.js`; database access is restricted by
+`database.rules.json`. Deploy the rules with:
+
+```sh
+npx firebase-tools deploy --only database
+```
+
+Player orientation stays on the device. A round submission sends only the
+player's starting coordinates and locked route, and other players cannot read
+it until the room enters the reveal phase.
