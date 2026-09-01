@@ -137,7 +137,6 @@ async function enterRoom(code) {
   leaving = false;
   hide(entry); show(lobby); hide(resultsPanel);
   byId('roomCodeLabel').textContent = displayCode(code);
-  byId('roomBadgeCode').textContent = displayCode(code);
   show(roomBadge);
   history.replaceState(null, '', `${location.pathname}?room=${displayCode(code)}`);
 
@@ -172,12 +171,10 @@ async function enterRoom(code) {
       byId('roomTargetInput').value = selectedTarget.label;
       roomTargetBanner.textContent = `Target: ${selectedTarget.label}`;
       show(roomTargetBanner);
-      panel.classList.add('has-room-target');
     } else {
       byId('roomTargetInput').value = '';
       roomTargetBanner.textContent = '';
       hide(roomTargetBanner);
-      panel.classList.remove('has-room-target');
     }
     byId('startRoomRound').disabled = !selectedTarget;
   }));
@@ -188,6 +185,7 @@ function renderRoom() {
   host ? show(hostControls) : hide(hostControls);
   byId('nextRoundBtn').classList.toggle('hidden', !host);
   if (roomMeta.phase === 'lobby') {
+    setResultsCollapsed(false);
     panel.classList.remove('results-mode');
     show(panel); show(lobby); hide(entry); hide(resultsPanel);
     roomMessage.textContent = host ? 'Choose a target, then start the round.' : 'Waiting for the host to start…';
@@ -319,13 +317,39 @@ async function showResults(submissions) {
     item.textContent = `${result.name} — ${error}`;
     byId('roundRanking').appendChild(item);
   });
-  show(panel); hide(lobby); hide(entry); show(resultsPanel);
-  panel.classList.add('results-mode');
+  openResultsPanel();
   if (isHost() && scoredRound !== roomMeta.round && Number.isFinite(ranking[0]?.errorMeters)) {
     scoredRound = roomMeta.round;
     const winner = ranking[0].uid;
     await runTransaction(ref(db, roomPath(`players/${winner}/wins`)), value => (value || 0) + 1);
   }
+}
+
+function setResultsCollapsed(collapsed) {
+  roomBadge.classList.toggle('results-collapsed', collapsed);
+  if (collapsed) {
+    roomBadge.setAttribute('role', 'button');
+    roomBadge.setAttribute('tabindex', '0');
+    roomBadge.setAttribute('aria-label', 'Show round results');
+  } else {
+    roomBadge.removeAttribute('role');
+    roomBadge.removeAttribute('tabindex');
+    roomBadge.removeAttribute('aria-label');
+  }
+}
+
+function openResultsPanel() {
+  if (!roomCode || roomMeta?.phase !== 'revealed') return;
+  show(panel); hide(lobby); hide(entry); show(resultsPanel);
+  panel.classList.add('results-mode');
+  setResultsCollapsed(false);
+}
+
+function closeResultsPanel() {
+  if (!roomCode || roomMeta?.phase !== 'revealed' || resultsPanel.classList.contains('hidden')) return false;
+  hide(panel);
+  setResultsCollapsed(true);
+  return true;
 }
 
 async function nextRound() {
@@ -380,7 +404,8 @@ async function leaveRoom() {
   byId('startRoomRound').disabled = true;
   hide(panel); hide(roomBadge); hide(roomTargetBanner); hide(lobby); hide(resultsPanel); show(entry);
   roomTargetBanner.textContent = '';
-  panel.classList.remove('results-mode', 'has-room-target');
+  panel.classList.remove('results-mode');
+  setResultsCollapsed(false);
   document.body.classList.remove('multiplayer-round');
   history.replaceState(null, '', location.pathname);
   window.BussoleGame.returnToMenu();
@@ -394,7 +419,10 @@ function friendlyError(error) {
 }
 
 byId('multiplayerBtn').addEventListener('click', () => { hide(menu); show(panel); show(entry); });
-byId('multiplayerClose').addEventListener('click', () => roomCode ? leaveRoom() : (hide(panel), show(menu)));
+byId('multiplayerClose').addEventListener('click', () => {
+  if (closeResultsPanel()) return;
+  roomCode ? leaveRoom() : (hide(panel), show(menu));
+});
 byId('createRoomBtn').addEventListener('click', createRoom);
 byId('showJoinRoomBtn').addEventListener('click', () => show(byId('joinRoomForm')));
 byId('roomCodeInput').addEventListener('input', event => { event.target.value = displayCode(compactCode(event.target.value)); });
@@ -405,6 +433,13 @@ byId('startRoomRound').addEventListener('click', startRound);
 byId('leaveRoomBtn').addEventListener('click', leaveRoom);
 byId('resultsLeaveBtn').addEventListener('click', leaveRoom);
 byId('nextRoundBtn').addEventListener('click', nextRound);
+roomBadge.addEventListener('click', openResultsPanel);
+roomBadge.addEventListener('keydown', event => {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    openResultsPanel();
+  }
+});
 playerNameInput.addEventListener('change', changeName);
 
 window.BussoleGame.registerMultiplayer({
