@@ -78,6 +78,8 @@ const randomTargets = Array.isArray(window.BUSSOLE_TARGETS)
   : [];
 const usedRandomTargets = new Set();
 let lastRandomTargetKey = null;
+let multiplayerController = null;
+let multiplayerLayers = [];
 
 const menuEl = document.getElementById('menu');
 const hudEl = document.getElementById('hud');
@@ -921,11 +923,30 @@ startBtn.addEventListener('click', () => {
   roundActive = true;
   lockMap();
   start();
+  if (multiplayerController) multiplayerController.markReady();
 });
 
 
 // Show the locked line.
 showLineBtn.addEventListener('click', () => {
+  if (multiplayerController && multiplayerController.isActive()) {
+    if (!lastPos || lastHeading === null) return;
+    const guessedKm = gameMode === 'hard' ? parseFloat(distanceInput.value) : null;
+    if (gameMode === 'hard' && !guessedKm) {
+      alert("Enter a distance!");
+      return;
+    }
+    if (gameMode === 'hard' && guessedKm > 40075) showDistanceEasterEgg();
+    multiplayerController.submitLine({
+      lat: lastPos.coords.latitude,
+      lon: lastPos.coords.longitude,
+      heading: lastHeading,
+      distanceMeters: gameMode === 'hard' ? guessedKm * 1000 : 20000000
+    });
+    showLineBtn.disabled = true;
+    setStatus('Line locked. Waiting for the other explorers…');
+    return;
+  }
   if (lineLocked) return;
   roundActive = false;
   hideDistanceEasterEgg();
@@ -1016,6 +1037,9 @@ resetBtn.addEventListener('click', () => {
 });
 
 homeBtn.addEventListener('click', () => {
+  if (multiplayerController && multiplayerController.isActive()) {
+    multiplayerController.leaveRoom();
+  }
   roundActive = false;
   lineVisible = false;
   lineLocked = false;
@@ -1139,3 +1163,103 @@ clearSearchBtn.addEventListener('click', () => {
 
 updateClearSearchButton();
 setRandomButtonState(false);
+
+function clearMultiplayerLayers() {
+  multiplayerLayers.forEach(layer => map.removeLayer(layer));
+  multiplayerLayers = [];
+}
+
+function renderMultiplayerResults(entries, roundTarget, mode) {
+  clearMultiplayerLayers();
+  roundActive = false;
+  unlockMap();
+  map.setBearing(0);
+  const boundsPoints = [roundTarget];
+  const results = [];
+
+  entries.forEach(entry => {
+    if (!entry.submission) {
+      results.push({ ...entry, errorMeters: null });
+      return;
+    }
+    const submission = entry.submission;
+    const route = greatCirclePoints(
+      submission.lat,
+      submission.lon,
+      submission.heading,
+      submission.distanceMeters,
+      400
+    );
+    const routeLayer = L.polyline(route, {
+      color: entry.color,
+      weight: 3,
+      opacity: 0.9,
+      noClip: true
+    }).addTo(map);
+    multiplayerLayers.push(routeLayer);
+
+    let errorOrigin;
+    let errorMeters;
+    if (mode === 'hard') {
+      errorOrigin = route[route.length - 1];
+      errorMeters = distance(errorOrigin[0], errorOrigin[1], roundTarget[0], roundTarget[1]);
+    } else {
+      const nearest = nearestPointOnLine(roundTarget, route);
+      errorOrigin = nearest.point;
+      errorMeters = nearest.distance;
+    }
+    const errorLayer = L.polyline(greatCircleArcBetween(errorOrigin, roundTarget), {
+      color: '#facf0a',
+      weight: 3,
+      opacity: 0.95,
+      interactive: false
+    }).addTo(map);
+    multiplayerLayers.push(errorLayer);
+    boundsPoints.push([submission.lat, submission.lon], errorOrigin);
+    results.push({ ...entry, errorMeters });
+  });
+
+  if (boundsPoints.length > 1) {
+    map.fitBounds(L.latLngBounds(boundsPoints).pad(0.28), {
+      animate: true,
+      duration: 0.9,
+      paddingTopLeft: [24, Math.max(120, hudEl.getBoundingClientRect().bottom + 20)],
+      paddingBottomRight: [24, 70]
+    });
+  }
+  setStatus('All routes revealed');
+  return results.sort((a, b) =>
+    (a.errorMeters ?? Infinity) - (b.errorMeters ?? Infinity)
+  );
+}
+
+window.BussoleGame = {
+  registerMultiplayer(controller) {
+    multiplayerController = controller;
+  },
+  prepareMultiplayerRound(settings, roundTarget) {
+    clearMultiplayerLayers();
+    timerCheckbox.checked = Boolean(settings.timerEnabled);
+    timerDurationInput.value = settings.timerDuration || 60;
+    blurCheckbox.checked = false;
+    document.querySelector(`.modeBtn[data-mode="${settings.mode}"]`).click();
+    setTarget(roundTarget.lat, roundTarget.lon, roundTarget.label);
+    startBtn.disabled = false;
+    showLineBtn.disabled = true;
+    resetBtn.disabled = true;
+    startBtn.textContent = 'Ready';
+    showLineBtn.textContent = 'Lock line';
+  },
+  revealMultiplayer(entries, roundTarget, mode) {
+    return renderMultiplayerResults(entries, [roundTarget.lat, roundTarget.lon], mode);
+  },
+  resetMultiplayerRound() {
+    clearMultiplayerLayers();
+    startBtn.textContent = 'Start';
+    showLineBtn.textContent = 'Show line';
+  },
+  returnToMenu() {
+    if (hudEl.style.display !== 'none') homeBtn.click();
+    else menuEl.style.display = 'flex';
+  }
+};
