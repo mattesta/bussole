@@ -63,7 +63,7 @@
       <ul id="roomPlayers"></ul>
       <div id="hostControls" class="hidden">
         <label>Difficulty
-          <select id="roomMode"><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Difficult</option></select>
+          <select id="roomMode"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Difficult</option></select>
         </label>
         <label><input id="roomTimerEnabled" type="checkbox"> Timer</label>
         <input id="roomTimerDuration" type="number" min="10" value="60" aria-label="Timer seconds">
@@ -85,6 +85,7 @@
     </section>
   </div>
 
+  <div id="roomTargetBanner" class="room-target-banner hidden" aria-live="polite"></div>
   <div id="roomBadge" class="room-badge hidden"><span id="roomBadgeCode"></span><span id="roomProgress"></span></div>
   
 
