@@ -147,7 +147,6 @@ body {
 }
 
 .multiplayer-panel h2 { margin-top: 0; }
-.multiplayer-panel.has-room-target { padding-top: 66px; }
 .multiplayer-panel button,
 .multiplayer-panel input,
 .multiplayer-panel select { min-height: 40px; font-size: 16px; box-sizing: border-box; }
@@ -168,15 +167,15 @@ body {
 #roomTargetInput { min-width: 0; flex: 1; }
 #roundRanking { padding-left: 28px; }
 #roundRanking li { padding: 7px 3px; }
-.room-badge { position: fixed; right: 10px; bottom: 10px; z-index: 700; display: flex; gap: 10px; padding: 7px 10px; color: white; background: rgba(0,0,0,.72); border-radius: 20px; font-size: 13px; }
+.room-badge { position: fixed; right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); z-index: 700; display: flex; padding: 7px 10px; color: white; background: rgba(0,0,0,.72); border-radius: 20px; font-size: 13px; }
+.room-badge.results-collapsed { cursor: pointer; box-shadow: 0 0 0 2px rgba(255,255,255,.7); }
 .room-target-banner {
   position: fixed;
-  top: 10px;
-  left: 50%;
-  z-index: 1250;
-  max-width: min(720px, calc(100% - 96px));
+  bottom: max(10px, env(safe-area-inset-bottom));
+  left: 10px;
+  z-index: 700;
+  max-width: min(520px, calc(100% - 110px));
   padding: 8px 13px;
-  transform: translateX(-50%);
   border-radius: 18px;
   box-sizing: border-box;
   overflow: hidden;
@@ -185,7 +184,7 @@ body {
   font-size: 14px;
   font-weight: 650;
   line-height: 1.25;
-  text-align: center;
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
   pointer-events: none;
@@ -393,7 +392,7 @@ body {
 
 #credits {
   position: fixed;
-  bottom: 8px;
+  bottom: max(8px, env(safe-area-inset-bottom));
   left: 8px;
   font-size: 11px;
   font-style: italic;
