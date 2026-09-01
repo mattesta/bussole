@@ -15,7 +15,8 @@ const EXPLORERS = [
   'Sacagawea', 'Cook', 'Amundsen', 'Gertrude Bell'
 ];
 const COLOURS = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#00a6a6', '#f781bf', '#6b4c2a'];
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const ERROR_COLOURS = ['#ff8587', '#86c5f4', '#92dc8f', '#d29ddd', '#ffc06a', '#70dada', '#ffc0df', '#b99a78'];
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const MAX_PLAYERS = 8;
 
 const byId = id => document.getElementById(id);
@@ -30,6 +31,7 @@ const roomPlayers = byId('roomPlayers');
 const playerNameInput = byId('playerNameInput');
 const roomBadge = byId('roomBadge');
 const roomProgress = byId('roomProgress');
+const roomTargetBanner = byId('roomTargetBanner');
 
 let user = null;
 let roomCode = null;
@@ -49,8 +51,12 @@ function show(element) { element.classList.remove('hidden'); }
 function hide(element) { element.classList.add('hidden'); }
 function isHost() { return roomMeta && user && roomMeta.hostId === user.uid; }
 function roomPath(suffix = '') { return `rooms/${roomCode}${suffix ? `/${suffix}` : ''}`; }
-function compactCode(value) { return value.toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, 6); }
+function compactCode(value) { return value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6); }
 function displayCode(value) { return value.match(/.{1,2}/g)?.join('-') || value; }
+function randomIndex(length) {
+  if (length <= 1) return 0;
+  return crypto.getRandomValues(new Uint32Array(1))[0] % length;
+}
 function makeCode() {
   let code = '';
   crypto.getRandomValues(new Uint8Array(6)).forEach(value => {
@@ -89,8 +95,8 @@ async function createRoom() {
       if (existing.exists()) { code = null; continue; }
       await set(roomRef, {
         meta: { hostId: user.uid, phase: 'lobby', round: 0, createdAt: Date.now(), lastActiveAt: Date.now() },
-        settings: { mode: 'easy', timerEnabled: false, timerDuration: 60 },
-        players: { [user.uid]: playerTemplate(0, 1) }
+        settings: { mode: 'medium', timerEnabled: false, timerDuration: 60 },
+        players: { [user.uid]: playerTemplate(randomIndex(MAX_PLAYERS), 1) }
       });
       break;
     }
@@ -116,7 +122,8 @@ async function joinRoom() {
     }
     if (!currentPlayers[user.uid]) {
       const used = new Set(Object.values(currentPlayers).map(player => player.colorIndex));
-      const index = [...Array(MAX_PLAYERS).keys()].find(candidate => !used.has(candidate)) ?? 0;
+      const available = [...Array(MAX_PLAYERS).keys()].filter(candidate => !used.has(candidate));
+      const index = available[randomIndex(available.length)] ?? 0;
       await set(ref(db, `rooms/${code}/players/${user.uid}`), playerTemplate(index, (joinedMeta.round || 0) + 1));
     }
     await enterRoom(code);
@@ -152,9 +159,26 @@ async function enterRoom(code) {
     maybeReveal();
     handlePhase();
   }));
+  subscriptions.push(onValue(ref(db, roomPath('settings')), snapshot => {
+    const settings = snapshot.val();
+    if (!settings) return;
+    byId('roomMode').value = settings.mode || 'medium';
+    byId('roomTimerEnabled').checked = Boolean(settings.timerEnabled);
+    byId('roomTimerDuration').value = settings.timerDuration || 60;
+  }));
   subscriptions.push(onValue(ref(db, roomPath('target')), snapshot => {
     selectedTarget = snapshot.val();
-    if (selectedTarget) byId('roomTargetInput').value = selectedTarget.label;
+    if (selectedTarget) {
+      byId('roomTargetInput').value = selectedTarget.label;
+      roomTargetBanner.textContent = `Target: ${selectedTarget.label}`;
+      show(roomTargetBanner);
+      panel.classList.add('has-room-target');
+    } else {
+      byId('roomTargetInput').value = '';
+      roomTargetBanner.textContent = '';
+      hide(roomTargetBanner);
+      panel.classList.remove('has-room-target');
+    }
     byId('startRoomRound').disabled = !selectedTarget;
   }));
 }
@@ -282,16 +306,17 @@ async function showResults(submissions) {
     uid,
     name: player.name,
     color: COLOURS[player.colorIndex],
+    errorColor: ERROR_COLOURS[player.colorIndex],
     wins: player.wins || 0,
     submission: submissions[uid] || null
   }));
   const ranking = window.BussoleGame.revealMultiplayer(entries, target, settings.mode);
   byId('roundRanking').innerHTML = '';
-  ranking.forEach((result, index) => {
+  ranking.forEach(result => {
     const item = document.createElement('li');
     item.style.color = result.color;
     const error = result.errorMeters === null ? 'DNF' : result.errorMeters >= 1000 ? `${(result.errorMeters / 1000).toFixed(1)} km` : `${Math.round(result.errorMeters)} m`;
-    item.textContent = `${index + 1}. ${result.name} — ${error}`;
+    item.textContent = `${result.name} — ${error}`;
     byId('roundRanking').appendChild(item);
   });
   show(panel); hide(lobby); hide(entry); show(resultsPanel);
@@ -347,11 +372,15 @@ async function leaveRoom() {
   subscriptions = [];
   if (revealSubscription) revealSubscription();
   revealSubscription = null;
-  if (disconnectHandle) await disconnectHandle.cancel();
+  if (disconnectHandle) await disconnectHandle.cancel().catch(() => {});
   if (roomCode && user) await update(ref(db, roomPath(`players/${user.uid}`)), { connected: false, lastSeenAt: serverTimestamp() }).catch(() => {});
-  roomCode = null; roomMeta = null; players = {}; selectedTarget = null; preparedRound = null;
-  hide(panel); hide(roomBadge); hide(lobby); hide(resultsPanel); show(entry);
-  panel.classList.remove('results-mode');
+  roomCode = null; roomMeta = null; players = {}; selectedTarget = null;
+  preparedRound = null; revealedRound = null; scoredRound = null;
+  byId('roomTargetInput').value = '';
+  byId('startRoomRound').disabled = true;
+  hide(panel); hide(roomBadge); hide(roomTargetBanner); hide(lobby); hide(resultsPanel); show(entry);
+  roomTargetBanner.textContent = '';
+  panel.classList.remove('results-mode', 'has-room-target');
   document.body.classList.remove('multiplayer-round');
   history.replaceState(null, '', location.pathname);
   window.BussoleGame.returnToMenu();
