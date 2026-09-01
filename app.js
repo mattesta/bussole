@@ -51,6 +51,7 @@ let userMarker = null;
 let headingLine = null;
 let watchId = null;
 let lastPos = null;
+let hasCenteredOnPlayer = false;
 let lineVisible = false;
 let lineLocked = false;
 let lockedPoints = null;
@@ -808,6 +809,7 @@ function stopOrientationTracking() {
 // Start tracking.
 function start() {
   startBtn.disabled = true;
+  hasCenteredOnPlayer = false;
   setStatus('Requesting permissions...');
 
   requestDeviceOrientationPermission().then(ok=>{
@@ -827,24 +829,26 @@ function start() {
         showLineBtn.disabled = false;
         resetBtn.disabled = false;
 
-        if (!headingLine) {
-          const lat = pos.coords.latitude;
-          const lon = pos.coords.longitude;
-        
-          if (userMarker) {
-            userMarker.setLatLng([lat, lon]);
-          } else {
-            userMarker = L.marker([lat, lon], { icon: whiteMarkerIcon }).addTo(map);
-          }
-        
-          // Keep player centered and use a sensible game zoom
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+
+        if (userMarker) {
+          userMarker.setLatLng([lat, lon]);
+        } else {
+          userMarker = L.marker([lat, lon], { icon: whiteMarkerIcon }).addTo(map);
+        }
+
+        // Centre once when the round begins. Further GPS updates must not
+        // fight the player's own zooming and panning gestures.
+        if (!hasCenteredOnPlayer) {
           map.setView([lat, lon], 16, {
             animate: false
           });
-        
-          if (blurEnabled) {
-            showBlurCircle(lat, lon);
-          }
+          hasCenteredOnPlayer = true;
+        }
+
+        if (blurEnabled) {
+          showBlurCircle(lat, lon);
         }
       }, err=>{
         setStatus('Geolocation error: ' + err.message);
@@ -1036,10 +1040,7 @@ resetBtn.addEventListener('click', () => {
   }
 });
 
-homeBtn.addEventListener('click', () => {
-  if (multiplayerController && multiplayerController.isActive()) {
-    multiplayerController.leaveRoom();
-  }
+function resetGameToMenu() {
   roundActive = false;
   lineVisible = false;
   lineLocked = false;
@@ -1061,6 +1062,7 @@ homeBtn.addEventListener('click', () => {
     headingLine = null;
   }
   removeErrorLine();
+  clearMultiplayerLayers();
   hideDistanceEasterEgg();
   hideBlurCircle();
   unlockMap();
@@ -1078,6 +1080,7 @@ homeBtn.addEventListener('click', () => {
     targetMarker = null;
   }
   targetLatLng = null;
+  hasCenteredOnPlayer = false;
   searchBox.value = '';
   distanceInput.value = '';
   suggestionsEl.innerHTML = '';
@@ -1098,6 +1101,14 @@ homeBtn.addEventListener('click', () => {
   hudEl.style.display = 'none';
   menuEl.style.display = 'flex';
   dismissSearchKeyboard();
+}
+
+homeBtn.addEventListener('click', () => {
+  if (multiplayerController && multiplayerController.isActive()) {
+    multiplayerController.leaveRoom();
+    return;
+  }
+  resetGameToMenu();
 });
 
 // Search for a target.
@@ -1209,7 +1220,7 @@ function renderMultiplayerResults(entries, roundTarget, mode) {
       errorMeters = nearest.distance;
     }
     const errorLayer = L.polyline(greatCircleArcBetween(errorOrigin, roundTarget), {
-      color: '#facf0a',
+      color: entry.errorColor || '#facf0a',
       weight: 3,
       opacity: 0.95,
       interactive: false
@@ -1259,7 +1270,6 @@ window.BussoleGame = {
     showLineBtn.textContent = 'Show line';
   },
   returnToMenu() {
-    if (hudEl.style.display !== 'none') homeBtn.click();
-    else menuEl.style.display = 'flex';
+    resetGameToMenu();
   }
 };
