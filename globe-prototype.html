@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Bussole! — Globe prototype</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="globe-prototype.css">
+</head>
+<body>
+  <main id="globeMap" aria-label="Interactive 3D globe"></main>
+
+  <section class="prototype-panel" aria-label="Globe prototype controls">
+    <div class="prototype-heading">
+      <div>
+        <span class="eyebrow">EXPERIMENT</span>
+        <h1>Bussole! Globe</h1>
+      </div>
+      <a class="back-link" href="./">2D game</a>
+    </div>
+
+    <p id="prototypeStatus" class="status">Demo position: Calimera. Drag the globe or use your location.</p>
+
+    <div class="button-row">
+      <button id="locateBtn" type="button">Use my location</button>
+      <button id="randomTargetBtn" type="button">Random target</button>
+    </div>
+
+    <label class="bearing-control" for="bearingInput">
+      <span>Bearing</span>
+      <output id="bearingValue" for="bearingInput">0°</output>
+      <input id="bearingInput" type="range" min="0" max="359" value="0">
+    </label>
+
+    <div class="button-row">
+      <button id="showPrototypeLineBtn" class="primary" type="button">Show line</button>
+      <button id="resetPrototypeBtn" type="button">Reset</button>
+    </div>
+  </section>
+
+  <aside class="target-card" aria-live="polite">
+    <span class="target-label">TARGET</span>
+    <strong id="prototypeTarget">Choosing…</strong>
+    <span id="prototypeError"></span>
+  </aside>
+
+  <div class="prototype-attribution">MapLibre · Tiles © Esri</div>
+
+  <script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+  <script src="targets.js"></script>
+  <script src="globe-prototype.js"></script>
+</body>
+</html>
