@@ -1,6 +1,7 @@
 const EARTH_RADIUS = 6378137;
 const ROUTE_DISTANCE_METERS = 20000000;
 const DEMO_POSITION = [40.2506, 18.2794]; // Calimera [lat, lon]
+const AIMING_ZOOM = 16;
 
 const statusEl = document.getElementById('prototypeStatus');
 const targetEl = document.getElementById('prototypeTarget');
@@ -11,15 +12,26 @@ const locateBtn = document.getElementById('locateBtn');
 const randomTargetBtn = document.getElementById('randomTargetBtn');
 const showLineBtn = document.getElementById('showPrototypeLineBtn');
 const resetBtn = document.getElementById('resetPrototypeBtn');
+const distanceInputWrap = document.getElementById('distanceInputWrap');
+const distanceInput = document.getElementById('distanceInput');
+const compassEl = document.getElementById('prototypeCompass');
+const compassNeedle = document.getElementById('prototypeCompassNeedle');
+const modeButtons = Array.from(document.querySelectorAll('[data-mode]'));
 
 let playerLatLng = DEMO_POSITION;
 let targetLatLng = null;
 let targetLabel = '';
 let heading = 0;
+let gameMode = 'medium';
+let lineRevealed = false;
 let mapReady = false;
 let playerMarker = null;
 let targetMarker = null;
 let orientationStarted = false;
+let lastAbsoluteOrientationAt = 0;
+let smoothHeading = null;
+let pendingHeading = null;
+let orientationFrameId = null;
 
 const emptyCollection = () => ({ type: 'FeatureCollection', features: [] });
 
@@ -43,13 +55,15 @@ const map = new maplibregl.Map({
       { id: 'satellite', type: 'raster', source: 'satellite' }
     ]
   },
-  center: [14, 26],
-  zoom: 1.15,
+  center: [DEMO_POSITION[1], DEMO_POSITION[0]],
+  zoom: AIMING_ZOOM,
+  minZoom: 0,
+  maxZoom: 20,
   pitch: 0,
   bearing: 0,
-  maxPitch: 60,
-  dragRotate: true,
-  pitchWithRotate: true,
+  maxPitch: 0,
+  dragRotate: false,
+  pitchWithRotate: false,
   touchZoomRotate: true
 });
 
@@ -77,10 +91,13 @@ map.on('load', () => {
     type: 'line',
     source: 'prototype-error',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#ff8587', 'line-width': 3.5, 'line-dasharray': [2, 1.3] }
+    paint: { 'line-color': '#facf0a', 'line-width': 3.5 }
   });
 
   mapReady = true;
+  if (typeof map.touchZoomRotate.disableRotation === 'function') {
+    map.touchZoomRotate.disableRotation();
+  }
   updatePlayerMarker();
   chooseRandomTarget();
 });
@@ -270,6 +287,31 @@ function updateTargetMarker() {
   }
 }
 
+function removeTargetMarker() {
+  if (!targetMarker) return;
+  targetMarker.remove();
+  targetMarker = null;
+}
+
+function setMapInteraction(enabled) {
+  const handlers = [
+    map.dragPan,
+    map.scrollZoom,
+    map.boxZoom,
+    map.doubleClickZoom,
+    map.keyboard,
+    map.touchZoomRotate
+  ];
+  for (const handler of handlers) {
+    if (!handler) continue;
+    if (enabled) handler.enable();
+    else handler.disable();
+  }
+  if (enabled && typeof map.touchZoomRotate.disableRotation === 'function') {
+    map.touchZoomRotate.disableRotation();
+  }
+}
+
 function weightedRandom(items) {
   const total = items.reduce((sum, item) => sum + (item.weight || 1), 0);
   let choice = Math.random() * total;
@@ -294,15 +336,59 @@ function clearLines() {
   errorEl.textContent = '';
 }
 
-function framePlayerAndTarget() {
-  if (!mapReady || !targetLatLng) return;
-  const midpoint = sphericalMidpoint(playerLatLng, targetLatLng);
+function frameAimingView(animated = true) {
+  if (!mapReady) return;
+  map.stop();
+  const camera = {
+    center: [normalizeLongitude(playerLatLng[1]), playerLatLng[0]],
+    zoom: AIMING_ZOOM,
+    pitch: 0,
+    bearing: normalizeHeading(360 - heading),
+    padding: { top: 0, right: 0, bottom: 0, left: 0 },
+    retainPadding: false,
+    duration: animated ? 650 : 0
+  };
+  if (animated) map.easeTo(camera);
+  else map.jumpTo(camera);
+}
+
+function sphericalCenter(points) {
+  const sum = points.reduce((result, point) => {
+    const vector = toUnitVector(point);
+    return result.map((value, index) => value + vector[index]);
+  }, [0, 0, 0]);
+  const center = normalizeVector(sum);
+  if (center) return vectorToLatLng(center);
+  return sphericalMidpoint(points[0], points[1]) || points[0];
+}
+
+function frameResult(points) {
+  if (!mapReady || !points.length) return;
+  const center = sphericalCenter(points);
+  const centerVector = toUnitVector(center);
+  const angularRadius = Math.max(
+    0.015,
+    ...points.map(point => angleBetween(centerVector, toUnitVector(point)))
+  );
+  const panelHeight = document.querySelector('.prototype-panel')?.getBoundingClientRect().height || 0;
+  const topPadding = Math.min(panelHeight + 24, map.getContainer().clientHeight * 0.48);
+  const padding = { top: topPadding, right: 28, bottom: 92, left: 28 };
+  const availableWidth = Math.max(160, map.getContainer().clientWidth - padding.left - padding.right);
+  const availableHeight = Math.max(160, map.getContainer().clientHeight - padding.top - padding.bottom);
+  const availableSize = Math.min(availableWidth, availableHeight);
+  const zoom = Math.max(0, Math.min(7, Math.log2(
+    availableSize * Math.PI / (512 * angularRadius * 1.35)
+  )));
+
+  map.stop();
   map.easeTo({
-    center: [normalizeLongitude(midpoint[1]), midpoint[0]],
-    zoom: .75,
+    center: [normalizeLongitude(center[1]), center[0]],
+    zoom,
     pitch: 0,
     bearing: 0,
-    duration: 850
+    padding,
+    retainPadding: false,
+    duration: 800
   });
 }
 
@@ -317,38 +403,53 @@ function chooseRandomTarget() {
   targetLabel = target.country ? `${target.name}, ${target.country}` : target.name;
   targetEl.textContent = targetLabel;
   clearLines();
-  updateTargetMarker();
-  framePlayerAndTarget();
+  removeTargetMarker();
+  lineRevealed = false;
+  setMapInteraction(false);
+  frameAimingView();
   statusEl.textContent = 'Target ready. Aim with your phone or adjust the bearing slider.';
 }
 
 function showPrototypeLine() {
   if (!mapReady || !targetLatLng) return;
+  let distanceMeters = ROUTE_DISTANCE_METERS;
+  if (gameMode === 'hard') {
+    const distanceKm = Number.parseFloat(distanceInput.value);
+    if (!Number.isFinite(distanceKm) || distanceKm <= 0) {
+      statusEl.textContent = 'Enter a valid distance for Hard mode.';
+      distanceInput.focus();
+      return;
+    }
+    distanceMeters = distanceKm * 1000;
+  }
   const route = greatCirclePoints(
     playerLatLng[0],
     playerLatLng[1],
     heading,
-    ROUTE_DISTANCE_METERS
+    distanceMeters
   );
-  const nearest = nearestPointOnLine(targetLatLng, route);
-  const errorArc = greatCircleArcBetween(nearest.point, targetLatLng);
+  const errorOrigin = gameMode === 'hard'
+    ? route[route.length - 1]
+    : nearestPointOnLine(targetLatLng, route).point;
+  const errorMeters = angleBetween(toUnitVector(errorOrigin), toUnitVector(targetLatLng)) * EARTH_RADIUS;
+  const errorArc = greatCircleArcBetween(errorOrigin, targetLatLng);
 
   map.getSource('prototype-route').setData(lineFeature(route));
   map.getSource('prototype-error').setData(lineFeature(errorArc));
-  errorEl.textContent = `Error: ${(nearest.distance / 1000).toFixed(1)} km`;
+  errorEl.textContent = `Error: ${(errorMeters / 1000).toFixed(1)} km`;
   statusEl.textContent = `Line locked at ${Math.round(heading)}°. Drag the globe to inspect it.`;
-  framePlayerAndTarget();
+  lineRevealed = true;
+  updateTargetMarker();
+  setMapInteraction(true);
+  frameResult([playerLatLng, targetLatLng, errorOrigin]);
 }
 
 function resetPrototype() {
   clearLines();
-  map.easeTo({
-    center: [normalizeLongitude(playerLatLng[1]), playerLatLng[0]],
-    zoom: 3.2,
-    pitch: 0,
-    bearing: normalizeHeading(360 - heading),
-    duration: 700
-  });
+  removeTargetMarker();
+  lineRevealed = false;
+  setMapInteraction(false);
+  frameAimingView();
   statusEl.textContent = 'Aiming view restored. The target is unchanged.';
 }
 
@@ -356,7 +457,8 @@ function updateBearing(value, rotateMap = false) {
   heading = normalizeHeading(Number(value) || 0);
   bearingInput.value = String(Math.round(heading));
   bearingValue.value = `${Math.round(heading)}°`;
-  if (rotateMap && mapReady && map.getZoom() > 1.4) {
+  compassNeedle.style.transform = `translate(-50%, -50%) rotate(${-heading}deg)`;
+  if (rotateMap && mapReady && !lineRevealed) {
     map.setBearing(normalizeHeading(360 - heading));
   }
 }
@@ -366,15 +468,71 @@ function screenOrientationAngle() {
   return typeof window.orientation === 'number' ? window.orientation : 0;
 }
 
+function smoothAngle(previous, next, amount) {
+  if (previous === null) return next;
+  const previousRadians = previous * Math.PI / 180;
+  const nextRadians = next * Math.PI / 180;
+  const x = (1 - amount) * Math.cos(previousRadians) + amount * Math.cos(nextRadians);
+  const y = (1 - amount) * Math.sin(previousRadians) + amount * Math.sin(nextRadians);
+  return normalizeHeading(Math.atan2(y, x) * 180 / Math.PI);
+}
+
+function angularDistanceDegrees(first, second) {
+  return Math.abs(((second - first + 540) % 360) - 180);
+}
+
+function tiltCompensatedHeading(alpha, beta, gamma) {
+  if (typeof alpha !== 'number') return null;
+  if (typeof beta !== 'number' || typeof gamma !== 'number' ||
+      (Math.abs(beta) < .5 && Math.abs(gamma) < .5)) {
+    return normalizeHeading(360 - alpha);
+  }
+  const radians = Math.PI / 180;
+  const x = beta * radians;
+  const y = gamma * radians;
+  const z = alpha * radians;
+  const cX = Math.cos(x);
+  const cY = Math.cos(y);
+  const cZ = Math.cos(z);
+  const sX = Math.sin(x);
+  const sY = Math.sin(y);
+  const sZ = Math.sin(z);
+  const vectorX = -cZ * sY - sZ * sX * cY;
+  const vectorY = -sZ * sY + cZ * sX * cY;
+  return normalizeHeading(Math.atan2(vectorX, vectorY) * 180 / Math.PI);
+}
+
+function applyOrientationFrame() {
+  orientationFrameId = null;
+  if (pendingHeading === null) return;
+  updateBearing(pendingHeading, true);
+}
+
 function handleOrientation(event) {
   let nextHeading = null;
   if (typeof event.webkitCompassHeading === 'number') {
     nextHeading = event.webkitCompassHeading;
-  } else if (typeof event.alpha === 'number' && event.absolute) {
-    nextHeading = 360 - event.alpha;
+  } else if (typeof event.alpha === 'number') {
+    nextHeading = tiltCompensatedHeading(event.alpha, event.beta, event.gamma);
   }
   if (!Number.isFinite(nextHeading)) return;
-  updateBearing(nextHeading + screenOrientationAngle(), true);
+  nextHeading = normalizeHeading(nextHeading + screenOrientationAngle());
+  const change = smoothHeading === null ? 180 : angularDistanceDegrees(smoothHeading, nextHeading);
+  const smoothing = change > 45 ? .65 : change > 15 ? .38 : .16;
+  smoothHeading = smoothAngle(smoothHeading, nextHeading, smoothing);
+  pendingHeading = smoothHeading;
+  if (orientationFrameId === null) orientationFrameId = requestAnimationFrame(applyOrientationFrame);
+}
+
+function handleAbsoluteOrientation(event) {
+  if (typeof event.webkitCompassHeading !== 'number' && typeof event.alpha !== 'number') return;
+  lastAbsoluteOrientationAt = performance.now();
+  handleOrientation(event);
+}
+
+function handleFallbackOrientation(event) {
+  if (performance.now() - lastAbsoluteOrientationAt < 1000) return;
+  handleOrientation(event);
 }
 
 async function startOrientation() {
@@ -384,8 +542,8 @@ async function startOrientation() {
     const permission = await DeviceOrientationEvent.requestPermission();
     if (permission !== 'granted') return false;
   }
-  window.addEventListener('deviceorientationabsolute', handleOrientation, true);
-  window.addEventListener('deviceorientation', handleOrientation, true);
+  window.addEventListener('deviceorientationabsolute', handleAbsoluteOrientation, true);
+  window.addEventListener('deviceorientation', handleFallbackOrientation, true);
   orientationStarted = true;
   return true;
 }
@@ -414,9 +572,26 @@ async function useMyLocation() {
   }
 }
 
+function setMode(mode) {
+  gameMode = mode;
+  for (const button of modeButtons) {
+    const selected = button.dataset.mode === mode;
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  }
+  distanceInputWrap.classList.toggle('hidden', mode !== 'hard');
+  compassEl.classList.toggle('hidden', mode !== 'easy');
+  if (mapReady) {
+    resetPrototype();
+    statusEl.textContent = `${mode[0].toUpperCase()}${mode.slice(1)} mode ready. The target is unchanged.`;
+  }
+}
+
 bearingInput.addEventListener('input', event => updateBearing(event.target.value, true));
 locateBtn.addEventListener('click', useMyLocation);
 randomTargetBtn.addEventListener('click', chooseRandomTarget);
 showLineBtn.addEventListener('click', showPrototypeLine);
 resetBtn.addEventListener('click', resetPrototype);
+modeButtons.forEach(button => button.addEventListener('click', () => setMode(button.dataset.mode)));
+setMode('medium');
 updateBearing(0);
