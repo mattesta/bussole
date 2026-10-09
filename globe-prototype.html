@@ -21,6 +21,12 @@
 
     <p id="prototypeStatus" class="status">Demo position: Calimera. Drag the globe or use your location.</p>
 
+    <div class="mode-picker" role="group" aria-label="Difficulty">
+      <button type="button" data-mode="easy">Easy</button>
+      <button type="button" data-mode="medium" class="selected" aria-pressed="true">Medium</button>
+      <button type="button" data-mode="hard">Hard</button>
+    </div>
+
     <div class="button-row">
       <button id="locateBtn" type="button">Use my location</button>
       <button id="randomTargetBtn" type="button">Random target</button>
@@ -30,6 +36,14 @@
       <span>Bearing</span>
       <output id="bearingValue" for="bearingInput">0°</output>
       <input id="bearingInput" type="range" min="0" max="359" value="0">
+    </label>
+
+    <label id="distanceInputWrap" class="distance-control hidden" for="distanceInput">
+      <span>Line distance</span>
+      <span class="distance-field">
+        <input id="distanceInput" type="number" min="0" step="1" inputmode="decimal" placeholder="Distance">
+        <span>km</span>
+      </span>
     </label>
 
     <div class="button-row">
@@ -43,6 +57,15 @@
     <strong id="prototypeTarget">Choosing…</strong>
     <span id="prototypeError"></span>
   </aside>
+
+  <div id="prototypeCompass" class="compass hidden" aria-label="Compass">
+    <div class="compass-forward"></div>
+    <div id="prototypeCompassNeedle" class="compass-needle" aria-hidden="true">
+      <span class="needle-north"></span>
+      <span class="needle-south"></span>
+    </div>
+    <div class="compass-center"></div>
+  </div>
 
   <div class="prototype-attribution">MapLibre · Tiles © Esri</div>
 
