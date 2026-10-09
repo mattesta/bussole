@@ -60,6 +60,19 @@ let smoothHeading = null;
 let pendingHeading = null;
 let orientationFrameId = null;
 
+// Apply the integrated shell before WebGL starts so the home-selected mode
+// remains the only visible difficulty choice even on unsupported devices.
+if (integratedMode) {
+  eyebrowEl.textContent = '3D MODE';
+  backLink.textContent = 'Home';
+  backLink.href = './?map=3d';
+  modePicker?.classList.add('hidden');
+}
+bearingControl.classList.toggle(
+  'hidden',
+  integratedMode && launchData?.orientationGranted && !debugMode
+);
+
 const emptyCollection = () => ({ type: 'FeatureCollection', features: [] });
 
 const map = new maplibregl.Map({
@@ -624,15 +637,5 @@ randomTargetBtn.addEventListener('click', chooseRandomTarget);
 showLineBtn.addEventListener('click', showPrototypeLine);
 resetBtn.addEventListener('click', resetPrototype);
 modeButtons.forEach(button => button.addEventListener('click', () => setMode(button.dataset.mode)));
-if (integratedMode) {
-  eyebrowEl.textContent = '3D MODE';
-  backLink.textContent = 'Home';
-  backLink.href = './?map=3d';
-  modePicker?.classList.add('hidden');
-}
-bearingControl.classList.toggle(
-  'hidden',
-  integratedMode && launchData?.orientationGranted && !debugMode
-);
 setMode(requestedMode);
 updateBearing(0);
