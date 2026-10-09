@@ -19,6 +19,15 @@
       Point your phone towards the target, and plot the most precise route possible. <br> Whoever gets closer wins.
     </p>
 
+    <div class="map-style-section">
+      <span class="map-style-label">MAP STYLE</span>
+      <div class="map-style-picker" role="group" aria-label="Map style">
+        <button type="button" data-map-style="2d" class="selected" aria-pressed="true">2D Map</button>
+        <button type="button" data-map-style="3d" aria-pressed="false">3D Globe <small>TEST</small></button>
+      </div>
+      <span id="mapStyleHint">Classic game. All features are available.</span>
+    </div>
+
     <button class="modeBtn" data-mode="easy">Easy (with compass)</button>
     <button class="modeBtn" data-mode="medium">Medium </button>
     <button class="modeBtn" data-mode="hard">Difficult (guess the distance too)</button>
