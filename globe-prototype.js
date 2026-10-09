@@ -38,6 +38,7 @@ const distanceInput = document.getElementById('distanceInput');
 const compassEl = document.getElementById('prototypeCompass');
 const compassNeedle = document.getElementById('prototypeCompassNeedle');
 const modeButtons = Array.from(document.querySelectorAll('[data-mode]'));
+const modePicker = document.querySelector('.mode-picker');
 const bearingControl = document.querySelector('.bearing-control');
 const eyebrowEl = document.getElementById('prototypeEyebrow');
 const backLink = document.getElementById('prototypeBackLink');
@@ -627,6 +628,7 @@ if (integratedMode) {
   eyebrowEl.textContent = '3D MODE';
   backLink.textContent = 'Home';
   backLink.href = './?map=3d';
+  modePicker?.classList.add('hidden');
 }
 bearingControl.classList.toggle(
   'hidden',
