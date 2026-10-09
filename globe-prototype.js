@@ -343,7 +343,8 @@ function frameAimingView(animated = true) {
     center: [normalizeLongitude(playerLatLng[1]), playerLatLng[0]],
     zoom: AIMING_ZOOM,
     pitch: 0,
-    bearing: normalizeHeading(360 - heading),
+    // MapLibre uses the direction at the top of the screen as its bearing.
+    bearing: heading,
     padding: { top: 0, right: 0, bottom: 0, left: 0 },
     retainPadding: false,
     duration: animated ? 650 : 0
@@ -459,7 +460,7 @@ function updateBearing(value, rotateMap = false) {
   bearingValue.value = `${Math.round(heading)}°`;
   compassNeedle.style.transform = `translate(-50%, -50%) rotate(${-heading}deg)`;
   if (rotateMap && mapReady && !lineRevealed) {
-    map.setBearing(normalizeHeading(360 - heading));
+    map.setBearing(heading);
   }
 }
 
