@@ -2,6 +2,27 @@ const EARTH_RADIUS = 6378137;
 const ROUTE_DISTANCE_METERS = 20000000;
 const DEMO_POSITION = [40.2506, 18.2794]; // Calimera [lat, lon]
 const AIMING_ZOOM = 16;
+const pageParameters = new URLSearchParams(window.location.search);
+const integratedMode = pageParameters.get('integrated') === '1';
+const debugMode = pageParameters.get('debug') === '1';
+const requestedMode = ['easy', 'medium', 'hard'].includes(pageParameters.get('mode'))
+  ? pageParameters.get('mode')
+  : 'medium';
+
+function readLaunchData() {
+  try {
+    const value = sessionStorage.getItem('bussoleGlobeLaunch');
+    sessionStorage.removeItem('bussoleGlobeLaunch');
+    return value ? JSON.parse(value) : null;
+  } catch {
+    return null;
+  }
+}
+
+const launchData = integratedMode ? readLaunchData() : null;
+const launchCoordinates = launchData?.coordinates;
+const hasLaunchCoordinates = Number.isFinite(launchCoordinates?.latitude) &&
+  Number.isFinite(launchCoordinates?.longitude);
 
 const statusEl = document.getElementById('prototypeStatus');
 const targetEl = document.getElementById('prototypeTarget');
@@ -17,8 +38,13 @@ const distanceInput = document.getElementById('distanceInput');
 const compassEl = document.getElementById('prototypeCompass');
 const compassNeedle = document.getElementById('prototypeCompassNeedle');
 const modeButtons = Array.from(document.querySelectorAll('[data-mode]'));
+const bearingControl = document.querySelector('.bearing-control');
+const eyebrowEl = document.getElementById('prototypeEyebrow');
+const backLink = document.getElementById('prototypeBackLink');
 
-let playerLatLng = DEMO_POSITION;
+let playerLatLng = hasLaunchCoordinates
+  ? [launchCoordinates.latitude, launchCoordinates.longitude]
+  : DEMO_POSITION;
 let targetLatLng = null;
 let targetLabel = '';
 let heading = 0;
@@ -99,7 +125,9 @@ map.on('load', () => {
     map.touchZoomRotate.disableRotation();
   }
   updatePlayerMarker();
+  if (hasLaunchCoordinates) locateBtn.textContent = 'Location active';
   chooseRandomTarget();
+  if (launchData?.orientationGranted) startOrientation(true);
 });
 
 function normalizeHeading(value) {
@@ -536,9 +564,10 @@ function handleFallbackOrientation(event) {
   handleOrientation(event);
 }
 
-async function startOrientation() {
+async function startOrientation(permissionAlreadyGranted = false) {
   if (orientationStarted) return true;
-  if (typeof DeviceOrientationEvent !== 'undefined' &&
+  if (!permissionAlreadyGranted &&
+      typeof DeviceOrientationEvent !== 'undefined' &&
       typeof DeviceOrientationEvent.requestPermission === 'function') {
     const permission = await DeviceOrientationEvent.requestPermission();
     if (permission !== 'granted') return false;
@@ -594,5 +623,14 @@ randomTargetBtn.addEventListener('click', chooseRandomTarget);
 showLineBtn.addEventListener('click', showPrototypeLine);
 resetBtn.addEventListener('click', resetPrototype);
 modeButtons.forEach(button => button.addEventListener('click', () => setMode(button.dataset.mode)));
-setMode('medium');
+if (integratedMode) {
+  eyebrowEl.textContent = '3D MODE';
+  backLink.textContent = 'Home';
+  backLink.href = './?map=3d';
+}
+bearingControl.classList.toggle(
+  'hidden',
+  integratedMode && launchData?.orientationGranted && !debugMode
+);
+setMode(requestedMode);
 updateBearing(0);

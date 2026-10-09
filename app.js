@@ -82,14 +82,79 @@ const usedRandomTargets = new Set();
 let lastRandomTargetKey = null;
 let multiplayerController = null;
 let multiplayerLayers = [];
+let selectedMapStyle = new URLSearchParams(window.location.search).get('map') === '3d' ? '3d' : '2d';
 
 const menuEl = document.getElementById('menu');
 const hudEl = document.getElementById('hud');
 const distanceInputWrap = document.getElementById('distanceInputWrap');
 const distanceInput = document.getElementById('distanceInput');
+const mapStyleButtons = Array.from(document.querySelectorAll('[data-map-style]'));
+const mapStyleHint = document.getElementById('mapStyleHint');
+
+function updateMapStylePicker() {
+  for (const button of mapStyleButtons) {
+    const selected = button.dataset.mapStyle === selectedMapStyle;
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  }
+  mapStyleHint.textContent = selectedMapStyle === '3d'
+    ? 'Globe test. Multiplayer still uses the 2D map.'
+    : 'Classic game. All features are available.';
+}
+
+mapStyleButtons.forEach(button => button.addEventListener('click', () => {
+  selectedMapStyle = button.dataset.mapStyle;
+  updateMapStylePicker();
+}));
+updateMapStylePicker();
+
+async function launchGlobeMode(mode, sourceButton) {
+  sourceButton.disabled = true;
+  mapStyleHint.textContent = 'Requesting location and compass access…';
+
+  const orientationAvailable = typeof DeviceOrientationEvent !== 'undefined';
+  const orientationGranted = orientationAvailable
+    ? await requestDeviceOrientationPermission()
+    : false;
+  let coordinates = null;
+
+  if (navigator.geolocation) {
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          maximumAge: 1000,
+          timeout: 12000
+        });
+      });
+      coordinates = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude
+      };
+    } catch {
+      // The globe page keeps its demo position and offers a retry button.
+    }
+  }
+
+  try {
+    sessionStorage.setItem('bussoleGlobeLaunch', JSON.stringify({
+      coordinates,
+      orientationGranted
+    }));
+  } catch {
+    // Private browsing may reject storage; the globe still remains usable.
+  }
+
+  const parameters = new URLSearchParams({ mode, integrated: '1' });
+  window.location.href = `globe-prototype.html?${parameters}`;
+}
 
 document.querySelectorAll('.modeBtn').forEach(btn => {
   btn.addEventListener('click', () => {
+    if (selectedMapStyle === '3d') {
+      launchGlobeMode(btn.dataset.mode, btn);
+      return;
+    }
     timerEnabled = timerCheckbox.checked;
     blurEnabled = blurCheckbox.checked;
     
