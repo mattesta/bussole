@@ -659,7 +659,7 @@ function unwrapLongitudeNear(referenceLongitude, [lat, lon]) {
 }
 
 function fitResultView() {
-  if (hudEl.style.display === 'none' || !lastPos || !targetLatLng || !errorOriginLatLng) return;
+  if (!lineLocked || hudEl.style.display === 'none' || !lastPos || !targetLatLng || !errorOriginLatLng) return;
 
   const player = [lastPos.coords.latitude, lastPos.coords.longitude];
   const referenceLongitude = player[1];
@@ -1026,11 +1026,24 @@ resetBtn.addEventListener('click', () => {
   setStatus('The line was hidden. Press "Show line" to plot a new one.');
   distanceEl.textContent = '';
   lockMap();
-  if (blurEnabled && lastPos) {
-    showBlurCircle(
+  if (lastPos) {
+    const playerLatLng = [
       lastPos.coords.latitude,
       lastPos.coords.longitude
-    );
+    ];
+
+    // The result view may be zoomed out to include half the globe. Reset must
+    // also restore the local aiming view, while keeping the current target.
+    if (typeof map.stop === 'function') map.stop();
+    if (typeof map.flyTo === 'function') {
+      map.flyTo(playerLatLng, 16, { duration: 0.6 });
+    } else {
+      map.setView(playerLatLng, 16, { animate: true });
+    }
+
+    if (blurEnabled) {
+      showBlurCircle(playerLatLng[0], playerLatLng[1]);
+    }
   }
   clearInterval(timerInterval);
   timerInterval = null;
