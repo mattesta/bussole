@@ -18,6 +18,7 @@ const COLOURS = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#00a6a6
 const ERROR_COLOURS = ['#ff8587', '#86c5f4', '#92dc8f', '#d29ddd', '#ffc06a', '#70dada', '#ffc0df', '#b99a78'];
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const MAX_PLAYERS = 8;
+const PRESENCE_GRACE_MS = 30000;
 
 const byId = id => document.getElementById(id);
 const menu = byId('menu');
@@ -32,6 +33,9 @@ const playerNameInput = byId('playerNameInput');
 const roomBadge = byId('roomBadge');
 const roomProgress = byId('roomProgress');
 const roomTargetBanner = byId('roomTargetBanner');
+const closeButton = byId('multiplayerClose');
+const timerEnabledInput = byId('roomTimerEnabled');
+const timerSettings = byId('roomTimerSettings');
 
 let user = null;
 let roomCode = null;
@@ -46,11 +50,19 @@ let subscriptions = [];
 let revealSubscription = null;
 let timerHandle = null;
 let leaving = false;
+let presenceRefreshPromise = null;
+let presenceUiTimer = null;
+let hostTransferTimer = null;
 
 function show(element) { element.classList.remove('hidden'); }
 function hide(element) { element.classList.add('hidden'); }
 function isHost() { return roomMeta && user && roomMeta.hostId === user.uid; }
 function roomPath(suffix = '') { return `rooms/${roomCode}${suffix ? `/${suffix}` : ''}`; }
+function isPlayerOnline(player) {
+  if (player?.connected !== false) return true;
+  const lastSeenAt = Number(player?.lastSeenAt) || 0;
+  return lastSeenAt > 0 && Date.now() - lastSeenAt < PRESENCE_GRACE_MS;
+}
 function compactCode(value) { return value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6); }
 function displayCode(value) { return value.match(/.{1,2}/g)?.join('-') || value; }
 function randomIndex(length) {
@@ -63,6 +75,36 @@ function makeCode() {
     code += CODE_ALPHABET[value % CODE_ALPHABET.length];
   });
   return code;
+}
+
+function setCloseButtonMode(mode) {
+  const leaveMode = mode === 'leave';
+  closeButton.textContent = leaveMode ? 'Leave room' : '×';
+  closeButton.setAttribute('aria-label', leaveMode ? 'Leave room' : 'Close');
+  closeButton.classList.toggle('leave-room-control', leaveMode);
+}
+
+function updateTimerSettingsVisibility() {
+  timerSettings.classList.toggle('hidden', !timerEnabledInput.checked);
+}
+
+async function refreshPresence() {
+  if (!roomCode || !user || leaving) return;
+  if (presenceRefreshPromise) return presenceRefreshPromise;
+  const activeCode = roomCode;
+  const activeUserId = user.uid;
+  presenceRefreshPromise = (async () => {
+    if (disconnectHandle) await disconnectHandle.cancel().catch(() => {});
+    if (roomCode !== activeCode || leaving) return;
+    const playerRef = ref(db, `rooms/${activeCode}/players/${activeUserId}`);
+    disconnectHandle = onDisconnect(playerRef);
+    await disconnectHandle.update({ connected: false, lastSeenAt: serverTimestamp() });
+    if (roomCode === activeCode && !leaving) {
+      await update(playerRef, { connected: true, lastSeenAt: serverTimestamp() });
+    }
+  })().catch(error => console.warn('Could not refresh multiplayer presence.', error))
+    .finally(() => { presenceRefreshPromise = null; });
+  return presenceRefreshPromise;
 }
 
 async function ensureUser() {
@@ -136,14 +178,17 @@ async function enterRoom(code) {
   roomCode = code;
   leaving = false;
   hide(entry); show(lobby); hide(resultsPanel);
+  panel.classList.add('lobby-mode');
+  panel.classList.remove('results-mode');
+  setCloseButtonMode('leave');
   byId('roomCodeLabel').textContent = displayCode(code);
-  show(roomBadge);
+  hide(roomBadge);
   history.replaceState(null, '', `${location.pathname}?room=${displayCode(code)}`);
 
-  const connectedRef = ref(db, roomPath(`players/${user.uid}/connected`));
-  disconnectHandle = onDisconnect(connectedRef);
-  await disconnectHandle.set(false);
-  await update(ref(db, roomPath(`players/${user.uid}`)), { connected: true, lastSeenAt: serverTimestamp() });
+  subscriptions.push(onValue(ref(db, '.info/connected'), snapshot => {
+    if (snapshot.val() === true) refreshPresence();
+  }));
+  await refreshPresence();
 
   subscriptions.push(onValue(ref(db, roomPath('meta')), snapshot => {
     roomMeta = snapshot.val();
@@ -164,13 +209,14 @@ async function enterRoom(code) {
     byId('roomMode').value = settings.mode || 'medium';
     byId('roomTimerEnabled').checked = Boolean(settings.timerEnabled);
     byId('roomTimerDuration').value = settings.timerDuration || 60;
+    updateTimerSettingsVisibility();
   }));
   subscriptions.push(onValue(ref(db, roomPath('target')), snapshot => {
     selectedTarget = snapshot.val();
     if (selectedTarget) {
       byId('roomTargetInput').value = selectedTarget.label;
       roomTargetBanner.textContent = `Target: ${selectedTarget.label}`;
-      show(roomTargetBanner);
+      if (roomMeta?.phase === 'aiming' || roomMeta?.phase === 'revealed') show(roomTargetBanner);
     } else {
       byId('roomTargetInput').value = '';
       roomTargetBanner.textContent = '';
@@ -187,34 +233,67 @@ function renderRoom() {
   if (roomMeta.phase === 'lobby') {
     setResultsCollapsed(false);
     panel.classList.remove('results-mode');
+    panel.classList.add('lobby-mode');
+    setCloseButtonMode('leave');
     show(panel); show(lobby); hide(entry); hide(resultsPanel);
+    hide(roomBadge);
+    hide(roomTargetBanner);
     roomMessage.textContent = host ? 'Choose a target, then start the round.' : 'Waiting for the host to start…';
   }
 }
 
 function renderPlayers() {
+  clearTimeout(presenceUiTimer);
+  presenceUiTimer = null;
   roomPlayers.innerHTML = '';
   const list = Object.entries(players).sort((a, b) => a[1].joinedAt - b[1].joinedAt);
+  let nextPresenceExpiry = Infinity;
   list.forEach(([uid, player]) => {
     const item = document.createElement('li');
     item.className = 'room-player';
     item.innerHTML = `<span class="player-colour" style="background:${COLOURS[player.colorIndex]}"></span><span></span><span class="player-state"></span>`;
     item.children[1].textContent = `${player.name}${uid === roomMeta?.hostId ? ' ★' : ''} · ${player.wins || 0} wins`;
     const spectator = roomMeta?.phase === 'aiming' && (player.eligibleRound || 1) > roomMeta.round;
-    item.children[2].textContent = !player.connected ? 'offline' : spectator ? 'next round' : player.locked ? 'locked' : player.ready ? 'aiming' : 'waiting';
+    const online = isPlayerOnline(player);
+    item.children[2].textContent = !online ? 'offline' : spectator ? 'next round' : player.locked ? 'locked' : player.ready ? 'aiming' : 'Ready';
+    if (player.connected === false && online) {
+      nextPresenceExpiry = Math.min(
+        nextPresenceExpiry,
+        PRESENCE_GRACE_MS - (Date.now() - Number(player.lastSeenAt))
+      );
+    }
     roomPlayers.appendChild(item);
   });
   const me = players[user?.uid];
   if (me && document.activeElement !== playerNameInput) playerNameInput.value = me.name;
-  const active = list.filter(([, player]) => player.connected && (
+  const active = list.filter(([, player]) => isPlayerOnline(player) && (
     !roomMeta || roomMeta.phase === 'lobby' || (player.eligibleRound || 1) <= roomMeta.round
   ));
   const locked = active.filter(([, player]) => player.locked).length;
   roomProgress.textContent = roomMeta?.phase === 'aiming' ? `${locked}/${active.length} locked` : `${active.length} explorers`;
+  if (Number.isFinite(nextPresenceExpiry)) {
+    presenceUiTimer = setTimeout(renderPlayers, Math.max(250, nextPresenceExpiry + 50));
+  }
 }
 
 async function tryHostTransfer() {
-  if (!roomMeta || roomMeta.phase === 'closed' || players[roomMeta.hostId]?.connected !== false) return;
+  if (!roomMeta || roomMeta.phase === 'closed' || players[roomMeta.hostId]?.connected !== false) {
+    clearTimeout(hostTransferTimer);
+    hostTransferTimer = null;
+    return;
+  }
+  const disconnectedHost = players[roomMeta.hostId];
+  if (Number(disconnectedHost?.lastSeenAt) > 0 && isPlayerOnline(disconnectedHost)) {
+    if (!hostTransferTimer) {
+      hostTransferTimer = setTimeout(() => {
+        hostTransferTimer = null;
+        tryHostTransfer();
+      }, PRESENCE_GRACE_MS + 100);
+    }
+    return;
+  }
+  clearTimeout(hostTransferTimer);
+  hostTransferTimer = null;
   const successor = Object.entries(players).filter(([, p]) => p.connected).sort((a, b) => a[1].joinedAt - b[1].joinedAt)[0];
   if (!successor) return;
   await runTransaction(ref(db, roomPath('meta/hostId')), current => current === roomMeta.hostId ? successor[0] : current);
@@ -252,7 +331,10 @@ async function handlePhase() {
     }
     preparedRound = roomMeta.round;
     revealedRound = null;
+    panel.classList.remove('lobby-mode');
     hide(panel);
+    show(roomBadge);
+    if (selectedTarget) show(roomTargetBanner);
     document.body.classList.add('multiplayer-round');
     const settings = (await get(ref(db, roomPath('settings')))).val();
     const target = (await get(ref(db, roomPath('target')))).val();
@@ -341,7 +423,11 @@ function setResultsCollapsed(collapsed) {
 function openResultsPanel() {
   if (!roomCode || roomMeta?.phase !== 'revealed') return;
   show(panel); hide(lobby); hide(entry); show(resultsPanel);
+  panel.classList.remove('lobby-mode');
   panel.classList.add('results-mode');
+  setCloseButtonMode('close');
+  show(roomBadge);
+  if (selectedTarget) show(roomTargetBanner);
   setResultsCollapsed(false);
 }
 
@@ -388,27 +474,70 @@ async function changeName() {
   if (name && roomCode) await set(ref(db, roomPath(`players/${user.uid}/name`)), name);
 }
 
+async function copyRoomLink() {
+  if (!roomCode) return;
+  const inviteUrl = new URL(location.pathname, location.origin);
+  inviteUrl.searchParams.set('room', displayCode(roomCode));
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(inviteUrl.href);
+    } else {
+      const temporaryInput = document.createElement('textarea');
+      temporaryInput.value = inviteUrl.href;
+      temporaryInput.setAttribute('readonly', '');
+      temporaryInput.style.position = 'fixed';
+      temporaryInput.style.opacity = '0';
+      document.body.appendChild(temporaryInput);
+      temporaryInput.select();
+      document.execCommand('copy');
+      temporaryInput.remove();
+    }
+    roomMessage.textContent = 'Invitation link copied.';
+    setTimeout(() => {
+      if (roomCode && roomMeta?.phase === 'lobby') renderRoom();
+    }, 1800);
+  } catch {
+    roomMessage.textContent = 'Could not copy the link. Please try again.';
+  }
+}
+
 async function leaveRoom() {
   if (leaving) return;
   leaving = true;
+  const previousCode = roomCode;
+  const previousUserId = user?.uid;
+  const previousDisconnectHandle = disconnectHandle;
   clearTimeout(timerHandle);
+  clearTimeout(presenceUiTimer);
+  clearTimeout(hostTransferTimer);
+  presenceUiTimer = null;
+  hostTransferTimer = null;
   subscriptions.forEach(unsubscribe => unsubscribe());
   subscriptions = [];
   if (revealSubscription) revealSubscription();
   revealSubscription = null;
-  if (disconnectHandle) await disconnectHandle.cancel().catch(() => {});
-  if (roomCode && user) await update(ref(db, roomPath(`players/${user.uid}`)), { connected: false, lastSeenAt: serverTimestamp() }).catch(() => {});
+  disconnectHandle = null;
   roomCode = null; roomMeta = null; players = {}; selectedTarget = null;
   preparedRound = null; revealedRound = null; scoredRound = null;
   byId('roomTargetInput').value = '';
   byId('startRoomRound').disabled = true;
   hide(panel); hide(roomBadge); hide(roomTargetBanner); hide(lobby); hide(resultsPanel); show(entry);
   roomTargetBanner.textContent = '';
-  panel.classList.remove('results-mode');
+  panel.classList.remove('results-mode', 'lobby-mode');
+  setCloseButtonMode('close');
   setResultsCollapsed(false);
   document.body.classList.remove('multiplayer-round');
   history.replaceState(null, '', location.pathname);
   window.BussoleGame.returnToMenu();
+
+  // Navigation should never wait for a slow or suspended mobile connection.
+  if (previousDisconnectHandle) await previousDisconnectHandle.cancel().catch(() => {});
+  if (previousCode && previousUserId) {
+    await update(ref(db, `rooms/${previousCode}/players/${previousUserId}`), {
+      connected: false,
+      lastSeenAt: 0
+    }).catch(() => {});
+  }
 }
 
 function friendlyError(error) {
@@ -418,8 +547,12 @@ function friendlyError(error) {
   return error?.message || 'Something went wrong.';
 }
 
-byId('multiplayerBtn').addEventListener('click', () => { hide(menu); show(panel); show(entry); });
-byId('multiplayerClose').addEventListener('click', () => {
+byId('multiplayerBtn').addEventListener('click', () => {
+  hide(menu); show(panel); show(entry);
+  panel.classList.remove('lobby-mode', 'results-mode');
+  setCloseButtonMode('close');
+});
+closeButton.addEventListener('click', () => {
   if (closeResultsPanel()) return;
   roomCode ? leaveRoom() : (hide(panel), show(menu));
 });
@@ -430,7 +563,8 @@ byId('joinRoomBtn').addEventListener('click', joinRoom);
 byId('roomTargetSearch').addEventListener('click', searchTarget);
 byId('roomTargetRandom').addEventListener('click', selectRandomTarget);
 byId('startRoomRound').addEventListener('click', startRound);
-byId('leaveRoomBtn').addEventListener('click', leaveRoom);
+byId('copyRoomLinkBtn').addEventListener('click', copyRoomLink);
+timerEnabledInput.addEventListener('change', updateTimerSettingsVisibility);
 byId('resultsLeaveBtn').addEventListener('click', leaveRoom);
 byId('nextRoundBtn').addEventListener('click', nextRound);
 roomBadge.addEventListener('click', openResultsPanel);
@@ -441,6 +575,12 @@ roomBadge.addEventListener('keydown', event => {
   }
 });
 playerNameInput.addEventListener('change', changeName);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') refreshPresence();
+});
+window.addEventListener('pageshow', refreshPresence);
+window.addEventListener('focus', refreshPresence);
+window.addEventListener('online', refreshPresence);
 
 window.BussoleGame.registerMultiplayer({
   isActive: () => Boolean(roomCode),
@@ -454,4 +594,5 @@ const invitedCode = compactCode(new URLSearchParams(location.search).get('room')
 if (invitedCode.length === 6) {
   byId('roomCodeInput').value = displayCode(invitedCode);
   hide(menu); show(panel); show(entry); show(byId('joinRoomForm'));
+  setCloseButtonMode('close');
 }

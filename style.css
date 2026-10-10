@@ -406,17 +406,51 @@ select:focus-visible {
   background: var(--ui-field);
 }
 .panel-close { position: absolute; top: 8px; right: 8px; width: 38px; border: 0 !important; background: transparent !important; font-size: 24px !important; }
+.panel-close.leave-room-control {
+  top: max(14px, env(safe-area-inset-top));
+  right: max(14px, env(safe-area-inset-right));
+  width: auto;
+  padding: 7px 11px;
+  border: 1px solid var(--ui-border) !important;
+  background: var(--ui-field) !important;
+  font-size: 14px !important;
+}
 #joinRoomForm { display: flex; gap: 7px; margin-top: 12px; }
 #roomCodeInput { width: 145px; text-transform: uppercase; letter-spacing: 2px; }
-.room-code-label { font-size: 19px; margin-bottom: 14px; }
+.room-code-label { display: flex; align-items: center; gap: 9px; font-size: 19px; margin-bottom: 14px; }
 .room-code-label strong { letter-spacing: 2px; }
+.copy-room-link {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  min-height: 38px !important;
+  padding: 7px !important;
+  border-radius: 50% !important;
+}
+.copy-room-link svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .player-name-label { display: grid; gap: 4px; }
-#roomPlayers { padding: 0; list-style: none; }
-.room-player { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--ui-border); }
+#roomPlayers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 18px;
+  margin: 10px 0;
+  padding: 0;
+  list-style: none;
+}
+.room-player { display: flex; min-width: 0; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--ui-border); }
+.room-player > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .player-colour { width: 14px; height: 14px; flex: 0 0 14px; border-radius: 50%; }
-.player-state { margin-left: auto; color: var(--ui-muted); font-size: 13px; }
+.player-state { flex: none; margin-left: auto; color: var(--ui-muted); font-size: 13px; }
 #hostControls { display: grid; gap: 9px; padding: 12px 0; border-top: 1px solid var(--ui-border); }
 #hostControls label { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.room-timer-row { display: flex; min-height: 40px; align-items: center; gap: 10px; }
+#hostControls .room-timer-toggle { justify-content: flex-start; }
+.room-timer-toggle input { margin: 0; accent-color: var(--ui-red); }
+#hostControls .room-timer-settings { justify-content: flex-start; gap: 6px; }
+.room-timer-settings input { width: 76px; min-height: 36px; padding: 5px 7px; }
+.room-timer-settings span { color: var(--ui-muted); }
 .room-target-row { display: flex; gap: 5px; }
 #roomTargetInput { min-width: 0; flex: 1; }
 #roundRanking { padding-left: 28px; }
@@ -463,11 +497,34 @@ select:focus-visible {
 }
 .multiplayer-panel.results-mode { top: auto; bottom: 10px; transform: translateX(-50%); max-height: 46%; }
 
+.multiplayer-panel.lobby-mode {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  padding: max(70px, calc(env(safe-area-inset-top) + 56px)) max(16px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  transform: none;
+  border: 0;
+  border-radius: 0;
+  background:
+    radial-gradient(circle at 50% -10%, rgba(39,71,118,.28), transparent 42%),
+    #020712;
+}
+#multiplayerLobby:not(.hidden) {
+  display: flex;
+  flex-direction: column;
+  width: min(720px, 100%);
+  min-height: 100%;
+  margin: 0 auto;
+}
+#multiplayerLobby #roomMessage { margin-top: auto; color: var(--ui-muted); }
+
 @media (max-width: 480px) {
   .multiplayer-panel { width: 100%; max-height: 100%; border-radius: 0; }
   .multiplayer-panel.results-mode { bottom: 0; max-height: 48%; border-radius: 12px 12px 0 0; }
   .room-target-row { flex-wrap: wrap; }
   #roomTargetInput { flex-basis: 100%; }
+  #roomPlayers { grid-template-columns: 1fr; max-height: 220px; overflow-y: auto; }
 }
 
 /* ===== COMPASS ===== */
