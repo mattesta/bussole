@@ -5,33 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Bussole! — Globe prototype</title>
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="globe-prototype.css">
+  <link rel="stylesheet" href="globe-prototype.css?v=17">
 </head>
 <body>
   <main id="globeMap" aria-label="Interactive 3D globe"></main>
 
-  <section class="prototype-panel" aria-label="Globe prototype controls">
-    <div class="prototype-heading">
-      <div>
-        <span id="prototypeEyebrow" class="eyebrow">EXPERIMENT</span>
-        <h1>Bussole! Globe</h1>
+  <aside class="target-card" aria-live="polite">
+    <span class="target-label">TARGET</span>
+    <strong id="prototypeTarget">Choose a target</strong>
+    <span id="prototypeStatus" class="status">Preparing location and compass…</span>
+    <span id="prototypeError"></span>
+  </aside>
+
+  <div id="globeSearchPanel" class="search-panel hidden" role="dialog" aria-modal="true" aria-labelledby="globeSearchTitle">
+    <section class="search-card">
+      <div class="search-heading">
+        <span id="globeSearchTitle">SEARCH TARGET</span>
+        <button id="globeSearchClose" type="button" aria-label="Close search">×</button>
       </div>
-      <a id="prototypeBackLink" class="back-link" href="./">2D game</a>
-    </div>
+      <div class="search-row">
+        <div class="search-input-wrap">
+          <input id="globeSearchBox" placeholder="Pick any place..." autocomplete="off">
+          <button id="globeClearSearch" type="button" aria-label="Clear search">×</button>
+          <div id="globeSuggestions" class="suggestions"></div>
+        </div>
+        <button id="globeSearchBtn" type="button">Search</button>
+      </div>
+    </section>
+  </div>
 
-    <p id="prototypeStatus" class="status">Demo position: Calimera. Drag the globe or use your location.</p>
-
-    <div class="mode-picker" role="group" aria-label="Difficulty">
-      <button type="button" data-mode="easy">Easy</button>
-      <button type="button" data-mode="medium" class="selected" aria-pressed="true">Medium</button>
-      <button type="button" data-mode="hard">Hard</button>
-    </div>
-
-    <div class="button-row">
-      <button id="locateBtn" type="button">Use my location</button>
-      <button id="randomTargetBtn" type="button">Random target</button>
-    </div>
-
+  <section class="game-controls" aria-label="Globe game controls">
     <label class="bearing-control" for="bearingInput">
       <span>Bearing</span>
       <output id="bearingValue" for="bearingInput">0°</output>
@@ -39,24 +42,18 @@
     </label>
 
     <label id="distanceInputWrap" class="distance-control hidden" for="distanceInput">
-      <span>Line distance</span>
-      <span class="distance-field">
-        <input id="distanceInput" type="number" min="0" step="1" inputmode="decimal" placeholder="Distance">
-        <span>km</span>
-      </span>
+      <input id="distanceInput" type="number" min="0" step="1" inputmode="decimal" placeholder="Distance">
+      <span>km</span>
     </label>
 
-    <div class="button-row">
-      <button id="showPrototypeLineBtn" class="primary" type="button">Show line</button>
+    <nav class="action-bar" aria-label="Game controls">
+      <button id="randomTargetBtn" type="button">Random Target</button>
+      <button id="openGlobeSearchBtn" type="button">Search</button>
+      <button id="showPrototypeLineBtn" class="primary" type="button" disabled>Go!</button>
       <button id="resetPrototypeBtn" type="button">Reset</button>
-    </div>
+      <a id="prototypeBackLink" class="home-button" href="./?map=3d">Home</a>
+    </nav>
   </section>
-
-  <aside class="target-card" aria-live="polite">
-    <span class="target-label">TARGET</span>
-    <strong id="prototypeTarget">Choosing…</strong>
-    <span id="prototypeError"></span>
-  </aside>
 
   <div id="prototypeCompass" class="compass hidden" aria-label="Compass">
     <div class="compass-forward"></div>
@@ -71,6 +68,6 @@
 
   <script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
   <script src="targets.js"></script>
-  <script src="globe-prototype.js?v=16"></script>
+  <script src="globe-prototype.js?v=17"></script>
 </body>
 </html>
