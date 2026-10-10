@@ -13,7 +13,10 @@ const requestedMode = ['easy', 'medium', 'hard'].includes(pageParameters.get('mo
 function readLaunchData() {
   try {
     const value = sessionStorage.getItem('bussoleGlobeLaunch');
-    sessionStorage.removeItem('bussoleGlobeLaunch');
+    // A multiplayer room returns to the lobby between rounds and then loads
+    // this page again. Keep the permission/location hand-off for those later
+    // rounds; a new game session will overwrite it from the multiplayer tap.
+    if (!multiplayerMode) sessionStorage.removeItem('bussoleGlobeLaunch');
     return value ? JSON.parse(value) : null;
   } catch {
     return null;
