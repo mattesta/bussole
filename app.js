@@ -269,10 +269,10 @@ function updateClearSearchButton() {
 }
 
 function setRandomButtonState(hasRandomTarget) {
-  randomBtn.textContent = hasRandomTarget ? 'Skip Target' : 'Random Target';
+  randomBtn.textContent = hasRandomTarget ? 'Next Target' : 'Random Target';
   randomBtn.setAttribute(
     'aria-label',
-    hasRandomTarget ? 'Skip this random target' : 'Choose a random target'
+    hasRandomTarget ? 'Choose the next random target' : 'Choose a random target'
   );
 }
 

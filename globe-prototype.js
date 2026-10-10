@@ -29,7 +29,6 @@ const targetEl = document.getElementById('prototypeTarget');
 const errorEl = document.getElementById('prototypeError');
 const bearingInput = document.getElementById('bearingInput');
 const bearingValue = document.getElementById('bearingValue');
-const locateBtn = document.getElementById('locateBtn');
 const randomTargetBtn = document.getElementById('randomTargetBtn');
 const showLineBtn = document.getElementById('showPrototypeLineBtn');
 const resetBtn = document.getElementById('resetPrototypeBtn');
@@ -37,11 +36,14 @@ const distanceInputWrap = document.getElementById('distanceInputWrap');
 const distanceInput = document.getElementById('distanceInput');
 const compassEl = document.getElementById('prototypeCompass');
 const compassNeedle = document.getElementById('prototypeCompassNeedle');
-const modeButtons = Array.from(document.querySelectorAll('[data-mode]'));
-const modePicker = document.querySelector('.mode-picker');
 const bearingControl = document.querySelector('.bearing-control');
-const eyebrowEl = document.getElementById('prototypeEyebrow');
-const backLink = document.getElementById('prototypeBackLink');
+const searchPanel = document.getElementById('globeSearchPanel');
+const openSearchBtn = document.getElementById('openGlobeSearchBtn');
+const searchCloseBtn = document.getElementById('globeSearchClose');
+const searchBtn = document.getElementById('globeSearchBtn');
+const searchBox = document.getElementById('globeSearchBox');
+const clearSearchBtn = document.getElementById('globeClearSearch');
+const suggestionsEl = document.getElementById('globeSuggestions');
 
 let playerLatLng = hasLaunchCoordinates
   ? [launchCoordinates.latitude, launchCoordinates.longitude]
@@ -59,15 +61,10 @@ let lastAbsoluteOrientationAt = 0;
 let smoothHeading = null;
 let pendingHeading = null;
 let orientationFrameId = null;
+let searchTimeout = null;
+const usedRandomTargets = new Set();
+let lastRandomTargetKey = null;
 
-// Apply the integrated shell before WebGL starts so the home-selected mode
-// remains the only visible difficulty choice even on unsupported devices.
-if (integratedMode) {
-  eyebrowEl.textContent = '3D MODE';
-  backLink.textContent = 'Home';
-  backLink.href = './?map=3d';
-  modePicker?.classList.add('hidden');
-}
 bearingControl.classList.toggle(
   'hidden',
   integratedMode && launchData?.orientationGranted && !debugMode
@@ -139,9 +136,16 @@ map.on('load', () => {
     map.touchZoomRotate.disableRotation();
   }
   updatePlayerMarker();
-  if (hasLaunchCoordinates) locateBtn.textContent = 'Location active';
-  chooseRandomTarget();
+  frameAimingView(false);
+  if (hasLaunchCoordinates) {
+    statusEl.textContent = 'Position acquired. Choose a target.';
+  } else if (integratedMode) {
+    statusEl.textContent = 'Location unavailable. Using Calimera as a fallback.';
+  } else {
+    useMyLocation();
+  }
   if (launchData?.orientationGranted) startOrientation(true);
+  updateGoButtonState();
 });
 
 function normalizeHeading(value) {
@@ -364,6 +368,38 @@ function weightedRandom(items) {
   return items[items.length - 1];
 }
 
+function targetKey(target) {
+  return `${target.name}|${target.lat}|${target.lon}`;
+}
+
+function setRandomButtonState(isRandomTarget) {
+  randomTargetBtn.textContent = isRandomTarget ? 'Next Target' : 'Random Target';
+  randomTargetBtn.setAttribute(
+    'aria-label',
+    isRandomTarget ? 'Choose the next random target' : 'Choose a random target'
+  );
+}
+
+function updateGoButtonState() {
+  showLineBtn.disabled = Boolean(!mapReady || !targetLatLng || lineRevealed);
+}
+
+function setTarget(lat, lon, label, isRandomTarget = false) {
+  targetLatLng = [lat, lon];
+  targetLabel = label;
+  targetEl.textContent = label;
+  searchBox.value = label;
+  updateClearSearchButton();
+  clearLines();
+  removeTargetMarker();
+  lineRevealed = false;
+  setRandomButtonState(isRandomTarget);
+  setMapInteraction(false);
+  frameAimingView();
+  statusEl.textContent = 'Target ready. Aim with your phone or use the bearing slider.';
+  updateGoButtonState();
+}
+
 function sphericalMidpoint(first, second) {
   const a = toUnitVector(first);
   const b = toUnitVector(second);
@@ -413,9 +449,10 @@ function frameResult(points) {
     0.015,
     ...points.map(point => angleBetween(centerVector, toUnitVector(point)))
   );
-  const panelHeight = document.querySelector('.prototype-panel')?.getBoundingClientRect().height || 0;
-  const topPadding = Math.min(panelHeight + 24, map.getContainer().clientHeight * 0.48);
-  const padding = { top: topPadding, right: 28, bottom: 92, left: 28 };
+  const targetBottom = document.querySelector('.target-card')?.getBoundingClientRect().bottom || 0;
+  const controlsHeight = document.querySelector('.game-controls')?.getBoundingClientRect().height || 0;
+  const topPadding = Math.min(targetBottom + 20, map.getContainer().clientHeight * 0.48);
+  const padding = { top: topPadding, right: 28, bottom: controlsHeight + 26, left: 28 };
   const availableWidth = Math.max(160, map.getContainer().clientWidth - padding.left - padding.right);
   const availableHeight = Math.max(160, map.getContainer().clientHeight - padding.top - padding.bottom);
   const availableSize = Math.min(availableWidth, availableHeight);
@@ -438,19 +475,32 @@ function frameResult(points) {
 function chooseRandomTarget() {
   const catalogue = Array.isArray(window.BUSSOLE_TARGETS) ? window.BUSSOLE_TARGETS : [];
   if (!catalogue.length) {
-    statusEl.textContent = 'The Random target catalogue could not be loaded.';
+    statusEl.textContent = 'The random target catalogue could not be loaded.';
     return;
   }
-  const target = weightedRandom(catalogue);
-  targetLatLng = [target.lat, target.lon];
-  targetLabel = target.country ? `${target.name}, ${target.country}` : target.name;
-  targetEl.textContent = targetLabel;
-  clearLines();
-  removeTargetMarker();
-  lineRevealed = false;
-  setMapInteraction(false);
-  frameAimingView();
-  statusEl.textContent = 'Target ready. Aim with your phone or adjust the bearing slider.';
+  const roll = Math.random();
+  const category = roll < .35 ? 'capital' : roll < .70 ? 'city' : 'landmark';
+  let candidates = catalogue.filter(target =>
+    target.category === category &&
+    !usedRandomTargets.has(targetKey(target)) &&
+    targetKey(target) !== lastRandomTargetKey
+  );
+  if (!candidates.length) {
+    candidates = catalogue.filter(target =>
+      !usedRandomTargets.has(targetKey(target)) &&
+      targetKey(target) !== lastRandomTargetKey
+    );
+  }
+  if (!candidates.length) {
+    usedRandomTargets.clear();
+    candidates = catalogue.filter(target => targetKey(target) !== lastRandomTargetKey);
+  }
+  const target = weightedRandom(candidates);
+  const key = targetKey(target);
+  usedRandomTargets.add(key);
+  lastRandomTargetKey = key;
+  const label = target.country ? `${target.name}, ${target.country}` : target.name;
+  setTarget(target.lat, target.lon, label, true);
 }
 
 function showPrototypeLine() {
@@ -482,6 +532,7 @@ function showPrototypeLine() {
   errorEl.textContent = `Error: ${(errorMeters / 1000).toFixed(1)} km`;
   statusEl.textContent = `Line locked at ${Math.round(heading)}°. Drag the globe to inspect it.`;
   lineRevealed = true;
+  updateGoButtonState();
   updateTargetMarker();
   setMapInteraction(true);
   frameResult([playerLatLng, targetLatLng, errorOrigin]);
@@ -491,6 +542,7 @@ function resetPrototype() {
   clearLines();
   removeTargetMarker();
   lineRevealed = false;
+  updateGoButtonState();
   setMapInteraction(false);
   frameAimingView();
   statusEl.textContent = 'Aiming view restored. The target is unchanged.';
@@ -592,8 +644,73 @@ async function startOrientation(permissionAlreadyGranted = false) {
   return true;
 }
 
+function updateClearSearchButton() {
+  clearSearchBtn.style.visibility = searchBox.value ? 'visible' : 'hidden';
+}
+
+function openSearchPanel() {
+  searchPanel.classList.remove('hidden');
+  requestAnimationFrame(() => searchBox.focus({ preventScroll: true }));
+}
+
+function closeSearchPanel() {
+  searchPanel.classList.add('hidden');
+  suggestionsEl.style.display = 'none';
+  searchBox.blur();
+  requestAnimationFrame(() => window.scrollTo(0, 0));
+}
+
+function selectSearchResult(result) {
+  setTarget(
+    Number.parseFloat(result.lat),
+    Number.parseFloat(result.lon),
+    result.display_name
+  );
+  closeSearchPanel();
+}
+
+function showSuggestions(results) {
+  suggestionsEl.innerHTML = '';
+  if (!results.length) {
+    suggestionsEl.style.display = 'none';
+    return;
+  }
+  results.forEach(result => {
+    const option = document.createElement('div');
+    option.className = 'suggestion';
+    option.textContent = result.display_name;
+    option.addEventListener('click', () => selectSearchResult(result));
+    suggestionsEl.appendChild(option);
+  });
+  suggestionsEl.style.display = 'block';
+}
+
+async function fetchSearchResults(query, limit = 5) {
+  const response = await fetch(
+    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=${limit}`,
+    { headers: { 'Accept-Language': 'en' } }
+  );
+  if (!response.ok) throw new Error('Search unavailable');
+  return response.json();
+}
+
+async function searchTarget() {
+  const query = searchBox.value.trim();
+  if (!query) return;
+  statusEl.textContent = 'Searching…';
+  try {
+    const results = await fetchSearchResults(query, 1);
+    if (!results.length) {
+      statusEl.textContent = 'Target not found. Try another search.';
+      return;
+    }
+    selectSearchResult(results[0]);
+  } catch {
+    statusEl.textContent = 'Search unavailable. Please try again.';
+  }
+}
+
 async function useMyLocation() {
-  locateBtn.disabled = true;
   statusEl.textContent = 'Requesting location and compass access…';
   try {
     await startOrientation().catch(() => false);
@@ -607,22 +724,14 @@ async function useMyLocation() {
     playerLatLng = [position.coords.latitude, position.coords.longitude];
     updatePlayerMarker();
     resetPrototype();
-    statusEl.textContent = 'Your position is active. Aim with the phone or use the slider.';
-    locateBtn.textContent = 'Location active';
+    statusEl.textContent = 'Your position is active. Choose a target.';
   } catch (error) {
     statusEl.textContent = `Location unavailable: ${error.message || 'permission denied'}. Using Calimera for the demo.`;
-  } finally {
-    locateBtn.disabled = false;
   }
 }
 
 function setMode(mode) {
   gameMode = mode;
-  for (const button of modeButtons) {
-    const selected = button.dataset.mode === mode;
-    button.classList.toggle('selected', selected);
-    button.setAttribute('aria-pressed', String(selected));
-  }
   distanceInputWrap.classList.toggle('hidden', mode !== 'hard');
   compassEl.classList.toggle('hidden', mode !== 'easy');
   if (mapReady) {
@@ -632,10 +741,47 @@ function setMode(mode) {
 }
 
 bearingInput.addEventListener('input', event => updateBearing(event.target.value, true));
-locateBtn.addEventListener('click', useMyLocation);
 randomTargetBtn.addEventListener('click', chooseRandomTarget);
 showLineBtn.addEventListener('click', showPrototypeLine);
 resetBtn.addEventListener('click', resetPrototype);
-modeButtons.forEach(button => button.addEventListener('click', () => setMode(button.dataset.mode)));
+openSearchBtn.addEventListener('click', openSearchPanel);
+searchCloseBtn.addEventListener('click', closeSearchPanel);
+searchPanel.addEventListener('click', event => {
+  if (event.target === searchPanel) closeSearchPanel();
+});
+searchBtn.addEventListener('click', searchTarget);
+searchBox.addEventListener('keydown', event => {
+  if (event.key === 'Enter') searchTarget();
+});
+searchBox.addEventListener('input', () => {
+  const query = searchBox.value.trim();
+  updateClearSearchButton();
+  setRandomButtonState(false);
+  clearTimeout(searchTimeout);
+  if (query.length < 3) {
+    suggestionsEl.style.display = 'none';
+    return;
+  }
+  searchTimeout = setTimeout(async () => {
+    try {
+      showSuggestions(await fetchSearchResults(query));
+    } catch {
+      suggestionsEl.style.display = 'none';
+    }
+  }, 300);
+});
+clearSearchBtn.addEventListener('click', () => {
+  searchBox.value = '';
+  suggestionsEl.style.display = 'none';
+  clearTimeout(searchTimeout);
+  updateClearSearchButton();
+  setRandomButtonState(false);
+  searchBox.focus({ preventScroll: true });
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !searchPanel.classList.contains('hidden')) closeSearchPanel();
+});
+updateClearSearchButton();
+setRandomButtonState(false);
 setMode(requestedMode);
 updateBearing(0);
