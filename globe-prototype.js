@@ -579,7 +579,8 @@ function showPrototypeLine() {
 
   map.getSource('prototype-route').setData(lineFeature(route));
   map.getSource('prototype-error').setData(lineFeature(errorArc));
-  errorEl.textContent = `Error: ${(errorMeters / 1000).toFixed(1)} km`;
+  const initialDistance = angleBetween(toUnitVector(playerLatLng), toUnitVector(targetLatLng)) * EARTH_RADIUS;
+  errorEl.textContent = `${window.BussoleScoring.points(errorMeters, initialDistance)} / 1000 points · Error: ${(errorMeters / 1000).toFixed(1)} km`;
   statusEl.textContent = `Line locked at ${Math.round(heading)}°. Drag the globe to inspect it.`;
   lineRevealed = true;
   updateGoButtonState();
@@ -597,7 +598,7 @@ function renderMultiplayerResults(entries, roundTarget, mode) {
   targetEl.textContent = targetLabel;
   const boundsPoints = [playerLatLng, targetLatLng];
   const results = entries.map((entry, index) => {
-    if (!entry.submission) return { ...entry, errorMeters: null };
+    if (!entry.submission) return { ...entry, errorMeters: null, points: 0 };
     const submission = entry.submission;
     const route = greatCirclePoints(
       submission.lat,
@@ -613,7 +614,8 @@ function renderMultiplayerResults(entries, roundTarget, mode) {
     addMultiplayerLine(`multiplayer-route-${index}`, route, entry.color, 3.5, true);
     addMultiplayerLine(`multiplayer-error-${index}`, errorArc, entry.errorColor || '#facf0a', 3.5);
     boundsPoints.push([submission.lat, submission.lon], errorOrigin);
-    return { ...entry, errorMeters };
+    const initialDistance = angleBetween(toUnitVector([submission.lat, submission.lon]), toUnitVector(targetLatLng)) * EARTH_RADIUS;
+    return { ...entry, errorMeters, points: window.BussoleScoring.points(errorMeters, initialDistance) };
   });
 
   lineRevealed = true;
@@ -825,7 +827,8 @@ function setMode(mode) {
   compassEl.classList.toggle('hidden', mode !== 'easy');
   if (mapReady) {
     resetPrototype();
-    statusEl.textContent = `${mode[0].toUpperCase()}${mode.slice(1)} mode ready. The target is unchanged.`;
+    const modeLabel = mode === 'medium' ? 'Normal' : `${mode[0].toUpperCase()}${mode.slice(1)}`;
+    statusEl.textContent = `${modeLabel} mode ready. The target is unchanged.`;
   }
 }
 

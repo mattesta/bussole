@@ -46,7 +46,6 @@ let players = {};
 let selectedTarget = null;
 let preparedRound = null;
 let revealedRound = null;
-let scoredRound = null;
 let disconnectHandle = null;
 let subscriptions = [];
 let revealSubscription = null;
@@ -290,7 +289,7 @@ function renderPlayers() {
     const item = document.createElement('li');
     item.className = 'room-player';
     item.innerHTML = `<span class="player-colour" style="background:${COLOURS[player.colorIndex]}"></span><span></span><span class="player-state"></span>`;
-    item.children[1].textContent = `${player.name}${uid === roomMeta?.hostId ? ' ★' : ''} · ${player.wins || 0} wins`;
+    item.children[1].textContent = `${player.name}${uid === roomMeta?.hostId ? ' ★' : ''} · ${window.BussoleScoring.total(player.roundScores)} points`;
     const spectator = roomMeta?.phase === 'aiming' && (player.eligibleRound || 1) > roomMeta.round;
     const online = isPlayerOnline(player);
     item.children[2].textContent = !online ? 'offline' : spectator ? 'next round' : player.locked ? 'locked' : player.ready ? 'aiming' : 'Ready';
@@ -440,24 +439,25 @@ async function showResults(submissions) {
     name: player.name,
     color: COLOURS[player.colorIndex],
     errorColor: ERROR_COLOURS[player.colorIndex],
-    wins: player.wins || 0,
     submission: submissions[uid] || null
   }));
-  const ranking = window.BussoleGame.revealMultiplayer(entries, target, settings.mode);
+  const round = roomMeta.round;
+  const results = window.BussoleGame.revealMultiplayer(entries, target, settings.mode);
+  const ranking = window.BussoleScoring.rank(results, players, round);
+  await Promise.all(ranking.filter(result => isHost() || result.uid === user.uid).map(result =>
+    runTransaction(ref(db, roomPath(`players/${result.uid}`)), player =>
+      window.BussoleScoring.record(player, round, result.points)
+    )
+  ));
   byId('roundRanking').innerHTML = '';
   ranking.forEach(result => {
     const item = document.createElement('li');
     item.style.color = result.color;
     const error = result.errorMeters === null ? 'DNF' : result.errorMeters >= 1000 ? `${(result.errorMeters / 1000).toFixed(1)} km` : `${Math.round(result.errorMeters)} m`;
-    item.textContent = `${result.name} — ${error}`;
+    item.textContent = `${result.name} — ${result.points} pts · ${error} · Total: ${result.totalPoints} pts`;
     byId('roundRanking').appendChild(item);
   });
   openResultsPanel();
-  if (isHost() && scoredRound !== roomMeta.round && Number.isFinite(ranking[0]?.errorMeters)) {
-    scoredRound = roomMeta.round;
-    const winner = ranking[0].uid;
-    await runTransaction(ref(db, roomPath(`players/${winner}/wins`)), value => (value || 0) + 1);
-  }
 }
 
 function setResultsCollapsed(collapsed) {
@@ -583,7 +583,7 @@ async function leaveRoom() {
   revealSubscription = null;
   disconnectHandle = null;
   roomCode = null; roomMeta = null; players = {}; selectedTarget = null;
-  preparedRound = null; revealedRound = null; scoredRound = null;
+  preparedRound = null; revealedRound = null;
   byId('roomTargetInput').value = '';
   byId('startRoomRound').disabled = true;
   hide(panel); hide(roomBadge); hide(roomTargetBanner); hide(lobby); hide(resultsPanel); show(entry);

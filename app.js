@@ -799,6 +799,9 @@ function updateDistanceToTarget() {
     errorOriginLatLng = nearest.point;
     drawErrorLine(targetLatLng, nearest.point);
   }
+  const start = lockedPoints[0];
+  const initialDistance = distance(start[0], start[1], targetLatLng[0], targetLatLng[1]);
+  distanceEl.textContent = `${window.BussoleScoring.points(d, initialDistance)} / 1000 points · Error: ${(d / 1000).toFixed(1)} km`;
 }
 
 function unwrapLongitudeNear(referenceLongitude, [lat, lon]) {
@@ -1346,7 +1349,7 @@ function renderMultiplayerResults(entries, roundTarget, mode) {
 
   entries.forEach(entry => {
     if (!entry.submission) {
-      results.push({ ...entry, errorMeters: null });
+      results.push({ ...entry, errorMeters: null, points: 0 });
       return;
     }
     const submission = entry.submission;
@@ -1383,7 +1386,8 @@ function renderMultiplayerResults(entries, roundTarget, mode) {
     }).addTo(map);
     multiplayerLayers.push(errorLayer);
     boundsPoints.push([submission.lat, submission.lon], errorOrigin);
-    results.push({ ...entry, errorMeters });
+    const initialDistance = distance(submission.lat, submission.lon, roundTarget[0], roundTarget[1]);
+    results.push({ ...entry, errorMeters, points: window.BussoleScoring.points(errorMeters, initialDistance) });
   });
 
   if (boundsPoints.length > 1) {
