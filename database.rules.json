@@ -11,7 +11,7 @@
         "settings": {
           ".read": "auth != null",
           ".write": "auth != null && root.child('rooms').child($room).child('meta/hostId').val() === auth.uid",
-          ".validate": "newData.hasChildren(['mode', 'timerEnabled', 'timerDuration']) && newData.child('mode').val().matches(/^(easy|medium|hard)$/) && newData.child('timerEnabled').isBoolean() && newData.child('timerDuration').isNumber() && newData.child('timerDuration').val() >= 10 && newData.child('timerDuration').val() <= 3600"
+          ".validate": "newData.hasChildren(['mode', 'timerEnabled', 'timerDuration']) && newData.child('mode').val().matches(/^(easy|medium|hard)$/) && (!newData.child('mapStyle').exists() || newData.child('mapStyle').val().matches(/^(2d|3d)$/)) && newData.child('timerEnabled').isBoolean() && newData.child('timerDuration').isNumber() && newData.child('timerDuration').val() >= 10 && newData.child('timerDuration').val() <= 3600"
         },
         "target": {
           ".read": "auth != null",

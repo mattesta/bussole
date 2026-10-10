@@ -4,6 +4,7 @@ const DEMO_POSITION = [40.2506, 18.2794]; // Calimera [lat, lon]
 const AIMING_ZOOM = 16;
 const pageParameters = new URLSearchParams(window.location.search);
 const integratedMode = pageParameters.get('integrated') === '1';
+const multiplayerMode = pageParameters.get('multiplayer') === '1';
 const debugMode = pageParameters.get('debug') === '1';
 const requestedMode = ['easy', 'medium', 'hard'].includes(pageParameters.get('mode'))
   ? pageParameters.get('mode')
@@ -62,8 +63,12 @@ let smoothHeading = null;
 let pendingHeading = null;
 let orientationFrameId = null;
 let searchTimeout = null;
+let multiplayerController = null;
+let multiplayerLayerIds = [];
 const usedRandomTargets = new Set();
 let lastRandomTargetKey = null;
+
+document.body.classList.toggle('globe-multiplayer', multiplayerMode);
 
 bearingControl.classList.toggle(
   'hidden',
@@ -414,6 +419,40 @@ function clearLines() {
   errorEl.textContent = '';
 }
 
+function clearMultiplayerLayers() {
+  if (!mapReady) return;
+  [...multiplayerLayerIds].reverse().forEach(id => {
+    if (map.getLayer(id)) map.removeLayer(id);
+    if (map.getSource(id)) map.removeSource(id);
+  });
+  multiplayerLayerIds = [];
+}
+
+function addMultiplayerLine(id, points, color, width, withShadow = false) {
+  const sourceId = `${id}-source`;
+  map.addSource(sourceId, { type: 'geojson', data: lineFeature(points) });
+  multiplayerLayerIds.push(sourceId);
+  if (withShadow) {
+    const shadowId = `${id}-shadow`;
+    map.addLayer({
+      id: shadowId,
+      type: 'line',
+      source: sourceId,
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': 'rgba(0,0,0,.72)', 'line-width': width + 3 }
+    });
+    multiplayerLayerIds.push(shadowId);
+  }
+  map.addLayer({
+    id,
+    type: 'line',
+    source: sourceId,
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': color, 'line-width': width }
+  });
+  multiplayerLayerIds.push(id);
+}
+
 function frameAimingView(animated = true) {
   if (!mapReady) return;
   map.stop();
@@ -515,6 +554,17 @@ function showPrototypeLine() {
     }
     distanceMeters = distanceKm * 1000;
   }
+  if (multiplayerController?.isActive()) {
+    multiplayerController.submitLine({
+      lat: playerLatLng[0],
+      lon: playerLatLng[1],
+      heading,
+      distanceMeters
+    });
+    showLineBtn.disabled = true;
+    statusEl.textContent = 'Line locked. Waiting for the other explorers…';
+    return;
+  }
   const route = greatCirclePoints(
     playerLatLng[0],
     playerLatLng[1],
@@ -538,8 +588,47 @@ function showPrototypeLine() {
   frameResult([playerLatLng, targetLatLng, errorOrigin]);
 }
 
+function renderMultiplayerResults(entries, roundTarget, mode) {
+  if (!mapReady) return [];
+  clearLines();
+  clearMultiplayerLayers();
+  targetLatLng = [roundTarget.lat, roundTarget.lon];
+  targetLabel = roundTarget.label;
+  targetEl.textContent = targetLabel;
+  const boundsPoints = [playerLatLng, targetLatLng];
+  const results = entries.map((entry, index) => {
+    if (!entry.submission) return { ...entry, errorMeters: null };
+    const submission = entry.submission;
+    const route = greatCirclePoints(
+      submission.lat,
+      submission.lon,
+      submission.heading,
+      submission.distanceMeters
+    );
+    const errorOrigin = mode === 'hard'
+      ? route[route.length - 1]
+      : nearestPointOnLine(targetLatLng, route).point;
+    const errorMeters = angleBetween(toUnitVector(errorOrigin), toUnitVector(targetLatLng)) * EARTH_RADIUS;
+    const errorArc = greatCircleArcBetween(errorOrigin, targetLatLng);
+    addMultiplayerLine(`multiplayer-route-${index}`, route, entry.color, 3.5, true);
+    addMultiplayerLine(`multiplayer-error-${index}`, errorArc, entry.errorColor || '#facf0a', 3.5);
+    boundsPoints.push([submission.lat, submission.lon], errorOrigin);
+    return { ...entry, errorMeters };
+  });
+
+  lineRevealed = true;
+  updateTargetMarker();
+  setMapInteraction(true);
+  frameResult(boundsPoints);
+  statusEl.textContent = 'All routes revealed. Drag the globe to inspect them.';
+  return results.sort((first, second) =>
+    (first.errorMeters ?? Infinity) - (second.errorMeters ?? Infinity)
+  );
+}
+
 function resetPrototype() {
   clearLines();
+  clearMultiplayerLayers();
   removeTargetMarker();
   lineRevealed = false;
   updateGoButtonState();
@@ -785,3 +874,28 @@ updateClearSearchButton();
 setRandomButtonState(false);
 setMode(requestedMode);
 updateBearing(0);
+
+window.BussoleGlobe = {
+  isReady() {
+    return mapReady;
+  },
+  registerMultiplayer(controller) {
+    multiplayerController = controller;
+  },
+  setMultiplayerTarget(target) {
+    if (!target) return;
+    setTarget(Number(target.lat), Number(target.lon), target.label || 'Multiplayer target');
+  },
+  revealMultiplayer(entries, target, mode) {
+    return renderMultiplayerResults(entries, target, mode);
+  },
+  setStatus(message) {
+    statusEl.textContent = message;
+  },
+  setGoEnabled(enabled) {
+    showLineBtn.disabled = !enabled;
+  },
+  refreshLocation() {
+    return useMyLocation();
+  }
+};
