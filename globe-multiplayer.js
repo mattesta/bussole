@@ -32,7 +32,6 @@ if (multiplayerMode) {
   let disconnectHandle;
   let timerHandle;
   let shownRound = null;
-  let scoredRound = null;
   let leaving = false;
   const unsubscribers = [];
 
@@ -121,7 +120,14 @@ if (multiplayerMode) {
         errorColor: ERROR_COLOURS[player.colorIndex],
         submission: submissions[uid] || null
       }));
-    const ranking = window.BussoleGlobe.revealMultiplayer(entries, target, settings.mode || 'medium');
+    const round = roomMeta.round;
+    const results = window.BussoleGlobe.revealMultiplayer(entries, target, settings.mode || 'medium');
+    const ranking = window.BussoleScoring.rank(results, players, round);
+    await Promise.all(ranking.filter(result => isHost() || result.uid === user.uid).map(result =>
+      runTransaction(ref(db, roomPath(`players/${result.uid}`)), player =>
+        window.BussoleScoring.record(player, round, result.points)
+      )
+    ));
     rankingList.replaceChildren();
     ranking.forEach(result => {
       const item = document.createElement('li');
@@ -131,19 +137,12 @@ if (multiplayerMode) {
         : result.errorMeters >= 1000
           ? `${(result.errorMeters / 1000).toFixed(1)} km`
           : `${Math.round(result.errorMeters)} m`;
-      item.textContent = `${result.name} — ${error}`;
+      item.textContent = `${result.name} — ${result.points} pts · ${error} · Total: ${result.totalPoints} pts`;
       rankingList.appendChild(item);
     });
     nextRoundButton.classList.toggle('hidden', !isHost());
     roomBadge.classList.remove('results-available');
     show(resultsPanel);
-    if (isHost() && scoredRound !== roomMeta.round && Number.isFinite(ranking[0]?.errorMeters)) {
-      scoredRound = roomMeta.round;
-      await runTransaction(
-        ref(db, roomPath(`players/${ranking[0].uid}/wins`)),
-        current => (current || 0) + 1
-      );
-    }
   }
 
   async function nextRound() {
