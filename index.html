@@ -6,7 +6,7 @@
   <title>Bussole!</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <link rel="stylesheet" href="style.css?v=15"/>
+  <link rel="stylesheet" href="style.css?v=16"/>
 </head>
 
 <body>
@@ -106,34 +106,45 @@
   <div id="timerBox" style="display:none;"></div>
   <div id="distanceEasterEgg" aria-live="polite">...where are you going?</div>
 
+  <aside id="soloTargetBanner" class="solo-target-banner hidden" aria-live="polite">
+    <span class="target-label">TARGET</span>
+    <strong id="soloTargetLabel">Choose a target</strong>
+    <span id="status">Bussole! ↑→↓←</span>
+    <span id="distance"></span>
+  </aside>
+
+  <div id="searchPanel" class="search-panel hidden" role="dialog" aria-modal="true" aria-labelledby="searchPanelTitle">
+    <section class="search-card">
+      <div class="search-panel-heading">
+        <span id="searchPanelTitle">SEARCH TARGET</span>
+        <button id="searchPanelClose" type="button" aria-label="Close search">×</button>
+      </div>
+      <div id="searchRow">
+        <div id="searchInputWrap">
+          <input id="searchBox" placeholder="Pick any place..." autocomplete="off" />
+          <button id="clearSearchBtn" type="button" aria-label="Clear search">×</button>
+          <div id="suggestions"></div>
+        </div>
+        <button id="searchBtn" type="button">Search</button>
+      </div>
+    </section>
+  </div>
+
   <!-- ================= HUD ================= -->
   <div id="hud" style="display:none;">
-
-    <div id="searchRow">
-      <div id="searchInputWrap">
-        <input id="searchBox" placeholder="Pick any place..." autocomplete="off" />
-        <button id="clearSearchBtn" type="button" aria-label="Clear search">×</button>
-        <div id="suggestions"></div>
-      </div>
-      <button id="searchBtn" type="button">Search</button>
-      <button id="randomBtn" type="button">Random</button>
-    </div>
-
-    <hr/>
-
-    <button id="startBtn">Start</button>
-    <button id="showLineBtn" disabled>Show line</button>
-    <button id="resetBtn" disabled>Reset</button>
-    <button id="homeBtn">Home</button>
-
     <!-- Hard mode only -->
     <div id="distanceInputWrap" style="display:none;">
       <input id="distanceInput" type="number" placeholder="Distance"/>
       <span id="distanceUnit">km</span>
     </div>
 
-    <div id="status">Bussole! ↑→↓←</div>
-    <div id="distance"></div>
+    <nav id="actionBar" aria-label="Game controls">
+      <button id="randomBtn" type="button">Random Target</button>
+      <button id="openSearchBtn" type="button">Search</button>
+      <button id="showLineBtn" class="primary-action" disabled>Go!</button>
+      <button id="resetBtn" disabled>Reset</button>
+      <button id="homeBtn">Home</button>
+    </nav>
     
     <!-- Stable needle compass (easy mode only) -->
     <div id="compass" class="hidden">
@@ -150,7 +161,7 @@
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
   <script src="targets.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=16"></script>
   <script type="module" src="multiplayer.js"></script>
 </body>
 </html>
