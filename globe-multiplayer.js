@@ -195,13 +195,19 @@ if (multiplayerMode) {
     if (roomCode.length !== 6) return goHome();
     try {
       user = await ensureUser();
-      const snapshot = await get(ref(db, roomPath()));
-      const room = snapshot.val();
-      if (!room?.meta || room.meta.phase === 'closed' || !room.players?.[user.uid]) return goHome();
-      roomMeta = room.meta;
-      settings = room.settings || { mode: 'medium' };
-      target = room.target;
-      players = room.players || {};
+      // Firebase rules grant access to each room section, not to the room root.
+      // Reading the whole room at once therefore fails even for valid players.
+      const [metaSnapshot, settingsSnapshot, targetSnapshot, playersSnapshot] = await Promise.all([
+        get(ref(db, roomPath('meta'))),
+        get(ref(db, roomPath('settings'))),
+        get(ref(db, roomPath('target'))),
+        get(ref(db, roomPath('players')))
+      ]);
+      roomMeta = metaSnapshot.val();
+      settings = settingsSnapshot.val() || { mode: 'medium' };
+      target = targetSnapshot.val();
+      players = playersSnapshot.val() || {};
+      if (!roomMeta || roomMeta.phase === 'closed' || !players[user.uid]) return goHome();
       if (settings.mapStyle !== '3d' || !target) return goHome();
 
       window.BussoleGlobe.registerMultiplayer({ isActive: () => true, submitLine });
