@@ -6,7 +6,7 @@
   <title>Bussole!</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <link rel="stylesheet" href="style.css?v=17"/>
+  <link rel="stylesheet" href="style.css?v=18"/>
 </head>
 
 <body>
@@ -65,7 +65,14 @@
       </div>
     </section>
     <section id="multiplayerLobby" class="hidden">
-      <div class="room-code-label">Room <strong id="roomCodeLabel"></strong></div>
+      <div class="room-code-label">
+        <span>Room <strong id="roomCodeLabel"></strong></span>
+        <button id="copyRoomLinkBtn" class="copy-room-link" type="button" aria-label="Copy room invitation link" title="Copy invitation link">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M10.6 13.4a4 4 0 0 0 5.7 0l2.1-2.1a4 4 0 0 0-5.7-5.7l-1.2 1.2M13.4 10.6a4 4 0 0 0-5.7 0l-2.1 2.1a4 4 0 1 0 5.7 5.7l1.2-1.2"/>
+          </svg>
+        </button>
+      </div>
       <label class="player-name-label">Explorer name
         <input id="playerNameInput" maxlength="24" autocomplete="off">
       </label>
@@ -74,8 +81,13 @@
         <label>Difficulty
           <select id="roomMode"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Difficult</option></select>
         </label>
-        <label><input id="roomTimerEnabled" type="checkbox"> Timer</label>
-        <input id="roomTimerDuration" type="number" min="10" value="60" aria-label="Timer seconds">
+        <div class="room-timer-row">
+          <label class="room-timer-toggle"><input id="roomTimerEnabled" type="checkbox"><span>Timer</span></label>
+          <label id="roomTimerSettings" class="room-timer-settings hidden">
+            <input id="roomTimerDuration" type="number" min="10" value="60" inputmode="numeric" aria-label="Timer seconds">
+            <span>sec.</span>
+          </label>
+        </div>
         <div class="room-target-row">
           <input id="roomTargetInput" placeholder="Choose the target…" autocomplete="off">
           <button id="roomTargetSearch" type="button">Search</button>
@@ -84,7 +96,6 @@
         <button id="startRoomRound" type="button" disabled>Start round</button>
       </div>
       <p id="roomMessage">Waiting for the host…</p>
-      <button id="leaveRoomBtn" type="button">Leave room</button>
     </section>
     <section id="multiplayerResults" class="hidden">
       <h2>Round results</h2>
@@ -162,6 +173,6 @@
   <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
   <script src="targets.js"></script>
   <script src="app.js?v=17"></script>
-  <script type="module" src="multiplayer.js"></script>
+  <script type="module" src="multiplayer.js?v=2"></script>
 </body>
 </html>
