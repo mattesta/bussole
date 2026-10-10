@@ -100,7 +100,7 @@ const map = new maplibregl.Map({
       { id: 'satellite', type: 'raster', source: 'satellite' }
     ]
   },
-  center: [DEMO_POSITION[1], DEMO_POSITION[0]],
+  center: [playerLatLng[1], playerLatLng[0]],
   zoom: AIMING_ZOOM,
   minZoom: 0,
   maxZoom: 20,

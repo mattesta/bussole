@@ -5,11 +5,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <title>Bussole!</title>
 
+  <script>
+    const roomResumeParameters = new URLSearchParams(location.search);
+    const roomResumeCode = (roomResumeParameters.get('room') || '').toUpperCase().replace(/[^A-Z]/g, '');
+    if (roomResumeParameters.get('resume') === '1' && roomResumeCode.length === 6) {
+      document.documentElement.classList.add('room-resuming');
+    }
+  </script>
+  <style>
+    #roomResumeLoading { display: none; }
+    html.room-resuming #menu { display: none; }
+    html.room-resuming #roomResumeLoading {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      display: grid;
+      place-content: center;
+      gap: 16px;
+      color: white;
+      background: #020712;
+      font: 16px system-ui, sans-serif;
+      text-align: center;
+    }
+    #roomResumeLoading a { color: rgba(255,255,255,.7); }
+  </style>
+
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <link rel="stylesheet" href="style.css?v=18"/>
 </head>
 
 <body>
+
+  <div id="roomResumeLoading" role="status">
+    <span>Returning to the room…</span>
+    <a href="./">Home</a>
+  </div>
 
   <!-- ================= START MENU ================= -->
   <div id="menu">
@@ -177,6 +207,6 @@
   <script src="targets.js"></script>
   <script src="scoring.js?v=1"></script>
   <script src="app.js?v=19"></script>
-  <script type="module" src="multiplayer.js?v=4"></script>
+  <script type="module" src="multiplayer.js?v=5"></script>
 </body>
 </html>
