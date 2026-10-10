@@ -75,6 +75,8 @@ let orientationTrackingStarted = false;
 let lastAbsoluteOrientationAt = 0;
 let pendingHeading = null;
 let orientationFrameId = null;
+let orientationPermissionGranted = false;
+let orientationPermissionRequest = null;
 const randomTargets = Array.isArray(window.BUSSOLE_TARGETS)
   ? window.BUSSOLE_TARGETS
   : [];
@@ -173,6 +175,11 @@ document.querySelectorAll('.modeBtn').forEach(btn => {
 
     menuEl.style.display = 'none';
     hudEl.style.display = 'block';
+    soloTargetBanner.classList.toggle(
+      'hidden',
+      document.body.classList.contains('multiplayer-round')
+    );
+    soloTargetLabel.textContent = targetLatLng ? searchBox.value : 'Choose a target';
 
     // HARD → show distance input
     if (gameMode === 'hard') {
@@ -188,21 +195,28 @@ document.querySelectorAll('.modeBtn').forEach(btn => {
       compassContainer.classList.add('hidden');
     }
 
-    setStatus('Mode: ' + gameMode);
+    roundActive = true;
+    lockMap();
+    setStatus('Requesting location and compass access…');
     requestAnimationFrame(() => map.invalidateSize());
+    start();
   });
 });
 
 
 
-const startBtn = document.getElementById('startBtn');
 const showLineBtn = document.getElementById('showLineBtn');
 const resetBtn = document.getElementById('resetBtn');
 const homeBtn = document.getElementById('homeBtn');
+const openSearchBtn = document.getElementById('openSearchBtn');
 const searchBtn = document.getElementById('searchBtn');
 const randomBtn = document.getElementById('randomBtn');
 const searchBox = document.getElementById('searchBox');
 const clearSearchBtn = document.getElementById('clearSearchBtn');
+const searchPanel = document.getElementById('searchPanel');
+const searchPanelClose = document.getElementById('searchPanelClose');
+const soloTargetBanner = document.getElementById('soloTargetBanner');
+const soloTargetLabel = document.getElementById('soloTargetLabel');
 const statusEl = document.getElementById('status');
 const suggestionsEl = document.getElementById('suggestions');
 const distanceEl = document.getElementById('distance');
@@ -215,6 +229,20 @@ const blurCheckbox = document.getElementById('blurCheckbox');
 const timerBox = document.getElementById('timerBox');
 const distanceEasterEggEl = document.getElementById('distanceEasterEgg');
 
+// Multiplayer rounds can begin from a remote host action, which is not an
+// iOS user gesture. Ask early from the player's own tap so the later automatic
+// round start can use the compass without bringing back a Ready/Start button.
+document.getElementById('multiplayerBtn').addEventListener('click', () => {
+  requestDeviceOrientationPermission();
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      () => {},
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
+    );
+  }
+});
+
 timerCheckbox.addEventListener('change', () => {
   timerSettings.style.display = timerCheckbox.checked ? 'block' : 'none';
 });
@@ -222,8 +250,11 @@ timerCheckbox.addEventListener('change', () => {
 function setStatus(s) { statusEl.textContent = s; }
 
 function showDistanceEasterEgg() {
+  const targetBottom = soloTargetBanner.classList.contains('hidden')
+    ? 80
+    : soloTargetBanner.getBoundingClientRect().bottom;
   distanceEasterEggEl.style.top =
-    `${hudEl.getBoundingClientRect().bottom + 18}px`;
+    `${targetBottom + 18}px`;
   distanceEasterEggEl.classList.remove('visible');
   void distanceEasterEggEl.offsetWidth;
   distanceEasterEggEl.classList.add('visible');
@@ -238,7 +269,7 @@ function updateClearSearchButton() {
 }
 
 function setRandomButtonState(hasRandomTarget) {
-  randomBtn.textContent = hasRandomTarget ? 'Skip' : 'Random';
+  randomBtn.textContent = hasRandomTarget ? 'Skip Target' : 'Random Target';
   randomBtn.setAttribute(
     'aria-label',
     hasRandomTarget ? 'Skip this random target' : 'Choose a random target'
@@ -289,15 +320,43 @@ function chooseRandomTarget() {
 function setTarget(lat, lon, label, isRandom = false) {
   targetLatLng = [lat, lon];
   searchBox.value = label;
+  soloTargetLabel.textContent = label;
+  if (!document.body.classList.contains('multiplayer-round')) {
+    soloTargetBanner.classList.remove('hidden');
+  }
   updateClearSearchButton();
   suggestionsEl.style.display = 'none';
   dismissSearchKeyboard();
+  closeSearchPanel();
   setRandomButtonState(isRandom);
 
   if (targetMarker) targetMarker.setLatLng(targetLatLng);
   else targetMarker = L.marker(targetLatLng, { icon: whiteMarkerIcon }).addTo(map);
 
   updateDistanceToTarget();
+  updateGoButtonState();
+  maybeStartTimer();
+}
+
+function openSearchPanel() {
+  searchPanel.classList.remove('hidden');
+  requestAnimationFrame(() => searchBox.focus({ preventScroll: true }));
+}
+
+function closeSearchPanel() {
+  searchPanel.classList.add('hidden');
+  suggestionsEl.style.display = 'none';
+  dismissSearchKeyboard();
+}
+
+function updateGoButtonState() {
+  showLineBtn.disabled = Boolean(lineLocked || !lastPos || !targetLatLng);
+}
+
+function maybeStartTimer() {
+  if (timerEnabled && roundActive && targetLatLng && lastPos && !timerInterval) {
+    startTimer();
+  }
 }
 
 function dismissSearchKeyboard() {
@@ -470,14 +529,20 @@ function updateLine(position, heading){
 
 // Request compass permission on iOS.
 async function requestDeviceOrientationPermission(){
+  if (orientationPermissionGranted) return true;
+  if (orientationPermissionRequest) return orientationPermissionRequest;
+
   if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-    try {
-      const resp = await DeviceOrientationEvent.requestPermission();
-      return resp === 'granted';
-    } catch {
-      return false;
-    }
+    orientationPermissionRequest = DeviceOrientationEvent.requestPermission()
+      .then(resp => {
+        orientationPermissionGranted = resp === 'granted';
+        return orientationPermissionGranted;
+      })
+      .catch(() => false)
+      .finally(() => { orientationPermissionRequest = null; });
+    return orientationPermissionRequest;
   }
+  orientationPermissionGranted = true;
   return true;
 }
 
@@ -733,13 +798,16 @@ function fitResultView() {
     unwrapLongitudeNear(referenceLongitude, targetLatLng),
     unwrapLongitudeNear(referenceLongitude, errorOriginLatLng)
   ];
-  const hudHeight = hudEl.getBoundingClientRect().height || 0;
+  const targetBottom = soloTargetBanner.classList.contains('hidden')
+    ? 24
+    : soloTargetBanner.getBoundingClientRect().bottom;
+  const controlsHeight = hudEl.getBoundingClientRect().height || 0;
 
   const bounds = L.latLngBounds(points).pad(0.15);
   const resultPadding = gameMode === 'easy' ? 130 : 60;
   const options = {
-    paddingTopLeft: [60, hudHeight + 60],
-    paddingBottomRight: [resultPadding, resultPadding],
+    paddingTopLeft: [60, targetBottom + 30],
+    paddingBottomRight: [resultPadding, controlsHeight + 40],
     maxZoom: 16,
     animate: true,
     duration: 0.8
@@ -874,9 +942,13 @@ function stopOrientationTracking() {
 
 // Start tracking.
 function start() {
-  startBtn.disabled = true;
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
   hasCenteredOnPlayer = false;
-  setStatus('Requesting permissions...');
+  showLineBtn.disabled = true;
+  setStatus('Requesting permissions…');
 
   requestDeviceOrientationPermission().then(ok=>{
     if (!ok) setStatus('Device orientation permission denied (compass may not work).');
@@ -888,11 +960,9 @@ function start() {
       watchId = navigator.geolocation.watchPosition(pos=>{
         lastPos = pos;
         setStatus('Position acquired. Move phone to set direction.');
-        if (timerEnabled && roundActive && !timerInterval) {
-          startTimer();
-        }
+        maybeStartTimer();
         // Enable controls when the position is ready.
-        showLineBtn.disabled = false;
+        updateGoButtonState();
         resetBtn.disabled = false;
 
         const lat = pos.coords.latitude;
@@ -971,29 +1041,15 @@ document.addEventListener('click', (e) => {
   }
 });
 
-
-startBtn.addEventListener('click', () => {
-
-  // validation before starting timer
-  if (timerEnabled) {
-
-    if (!targetLatLng) {
-      alert("Select a target location first!");
-      return;
-    }
-
-    if (gameMode === 'hard') {
-      const km = parseFloat(distanceInput.value);
-      if (!km) {
-        alert("Insert distance for hard mode!");
-        return;
-      }
-    }
+openSearchBtn.addEventListener('click', openSearchPanel);
+searchPanelClose.addEventListener('click', closeSearchPanel);
+searchPanel.addEventListener('click', event => {
+  if (event.target === searchPanel) closeSearchPanel();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !searchPanel.classList.contains('hidden')) {
+    closeSearchPanel();
   }
-  roundActive = true;
-  lockMap();
-  start();
-  if (multiplayerController) multiplayerController.markReady();
 });
 
 
@@ -1018,8 +1074,23 @@ showLineBtn.addEventListener('click', () => {
     return;
   }
   if (lineLocked) return;
+  if (!lastPos || lastHeading === null || !targetLatLng) return;
+
+  let distanceMeters = 20000000;
+  let showEasterEgg = false;
+  if (gameMode === 'hard') {
+    const km = parseFloat(distanceInput.value);
+    if (!km) {
+      alert("Enter a distance!");
+      return;
+    }
+    showEasterEgg = km > 40075;
+    distanceMeters = km * 1000;
+  }
+
   roundActive = false;
   hideDistanceEasterEgg();
+  if (showEasterEgg) showDistanceEasterEgg();
 
   // Smoothly return to north-up.
   const northUpAnimation = animateMapBearingTo(0);
@@ -1030,28 +1101,12 @@ showLineBtn.addEventListener('click', () => {
     timerInterval = null;
     timerBox.style.display = 'none';
   }
-  if (!lastPos || lastHeading === null) return;
-
   lineVisible = true;
   lineLocked = true;
+  updateGoButtonState();
 
   const lat = lastPos.coords.latitude;
   const lon = lastPos.coords.longitude;
-
-  let distanceMeters = 20000000;
-
-  // HARD → use the entered distance.
-  if (gameMode === 'hard') {
-    const km = parseFloat(distanceInput.value);
-    if (!km) {
-      alert("Enter a distance!");
-      return;
-    }
-    if (km > 40075) {
-      showDistanceEasterEgg();
-    }
-    distanceMeters = km * 1000;
-  }
 
   const points = greatCirclePoints(lat, lon, lastHeading, distanceMeters, 400);
   lockedPoints = points;
@@ -1088,7 +1143,7 @@ resetBtn.addEventListener('click', () => {
   lineVisible = false;
   removeErrorLine();
   hideDistanceEasterEgg();
-  setStatus('The line was hidden. Press "Show line" to plot a new one.');
+  setStatus('The line was hidden. Press “Go!” to plot a new one.');
   distanceEl.textContent = '';
   lockMap();
   if (lastPos) {
@@ -1115,8 +1170,9 @@ resetBtn.addEventListener('click', () => {
   timerBox.style.display = 'none';
   
   if (timerEnabled) {
-    startTimer();
+    maybeStartTimer();
   }
+  updateGoButtonState();
 });
 
 function resetGameToMenu() {
@@ -1147,7 +1203,6 @@ function resetGameToMenu() {
   unlockMap();
   map.setBearing(0);
 
-  startBtn.disabled = false;
   showLineBtn.disabled = true;
   resetBtn.disabled = true;
   distanceEl.textContent = '';
@@ -1164,6 +1219,7 @@ function resetGameToMenu() {
   distanceInput.value = '';
   suggestionsEl.innerHTML = '';
   suggestionsEl.style.display = 'none';
+  closeSearchPanel();
   clearTimeout(searchTimeout);
   updateClearSearchButton();
   setRandomButtonState(false);
@@ -1178,6 +1234,8 @@ function resetGameToMenu() {
 
   distanceInputWrap.style.display = 'none';
   hudEl.style.display = 'none';
+  soloTargetBanner.classList.add('hidden');
+  soloTargetLabel.textContent = 'Choose a target';
   menuEl.style.display = 'flex';
   dismissSearchKeyboard();
 }
@@ -1313,8 +1371,8 @@ function renderMultiplayerResults(entries, roundTarget, mode) {
     map.fitBounds(L.latLngBounds(boundsPoints).pad(0.28), {
       animate: true,
       duration: 0.9,
-      paddingTopLeft: [24, Math.max(120, hudEl.getBoundingClientRect().bottom + 20)],
-      paddingBottomRight: [24, 70]
+      paddingTopLeft: [24, 100],
+      paddingBottomRight: [24, (hudEl.getBoundingClientRect().height || 0) + 36]
     });
   }
   setStatus('All routes revealed');
@@ -1334,19 +1392,17 @@ window.BussoleGame = {
     blurCheckbox.checked = false;
     document.querySelector(`.modeBtn[data-mode="${settings.mode}"]`).click();
     setTarget(roundTarget.lat, roundTarget.lon, roundTarget.label);
-    startBtn.disabled = false;
-    showLineBtn.disabled = true;
     resetBtn.disabled = true;
-    startBtn.textContent = 'Ready';
-    showLineBtn.textContent = 'Lock line';
+    showLineBtn.textContent = 'Go!';
+    updateGoButtonState();
+    multiplayerController.markReady();
   },
   revealMultiplayer(entries, roundTarget, mode) {
     return renderMultiplayerResults(entries, [roundTarget.lat, roundTarget.lon], mode);
   },
   resetMultiplayerRound() {
     clearMultiplayerLayers();
-    startBtn.textContent = 'Start';
-    showLineBtn.textContent = 'Show line';
+    showLineBtn.textContent = 'Go!';
   },
   returnToMenu() {
     resetGameToMenu();

@@ -23,13 +23,17 @@ body {
 }
 .leaflet-control-attribution a { color: white !important; }
 #hud {
-  position: absolute; left:10px; top:10px; z-index:400;
-  color: white; background: var(--ui-panel); padding:10px; border:1px solid var(--ui-border); border-radius:14px;
-  font-family: system-ui, Arial; box-shadow:0 10px 36px rgba(0,0,0,.38);
-  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  box-sizing: border-box;
+  position: fixed;
+  z-index: 700;
+  right: 12px;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: 12px;
+  color: white;
+  font-family: system-ui, Arial;
+  pointer-events: none;
 }
 #hud button,
+.search-panel button,
 .multiplayer-panel button {
   border: 1px solid var(--ui-border);
   border-radius: 9px;
@@ -40,12 +44,33 @@ body {
 }
 #hud hr { border: 0; border-top: 1px solid var(--ui-border); }
 #hud button:disabled,
+.search-panel button:disabled,
 .multiplayer-panel button:disabled { opacity: .42; }
 #hud #showLineBtn,
 #startRoomRound { border-color: var(--ui-red); background: var(--ui-red); }
-#startBtn{ padding:8px 10px; margin-bottom:6px; }
 #status{ color: var(--ui-muted); font-size:13px; }
 #distance { color: white; font-size: 13px; font-weight: 650; }
+#actionBar {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  width: min(760px, 100%);
+  margin: 0 auto;
+  padding: 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  background: var(--ui-panel);
+  box-shadow: 0 10px 36px rgba(0,0,0,.38);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  pointer-events: auto;
+}
+#actionBar button {
+  min-width: 0;
+  min-height: 46px;
+  padding: 7px 5px;
+  line-height: 1.08;
+}
 #searchRow {
   display: flex;
   align-items: stretch;
@@ -69,7 +94,7 @@ body {
 }
 #searchBox::placeholder,
 .multiplayer-panel input::placeholder { color: rgba(255,255,255,.48); }
-#hud #clearSearchBtn {
+#clearSearchBtn {
   position: absolute;
   top: 50%;
   right: 6px;
@@ -95,15 +120,24 @@ body {
 }
 #randomBtn {
   min-height: 34px;
-  min-width: 68px;
+  min-width: 0;
 }
 #distanceInput {
   font-size: 16px;
 }
 #distanceInputWrap {
+  width: min(420px, 100%);
   align-items: center;
   gap: 6px;
-  margin-top: 6px;
+  margin: 0 auto 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-panel);
+  box-shadow: 0 8px 26px rgba(0,0,0,.32);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  pointer-events: auto;
 }
 #distanceInput {
   min-width: 0;
@@ -131,6 +165,78 @@ body {
   display: none;
   width: 100%;
   box-sizing: border-box;
+}
+
+.solo-target-banner {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  z-index: 650;
+  width: min(620px, calc(100% - 24px));
+  padding: 10px 13px;
+  transform: translateX(-50%);
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  color: white;
+  background: var(--ui-panel);
+  box-shadow: 0 8px 26px rgba(0,0,0,.3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+.target-label {
+  display: block;
+  color: #ff8587;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .16em;
+}
+.solo-target-banner strong,
+.solo-target-banner #status,
+.solo-target-banner #distance { display: block; }
+.solo-target-banner strong {
+  margin-top: 2px;
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.solo-target-banner #status { margin-top: 3px; }
+
+.search-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: grid;
+  place-items: start center;
+  padding: max(72px, calc(env(safe-area-inset-top) + 50px)) 12px 12px;
+  background: rgba(0,0,0,.42);
+}
+.search-card {
+  width: min(560px, 100%);
+  padding: 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  background: rgba(5,11,23,.97);
+  box-shadow: 0 16px 48px rgba(0,0,0,.5);
+}
+.search-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  color: #ff8587;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .16em;
+}
+#searchPanelClose {
+  width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 24px;
 }
 
 .suggestion {
@@ -262,7 +368,7 @@ select:focus-visible {
   font-weight: 700;
   color: white;
   background: var(--ui-field);
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-red);
   border-radius: 10px;
 }
 
@@ -337,8 +443,24 @@ select:focus-visible {
   white-space: nowrap;
   pointer-events: none;
 }
-.multiplayer-round #searchRow,
+.multiplayer-round #randomBtn,
+.multiplayer-round #openSearchBtn,
 .multiplayer-round #resetBtn { display: none; }
+.multiplayer-round #actionBar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.multiplayer-round .room-target-banner {
+  top: max(12px, env(safe-area-inset-top));
+  right: 12px;
+  bottom: auto;
+  left: 12px;
+  max-width: none;
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  background: var(--ui-panel);
+  text-align: center;
+}
+.multiplayer-round .room-badge {
+  bottom: max(78px, calc(env(safe-area-inset-bottom) + 72px));
+}
 .multiplayer-panel.results-mode { top: auto; bottom: 10px; transform: translateX(-50%); max-height: 46%; }
 
 @media (max-width: 480px) {
@@ -352,8 +474,9 @@ select:focus-visible {
 
 #compass {
   position: fixed;
-  bottom: 20px;
+  top: max(112px, calc(env(safe-area-inset-top) + 100px));
   right: 20px;
+  bottom: auto;
   width: 90px;
   height: 90px;
   border-radius: 50%;
@@ -465,38 +588,30 @@ select:focus-visible {
 
 @media (max-width: 700px) {
   #hud {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
-    padding: max(8px, env(safe-area-inset-top)) 10px 8px;
-    border-radius: 0 0 8px 8px;
+    right: 6px;
+    bottom: max(6px, env(safe-area-inset-bottom));
+    left: 6px;
   }
 
   #hud button {
     min-height: 34px;
   }
 
-  #hud #clearSearchBtn {
+  #clearSearchBtn {
     min-height: 22px;
     height: 22px;
   }
 
-  #searchRow {
-    gap: 5px;
-  }
-
-  #searchBtn,
-  #randomBtn {
-    padding-left: 8px;
-    padding-right: 8px;
-  }
+  #actionBar { gap: 4px; padding: 6px; }
+  #actionBar button { min-height: 48px; padding: 5px 2px; font-size: 12px; }
 
   #compass {
     right: max(16px, env(safe-area-inset-right));
-    bottom: max(16px, env(safe-area-inset-bottom));
+    top: max(112px, calc(env(safe-area-inset-top) + 100px));
+    bottom: auto;
   }
+
+  .leaflet-bottom { bottom: 66px; }
 }
 
 /* ===== BLUR CIRCLE ===== */
@@ -527,8 +642,8 @@ select:focus-visible {
 
 #timerBox {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  top: max(112px, calc(env(safe-area-inset-top) + 100px));
+  left: 12px;
   background: rgba(0,0,0,0.8);
   color: white;
   padding: 8px 12px;
