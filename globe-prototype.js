@@ -78,7 +78,7 @@ bearingControl.classList.toggle(
   integratedMode && launchData?.orientationGranted && !debugMode
 );
 
-const emptyCollection = () => ({ type: 'FeatureCollection', features: [] });
+const globeLines = window.BussoleGlobeLines.createLayer();
 
 const map = new maplibregl.Map({
   container: 'globeMap',
@@ -114,30 +114,7 @@ const map = new maplibregl.Map({
 
 map.on('load', () => {
   map.setProjection({ type: 'globe' });
-  map.addSource('prototype-route', { type: 'geojson', data: emptyCollection() });
-  map.addSource('prototype-error', { type: 'geojson', data: emptyCollection() });
-
-  map.addLayer({
-    id: 'prototype-route-shadow',
-    type: 'line',
-    source: 'prototype-route',
-    layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': 'rgba(0,0,0,.72)', 'line-width': 6 }
-  });
-  map.addLayer({
-    id: 'prototype-route',
-    type: 'line',
-    source: 'prototype-route',
-    layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#e41a1c', 'line-width': 3.5 }
-  });
-  map.addLayer({
-    id: 'prototype-error',
-    type: 'line',
-    source: 'prototype-error',
-    layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#facf0a', 'line-width': 3.5 }
-  });
+  map.addLayer(globeLines);
 
   mapReady = true;
   if (typeof map.touchZoomRotate.disableRotation === 'function') {
@@ -180,7 +157,7 @@ function destLatLng(lat, lon, bearingDeg, distanceMeters) {
   return [lat2 * 180 / Math.PI, lon2 * 180 / Math.PI];
 }
 
-function greatCirclePoints(lat, lon, bearing, distanceMeters, steps = 400) {
+function greatCirclePoints(lat, lon, bearing, distanceMeters, steps = Math.min(20000, Math.max(400, Math.ceil(Math.abs(distanceMeters) / 25000)))) {
   const points = [];
   for (let index = 0; index <= steps; index++) {
     const fraction = index / steps;
@@ -297,20 +274,6 @@ function greatCircleArcBetween(from, to) {
   return points;
 }
 
-function lineFeature(points) {
-  return {
-    type: 'FeatureCollection',
-    features: [{
-      type: 'Feature',
-      properties: {},
-      geometry: {
-        type: 'LineString',
-        coordinates: points.map(([lat, lon]) => [lon, lat])
-      }
-    }]
-  };
-}
-
 function markerElement(type) {
   const element = document.createElement('div');
   element.className = `globe-marker ${type}`;
@@ -417,42 +380,19 @@ function sphericalMidpoint(first, second) {
 
 function clearLines() {
   if (!mapReady) return;
-  map.getSource('prototype-route').setData(emptyCollection());
-  map.getSource('prototype-error').setData(emptyCollection());
+  globeLines.removeLine('prototype-route');
+  globeLines.removeLine('prototype-error');
   errorEl.textContent = '';
 }
 
 function clearMultiplayerLayers() {
   if (!mapReady) return;
-  [...multiplayerLayerIds].reverse().forEach(id => {
-    if (map.getLayer(id)) map.removeLayer(id);
-    if (map.getSource(id)) map.removeSource(id);
-  });
+  multiplayerLayerIds.forEach(id => globeLines.removeLine(id));
   multiplayerLayerIds = [];
 }
 
 function addMultiplayerLine(id, points, color, width, withShadow = false) {
-  const sourceId = `${id}-source`;
-  map.addSource(sourceId, { type: 'geojson', data: lineFeature(points) });
-  multiplayerLayerIds.push(sourceId);
-  if (withShadow) {
-    const shadowId = `${id}-shadow`;
-    map.addLayer({
-      id: shadowId,
-      type: 'line',
-      source: sourceId,
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': 'rgba(0,0,0,.72)', 'line-width': width + 3 }
-    });
-    multiplayerLayerIds.push(shadowId);
-  }
-  map.addLayer({
-    id,
-    type: 'line',
-    source: sourceId,
-    layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': color, 'line-width': width }
-  });
+  globeLines.setLine(id, points, color, width, withShadow);
   multiplayerLayerIds.push(id);
 }
 
@@ -580,8 +520,8 @@ function showPrototypeLine() {
   const errorMeters = angleBetween(toUnitVector(errorOrigin), toUnitVector(targetLatLng)) * EARTH_RADIUS;
   const errorArc = greatCircleArcBetween(errorOrigin, targetLatLng);
 
-  map.getSource('prototype-route').setData(lineFeature(route));
-  map.getSource('prototype-error').setData(lineFeature(errorArc));
+  globeLines.setLine('prototype-route', route, '#e41a1c', 3.5, true);
+  globeLines.setLine('prototype-error', errorArc, '#facf0a');
   const initialDistance = angleBetween(toUnitVector(playerLatLng), toUnitVector(targetLatLng)) * EARTH_RADIUS;
   errorEl.textContent = `${window.BussoleScoring.points(errorMeters, initialDistance)} / 1000 points · Error: ${(errorMeters / 1000).toFixed(1)} km`;
   statusEl.textContent = `Line locked at ${Math.round(heading)}°. Drag the globe to inspect it.`;
