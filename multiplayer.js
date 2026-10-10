@@ -206,6 +206,10 @@ async function joinRoom() {
     }
     await enterRoom(code);
   } catch (error) {
+    if (resumeRequested) {
+      byId('roomResumeLoading').querySelector('span').textContent =
+        'Could not return to the room. Go Home and rejoin.';
+    }
     roomMessage.textContent = friendlyError(error);
   }
 }
@@ -276,6 +280,7 @@ function renderRoom() {
     hide(roomBadge);
     hide(roomTargetBanner);
     roomMessage.textContent = host ? 'Choose a target, then start the round.' : 'Waiting for the host to start…';
+    document.documentElement.classList.remove('room-resuming');
   }
 }
 
@@ -674,7 +679,12 @@ onAuthStateChanged(auth, current => { user = current; });
 const invitedCode = compactCode(pageParameters.get('room') || '');
 if (invitedCode.length === 6) {
   byId('roomCodeInput').value = displayCode(invitedCode);
-  hide(menu); show(panel); show(entry); show(byId('joinRoomForm'));
-  setCloseButtonMode('close');
-  if (resumeRequested) joinRoom();
+  hide(menu); show(panel);
+  if (resumeRequested) {
+    hide(entry);
+    joinRoom();
+  } else {
+    show(entry); show(byId('joinRoomForm'));
+    setCloseButtonMode('close');
+  }
 }
