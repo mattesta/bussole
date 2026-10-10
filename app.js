@@ -32,11 +32,16 @@ L.tileLayer(
   }
 ).addTo(map);
 
-const whiteMarkerIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  className: 'white-marker-icon'
+const playerMarkerIcon = L.divIcon({
+  className: 'map-dot-marker player',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9]
+});
+
+const targetMarkerIcon = L.divIcon({
+  className: 'map-dot-marker target',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9]
 });
 
 map.on('move', () => {
@@ -331,7 +336,7 @@ function setTarget(lat, lon, label, isRandom = false) {
   setRandomButtonState(isRandom);
 
   if (targetMarker) targetMarker.setLatLng(targetLatLng);
-  else targetMarker = L.marker(targetLatLng, { icon: whiteMarkerIcon }).addTo(map);
+  else targetMarker = L.marker(targetLatLng, { icon: targetMarkerIcon }).addTo(map);
 
   updateDistanceToTarget();
   updateGoButtonState();
@@ -521,7 +526,7 @@ function updateLine(position, heading){
   const points = greatCirclePoints(lat, lon, heading, distance, 400);
 
   if (userMarker) userMarker.setLatLng([lat, lon]);
-  else userMarker = L.marker([lat, lon], { icon: whiteMarkerIcon }).addTo(map);
+  else userMarker = L.marker([lat, lon], { icon: playerMarkerIcon }).addTo(map);
 
   if (headingLine) headingLine.setLatLngs(points);
   else headingLine = L.polyline(points, { color: 'red', weight: 2 }).addTo(map);
@@ -971,7 +976,7 @@ function start() {
         if (userMarker) {
           userMarker.setLatLng([lat, lon]);
         } else {
-          userMarker = L.marker([lat, lon], { icon: whiteMarkerIcon }).addTo(map);
+          userMarker = L.marker([lat, lon], { icon: playerMarkerIcon }).addTo(map);
         }
 
         // Centre once when the round begins. Further GPS updates must not
