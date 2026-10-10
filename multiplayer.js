@@ -36,6 +36,8 @@ const roomTargetBanner = byId('roomTargetBanner');
 const closeButton = byId('multiplayerClose');
 const timerEnabledInput = byId('roomTimerEnabled');
 const timerSettings = byId('roomTimerSettings');
+const pageParameters = new URLSearchParams(location.search);
+const resumeRequested = pageParameters.get('resume') === '1';
 
 let user = null;
 let roomCode = null;
@@ -108,6 +110,7 @@ async function refreshPresence() {
 }
 
 async function ensureUser() {
+  await auth.authStateReady();
   if (auth.currentUser) return auth.currentUser;
   const credential = await signInAnonymously(auth);
   return credential.user;
@@ -129,17 +132,46 @@ function playerTemplate(index, eligibleRound = 1) {
 async function createRoom() {
   try {
     user = await ensureUser();
+    const initialMapStyle = window.BussoleGame.getSelectedMapStyle?.() === '3d' ? '3d' : '2d';
     let code;
     for (let attempt = 0; attempt < 8; attempt++) {
       code = makeCode();
       const roomRef = ref(db, `rooms/${code}`);
       const existing = await get(ref(db, `rooms/${code}/meta`));
-      if (existing.exists()) { code = null; continue; }
-      await set(roomRef, {
-        meta: { hostId: user.uid, phase: 'lobby', round: 0, createdAt: Date.now(), lastActiveAt: Date.now() },
-        settings: { mode: 'medium', timerEnabled: false, timerDuration: 60 },
-        players: { [user.uid]: playerTemplate(randomIndex(MAX_PLAYERS), 1) }
-      });
+      const newPlayer = playerTemplate(randomIndex(MAX_PLAYERS), 1);
+      if (!existing.exists()) {
+        await set(roomRef, {
+          meta: { hostId: user.uid, phase: 'lobby', round: 0, createdAt: Date.now(), lastActiveAt: Date.now() },
+          settings: { mode: 'medium', mapStyle: initialMapStyle, timerEnabled: false, timerDuration: 60 },
+          players: { [user.uid]: newPlayer }
+        });
+      } else {
+        const stalePlayersSnapshot = await get(ref(db, `rooms/${code}/players`));
+        const stalePlayers = stalePlayersSnapshot.val() || {};
+        if (Object.values(stalePlayers).some(isPlayerOnline)) { code = null; continue; }
+
+        // Reclaim an abandoned code as a completely fresh room. Adding our
+        // player first lets the existing Firebase rules safely transfer host.
+        await set(ref(db, `rooms/${code}/players/${user.uid}`), newPlayer);
+        await update(ref(db, `rooms/${code}/meta`), {
+          hostId: user.uid,
+          phase: 'lobby',
+          round: 0,
+          createdAt: Date.now(),
+          lastActiveAt: Date.now(),
+          deadline: null
+        });
+        await set(ref(db, `rooms/${code}/settings`), {
+          mode: 'medium', mapStyle: initialMapStyle, timerEnabled: false, timerDuration: 60
+        });
+        await Promise.all([
+          remove(ref(db, `rooms/${code}/target`)),
+          remove(ref(db, `rooms/${code}/submissions`)),
+          ...Object.keys(stalePlayers)
+            .filter(uid => uid !== user.uid)
+            .map(uid => remove(ref(db, `rooms/${code}/players/${uid}`)))
+        ]);
+      }
       break;
     }
     if (!code) throw new Error('Could not create a unique room.');
@@ -159,6 +191,11 @@ async function joinRoom() {
     const joinedMeta = metaSnapshot.val();
     const playerSnapshot = await get(ref(db, `rooms/${code}/players`));
     const currentPlayers = playerSnapshot.val() || {};
+    const hasConnectedPlayer = Object.values(currentPlayers).some(player => player.connected);
+    const canResumeOwnSeat = resumeRequested && currentPlayers[user.uid] && isPlayerOnline(currentPlayers[user.uid]);
+    if (joinedMeta.phase === 'closed' || (!hasConnectedPlayer && !canResumeOwnSeat)) {
+      throw new Error('This room is no longer active. Ask the host to create a new room.');
+    }
     if (!currentPlayers[user.uid] && Object.keys(currentPlayers).length >= MAX_PLAYERS) {
       throw new Error('This room is full.');
     }
@@ -207,6 +244,7 @@ async function enterRoom(code) {
     const settings = snapshot.val();
     if (!settings) return;
     byId('roomMode').value = settings.mode || 'medium';
+    byId('roomMapStyle').value = settings.mapStyle === '3d' ? '3d' : '2d';
     byId('roomTimerEnabled').checked = Boolean(settings.timerEnabled);
     byId('roomTimerDuration').value = settings.timerDuration || 60;
     updateTimerSettingsVisibility();
@@ -304,7 +342,12 @@ async function startRound() {
   const round = (roomMeta.round || 0) + 1;
   const timerEnabled = byId('roomTimerEnabled').checked;
   const timerDuration = Math.max(10, Number(byId('roomTimerDuration').value) || 60);
-  const settings = { mode: byId('roomMode').value, timerEnabled, timerDuration };
+  const settings = {
+    mode: byId('roomMode').value,
+    mapStyle: byId('roomMapStyle').value === '3d' ? '3d' : '2d',
+    timerEnabled,
+    timerDuration
+  };
   const playerUpdates = {};
   Object.keys(players).forEach(uid => {
     playerUpdates[`players/${uid}/ready`] = false;
@@ -331,13 +374,23 @@ async function handlePhase() {
     }
     preparedRound = roomMeta.round;
     revealedRound = null;
+    const settings = (await get(ref(db, roomPath('settings')))).val();
+    const target = (await get(ref(db, roomPath('target')))).val();
+    if (settings?.mapStyle === '3d') {
+      const parameters = new URLSearchParams({
+        integrated: '1',
+        multiplayer: '1',
+        room: displayCode(roomCode),
+        mode: settings.mode || 'medium'
+      });
+      window.location.replace(`globe-prototype.html?${parameters}`);
+      return;
+    }
     panel.classList.remove('lobby-mode');
     hide(panel);
     show(roomBadge);
     if (selectedTarget) show(roomTargetBanner);
     document.body.classList.add('multiplayer-round');
-    const settings = (await get(ref(db, roomPath('settings')))).val();
-    const target = (await get(ref(db, roomPath('target')))).val();
     window.BussoleGame.prepareMultiplayerRound(settings, target);
     if (isHost() && roomMeta.deadline) {
       clearTimeout(timerHandle);
@@ -440,7 +493,16 @@ function closeResultsPanel() {
 
 async function nextRound() {
   if (!isHost()) return;
-  await update(ref(db, roomPath('meta')), { phase: 'lobby', deadline: null, lastActiveAt: serverTimestamp() });
+  const updates = {
+    'meta/phase': 'lobby',
+    'meta/deadline': null,
+    'meta/lastActiveAt': serverTimestamp()
+  };
+  Object.keys(players).forEach(uid => {
+    updates[`players/${uid}/ready`] = false;
+    updates[`players/${uid}/locked`] = false;
+  });
+  await update(ref(db, roomPath()), updates);
   window.BussoleGame.resetMultiplayerRound();
   document.body.classList.remove('multiplayer-round');
 }
@@ -507,6 +569,9 @@ async function leaveRoom() {
   const previousCode = roomCode;
   const previousUserId = user?.uid;
   const previousDisconnectHandle = disconnectHandle;
+  const shouldCloseRoom = !Object.entries(players).some(([uid, player]) =>
+    uid !== previousUserId && player.connected
+  );
   clearTimeout(timerHandle);
   clearTimeout(presenceUiTimer);
   clearTimeout(hostTransferTimer);
@@ -527,17 +592,33 @@ async function leaveRoom() {
   setCloseButtonMode('close');
   setResultsCollapsed(false);
   document.body.classList.remove('multiplayer-round');
-  history.replaceState(null, '', location.pathname);
+  show(menu);
   window.BussoleGame.returnToMenu();
-
-  // Navigation should never wait for a slow or suspended mobile connection.
-  if (previousDisconnectHandle) await previousDisconnectHandle.cancel().catch(() => {});
+  // Mark this seat offline before reloading. If the network is suspended, keep
+  // the onDisconnect handler armed so Firebase performs the same cleanup.
+  let presenceSaved = false;
   if (previousCode && previousUserId) {
-    await update(ref(db, `rooms/${previousCode}/players/${previousUserId}`), {
-      connected: false,
-      lastSeenAt: 0
-    }).catch(() => {});
+    presenceSaved = await Promise.race([
+      update(ref(db, `rooms/${previousCode}/players/${previousUserId}`), {
+        connected: false,
+        lastSeenAt: 0
+      }).then(() => true).catch(() => false),
+      new Promise(resolve => setTimeout(() => resolve(false), 700))
+    ]);
   }
+  if (presenceSaved && previousDisconnectHandle) {
+    await previousDisconnectHandle.cancel().catch(() => {});
+  }
+  if (presenceSaved && shouldCloseRoom && previousCode) {
+    await Promise.race([
+      update(ref(db, `rooms/${previousCode}/meta`), {
+        phase: 'closed',
+        lastActiveAt: serverTimestamp()
+      }).catch(() => {}),
+      new Promise(resolve => setTimeout(resolve, 500))
+    ]);
+  }
+  window.location.replace(new URL('./', window.location.href).href);
 }
 
 function friendlyError(error) {
@@ -590,9 +671,10 @@ window.BussoleGame.registerMultiplayer({
 });
 
 onAuthStateChanged(auth, current => { user = current; });
-const invitedCode = compactCode(new URLSearchParams(location.search).get('room') || '');
+const invitedCode = compactCode(pageParameters.get('room') || '');
 if (invitedCode.length === 6) {
   byId('roomCodeInput').value = displayCode(invitedCode);
   hide(menu); show(panel); show(entry); show(byId('joinRoomForm'));
   setCloseButtonMode('close');
+  if (resumeRequested) joinRoom();
 }

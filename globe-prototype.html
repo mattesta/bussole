@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Bussole! — Globe prototype</title>
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="globe-prototype.css?v=17">
+  <link rel="stylesheet" href="globe-prototype.css?v=18">
 </head>
 <body>
   <main id="globeMap" aria-label="Interactive 3D globe"></main>
@@ -64,10 +64,22 @@
     <div class="compass-center"></div>
   </div>
 
+  <section id="globeMultiplayerResults" class="globe-results hidden" aria-live="polite">
+    <button id="globeResultsClose" class="globe-results-close" type="button" aria-label="Close round results">×</button>
+    <h2>Round results</h2>
+    <ol id="globeRoundRanking"></ol>
+    <button id="globeNextRoundBtn" class="hidden" type="button">Next round</button>
+  </section>
+
+  <button id="globeRoomBadge" class="globe-room-badge hidden" type="button" aria-label="Show round results">
+    <span id="globeRoomProgress">0 explorers</span>
+  </button>
+
   <div class="prototype-attribution">MapLibre · Tiles © Esri</div>
 
   <script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
   <script src="targets.js"></script>
-  <script src="globe-prototype.js?v=17"></script>
+  <script src="globe-prototype.js?v=18"></script>
+  <script type="module" src="globe-multiplayer.js?v=1"></script>
 </body>
 </html>

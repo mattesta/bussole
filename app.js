@@ -105,7 +105,7 @@ function updateMapStylePicker() {
     button.setAttribute('aria-pressed', String(selected));
   }
   mapStyleHint.textContent = selectedMapStyle === '3d'
-    ? 'Globe test. Multiplayer still uses the 2D map.'
+    ? 'Globe game. Multiplayer can use the 3D globe too.'
     : 'Classic game. All features are available.';
 }
 
@@ -237,14 +237,28 @@ const distanceEasterEggEl = document.getElementById('distanceEasterEgg');
 // Multiplayer rounds can begin from a remote host action, which is not an
 // iOS user gesture. Ask early from the player's own tap so the later automatic
 // round start can use the compass without bringing back a Ready/Start button.
-document.getElementById('multiplayerBtn').addEventListener('click', () => {
-  requestDeviceOrientationPermission();
+document.getElementById('multiplayerBtn').addEventListener('click', async () => {
+  const orientationGranted = await requestDeviceOrientationPermission();
+  let coordinates = null;
   if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      () => {},
-      () => {},
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
-    );
+    coordinates = await new Promise(resolve => {
+      navigator.geolocation.getCurrentPosition(
+        position => resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        }),
+        () => resolve(null),
+        { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
+      );
+    });
+  }
+  try {
+    sessionStorage.setItem('bussoleGlobeLaunch', JSON.stringify({
+      coordinates,
+      orientationGranted
+    }));
+  } catch {
+    // The 2D game remains available when private browsing blocks storage.
   }
 });
 
@@ -1387,6 +1401,9 @@ function renderMultiplayerResults(entries, roundTarget, mode) {
 }
 
 window.BussoleGame = {
+  getSelectedMapStyle() {
+    return selectedMapStyle;
+  },
   registerMultiplayer(controller) {
     multiplayerController = controller;
   },
