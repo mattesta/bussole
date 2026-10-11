@@ -9,6 +9,18 @@ const pageParameters = new URLSearchParams(window.location.search);
 const integratedMode = pageParameters.get('integrated') === '1';
 const multiplayerMode = pageParameters.get('multiplayer') === '1';
 const debugMode = pageParameters.get('debug') === '1';
+const soloTimerSeconds = !multiplayerMode && window.BussoleRoundTimer.validDuration(pageParameters.get('timer'))
+  ? Number(pageParameters.get('timer')) : 0;
+let soloTimerActive = false;
+const soloCountdown = window.BussoleRoundTimer.create(
+  document.getElementById('globeCountdown'), document.querySelector('.target-card'), () => Date.now(),
+  () => { showPrototypeLine(); }
+);
+function stopSoloTimer() {
+  soloTimerActive = false;
+  soloCountdown.stop();
+}
+
 const requestedMode = ['easy', 'medium', 'hard'].includes(pageParameters.get('mode'))
   ? pageParameters.get('mode')
   : 'medium';
@@ -366,9 +378,14 @@ function setRandomButtonState(isRandomTarget) {
 
 function updateGoButtonState() {
   showLineBtn.disabled = Boolean(!mapReady || !targetLatLng || lineRevealed || compassSubmitted || (!compassUsable && !manualBearing));
+  if (soloTimerSeconds && !soloTimerActive && !showLineBtn.disabled) {
+    soloTimerActive = true;
+    soloCountdown.sync({ phase: 'aiming', deadline: Date.now() + soloTimerSeconds * 1000 });
+  }
 }
 
 function setTarget(lat, lon, label, isRandomTarget = false) {
+  if (!multiplayerMode) stopSoloTimer();
   targetLatLng = [lat, lon];
   targetLabel = label;
   targetEl.textContent = label;
@@ -541,6 +558,7 @@ function showPrototypeLine() {
   errorEl.textContent = `${window.BussoleScoring.points(errorMeters, initialDistance)} / 1000 points · Error: ${(errorMeters / 1000).toFixed(1)} km`;
   statusEl.textContent = `Line locked at ${Math.round(heading)}°. Drag the globe to inspect it.`;
   lineRevealed = true;
+  if (!multiplayerMode) stopSoloTimer();
   updateGoButtonState();
   updateTargetMarker();
   setMapInteraction(true);
@@ -587,6 +605,7 @@ function renderMultiplayerResults(entries, roundTarget, mode) {
 }
 
 function resetPrototype() {
+  if (!multiplayerMode) stopSoloTimer();
   compassSubmitted = false;
   clearLines();
   clearMultiplayerLayers();

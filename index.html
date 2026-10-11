@@ -31,8 +31,8 @@
   </style>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <link rel="stylesheet" href="style.css?v=19"/>
-  <link rel="stylesheet" href="round-timer.css?v=1">
+  <link rel="stylesheet" href="style.css?v=20"/>
+  <link rel="stylesheet" href="round-timer.css?v=2">
 </head>
 
 <body>
@@ -70,7 +70,8 @@
     </label>
     
     <div id="timerSettings" style="display:none; margin-top:8px;">
-      <input type="number" id="timerDuration" placeholder="Duration (seconds)" min="1"/>
+      <input type="number" id="timerDuration" placeholder="Duration (seconds)" min="3" max="60" step="1" value="60" inputmode="numeric" aria-describedby="soloTimerError"/>
+      <span id="soloTimerError" class="hidden" role="status">Enter 3–60 seconds.</span>
     </div>
     
     <label style="margin-top:12px;">
@@ -156,7 +157,7 @@
   <div id="map"></div>
   
   <!-- ================= TIMER ================= -->
-  <div id="timerBox" style="display:none;"></div>
+  <div id="timerBox" class="round-countdown hidden" role="timer"></div>
   <div id="distanceEasterEgg" aria-live="polite">...where are you going?</div>
 
   <aside id="soloTargetBanner" class="solo-target-banner hidden" aria-live="polite">
@@ -214,10 +215,10 @@
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
   <script src="targets.js"></script>
-  <script src="round-timer.js?v=1"></script>
+  <script src="round-timer.js?v=2"></script>
   <script src="scoring.js?v=2"></script>
   <script src="compass.js?v=1"></script>
-  <script src="app.js?v=21"></script>
+  <script src="app.js?v=22"></script>
   <script type="module" src="multiplayer.js?v=7"></script>
 </body>
 </html>

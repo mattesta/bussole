@@ -69,8 +69,7 @@ let smoothHeading = null;
 let gameMode = "medium"; // default
 let timerEnabled = false;
 let timerDuration = 0;
-let timerInterval = null;
-let remainingTime = 0;
+let timerActive = false;
 let roundActive = false;
 let blurEnabled = false;
 let blurCircleEl = null;
@@ -156,29 +155,23 @@ async function launchGlobeMode(mode, sourceButton) {
   }
 
   const parameters = new URLSearchParams({ mode, integrated: '1' });
+  if (timerEnabled) parameters.set('timer', String(timerDuration));
   window.location.href = `globe-prototype.html?${parameters}`;
 }
 
 document.querySelectorAll('.modeBtn').forEach(btn => {
   btn.addEventListener('click', () => {
+    timerEnabled = timerCheckbox.checked;
+    blurEnabled = blurCheckbox.checked;
+    if (timerEnabled) {
+      if (!validateSoloTimer()) { timerDurationInput.focus(); return; }
+      timerDuration = Number(timerDurationInput.value);
+    }
     if (selectedMapStyle === '3d') {
       launchGlobeMode(btn.dataset.mode, btn);
       return;
     }
-    timerEnabled = timerCheckbox.checked;
-    blurEnabled = blurCheckbox.checked;
-    
-    if (timerEnabled) {
-      const value = parseInt(timerDurationInput.value);
-    
-      if (!value || value <= 0) {
-        alert("Insert a valid timer duration in seconds.");
-        return;
-      }
-    
-      timerDuration = value;
-    }
-        
+
     gameMode = btn.dataset.mode;
 
     menuEl.style.display = 'none';
@@ -235,6 +228,21 @@ const timerSettings = document.getElementById('timerSettings');
 const timerDurationInput = document.getElementById('timerDuration');
 const blurCheckbox = document.getElementById('blurCheckbox');
 const timerBox = document.getElementById('timerBox');
+const soloCountdown = window.BussoleRoundTimer.create(timerBox, soloTargetBanner, () => Date.now(), () => {
+  showLineBtn.click();
+  hideBlurCircle();
+});
+function validateSoloTimer() {
+  const valid = window.BussoleRoundTimer.validDuration(timerDurationInput.value);
+  document.getElementById('soloTimerError').classList.toggle('hidden', !timerCheckbox.checked || valid);
+  timerDurationInput.setAttribute('aria-invalid', String(timerCheckbox.checked && !valid));
+  return valid;
+}
+function stopSoloTimer() {
+  timerActive = false;
+  soloCountdown.stop();
+}
+
 const distanceEasterEggEl = document.getElementById('distanceEasterEgg');
 
 // Multiplayer rounds can begin from a remote host action, which is not an
@@ -265,8 +273,10 @@ document.getElementById('multiplayerBtn').addEventListener('click', async () => 
   }
 });
 
+timerDurationInput.addEventListener('input', validateSoloTimer);
 timerCheckbox.addEventListener('change', () => {
-  timerSettings.style.display = timerCheckbox.checked ? 'block' : 'none';
+  timerSettings.style.display = timerCheckbox.checked ? 'flex' : 'none';
+  validateSoloTimer();
 });
 
 function setStatus(s) { statusEl.textContent = s; }
@@ -376,7 +386,7 @@ function updateGoButtonState() {
 }
 
 function maybeStartTimer() {
-  if (timerEnabled && roundActive && targetLatLng && lastPos && !timerInterval) {
+  if (timerEnabled && roundActive && targetLatLng && lastPos && !timerActive) {
     startTimer();
   }
 }
@@ -441,30 +451,9 @@ function unlockMap() {
 }
 
 function startTimer() {
-
-  if (!timerEnabled || timerDuration <= 0) return;
-
-  remainingTime = timerDuration;
-  timerBox.style.display = 'block';
-  timerBox.textContent = remainingTime + "s";
-
-  clearInterval(timerInterval);
-
-  timerInterval = setInterval(() => {
-
-    remainingTime--;
-    timerBox.textContent = remainingTime + "s";
-
-    if (remainingTime <= 0) {
-
-      clearInterval(timerInterval);
-      timerBox.textContent = "0s";
-
-      showLineBtn.click();
-      hideBlurCircle();
-    }
-
-  }, 1000);
+  if (!timerEnabled || !window.BussoleRoundTimer.validDuration(timerDuration)) return;
+  timerActive = true;
+  soloCountdown.sync({ phase: 'aiming', deadline: Date.now() + timerDuration * 1000 });
 }
 
 // Calculate a destination from latitude, longitude, bearing and distance.
@@ -1082,11 +1071,7 @@ showLineBtn.addEventListener('click', () => {
   const northUpAnimation = animateMapBearingTo(0);
   
   // Stop timer if running
-  if (timerInterval) {
-    clearInterval(timerInterval);
-    timerInterval = null;
-    timerBox.style.display = 'none';
-  }
+  stopSoloTimer();
   lineVisible = true;
   lineLocked = true;
   updateGoButtonState();
@@ -1151,9 +1136,7 @@ resetBtn.addEventListener('click', () => {
       showBlurCircle(playerLatLng[0], playerLatLng[1]);
     }
   }
-  clearInterval(timerInterval);
-  timerInterval = null;
-  timerBox.style.display = 'none';
+  stopSoloTimer();
   
   if (timerEnabled) {
     maybeStartTimer();
@@ -1174,9 +1157,7 @@ function resetGameToMenu() {
     watchId = null;
   }
   stopOrientationTracking();
-  clearInterval(timerInterval);
-  timerInterval = null;
-  timerBox.style.display = 'none';
+  stopSoloTimer();
 
   if (headingLine) {
     map.removeLayer(headingLine);

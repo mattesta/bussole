@@ -1,4 +1,4 @@
-// Shared multiplayer clock: the deadline belongs to the room, not a local decrement.
+// Shared solo and multiplayer clock, measured against a deadline.
 window.BussoleRoundTimer = {
   validDuration(value) {
     const seconds = Number(value);
@@ -8,9 +8,10 @@ window.BussoleRoundTimer = {
     const value = settings.timerSeconds ?? settings.timerDuration;
     return this.validDuration(value) ? Number(value) : 60;
   },
-  create(element, anchor, now = () => Date.now()) {
+  create(element, anchor, now = () => Date.now(), onExpire = () => {}) {
     let interval;
     let deadline;
+    let expired = false;
     const stop = () => {
       clearInterval(interval);
       interval = null;
@@ -18,11 +19,17 @@ window.BussoleRoundTimer = {
     };
     const tick = () => {
       const remaining = Math.max(0, deadline - now());
-      element.textContent = `${Math.ceil(remaining / 1000)}s`;
-      element.classList.toggle('urgent', remaining < 10000);
+      const seconds = Math.ceil(remaining / 1000);
+      element.textContent = `${seconds} s`;
+      element.classList.toggle('urgent', seconds < 5);
       element.setAttribute('aria-label', `${Math.ceil(remaining / 1000)} seconds remaining`);
       element.style.top = `${Math.max(12, anchor.getBoundingClientRect().bottom + 8)}px`;
-      if (!remaining) clearInterval(interval);
+      if (!remaining && !expired) {
+        expired = true;
+        clearInterval(interval);
+        interval = null;
+        onExpire();
+      }
     };
     return {
       sync(meta) {
@@ -30,9 +37,10 @@ window.BussoleRoundTimer = {
         if (deadline === meta.deadline && interval) return;
         stop();
         deadline = meta.deadline;
+        expired = false;
         element.classList.remove('hidden');
-        tick();
         interval = setInterval(tick, 200);
+        tick();
       },
       stop
     };

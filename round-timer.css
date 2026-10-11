@@ -12,5 +12,8 @@
   pointer-events: none;
 }
 .round-countdown.urgent { color: #ff8587; border-color: #ff8587; }
-#roomTimerError { color: #ff8587; font-size: 12px; }
+#roomTimerError, #soloTimerError { color: #ff8587; font-size: 12px; }
 .room-timer-row { flex-wrap: wrap; }
+
+#timerSettings { display: flex; align-items: center; gap: 8px; }
+#timerSettings #timerDuration { width: 112px; }

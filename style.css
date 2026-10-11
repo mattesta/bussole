@@ -700,18 +700,7 @@ select:focus-visible {
 }
 
 
-#timerBox {
-  position: fixed;
-  top: max(112px, calc(env(safe-area-inset-top) + 100px));
-  left: 12px;
-  background: rgba(0,0,0,0.8);
-  color: white;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-family: system-ui;
-  font-weight: bold;
-  z-index: 500;
-}
+
 
 #credits {
   position: fixed;
