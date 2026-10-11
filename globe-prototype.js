@@ -2,6 +2,9 @@ const EARTH_RADIUS = 6378137;
 const ROUTE_DISTANCE_METERS = 20000000;
 const DEMO_POSITION = [40.2506, 18.2794]; // Calimera [lat, lon]
 const AIMING_ZOOM = 16;
+// Native drag inertia keeps touch/pinch handling and horizon constraints in
+// MapLibre. A lower deceleration gives a short, soft coast after a flick.
+const GLOBE_DRAG_INERTIA = { linearity: 0.4, maxSpeed: 1400, deceleration: 1200 };
 const pageParameters = new URLSearchParams(window.location.search);
 const integratedMode = pageParameters.get('integrated') === '1';
 const multiplayerMode = pageParameters.get('multiplayer') === '1';
@@ -116,11 +119,16 @@ const map = new maplibregl.Map({
   touchZoomRotate: true
 });
 
+map.getCanvas().addEventListener('pointerdown', () => {
+  if (lineRevealed) map.stop();
+}, { passive: true });
+
 map.on('load', () => {
   map.setProjection({ type: 'globe' });
   map.addLayer(globeLines);
 
   mapReady = true;
+  setMapInteraction(false);
   if (typeof map.touchZoomRotate.disableRotation === 'function') {
     map.touchZoomRotate.disableRotation();
   }
@@ -315,6 +323,7 @@ function removeTargetMarker() {
 }
 
 function setMapInteraction(enabled) {
+  if (!enabled) map.stop();
   const handlers = [
     map.dragPan,
     map.scrollZoom,
@@ -325,7 +334,7 @@ function setMapInteraction(enabled) {
   ];
   for (const handler of handlers) {
     if (!handler) continue;
-    if (enabled) handler.enable();
+    if (enabled) handler.enable(handler === map.dragPan ? GLOBE_DRAG_INERTIA : undefined);
     else handler.disable();
   }
   if (enabled && typeof map.touchZoomRotate.disableRotation === 'function') {
