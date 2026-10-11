@@ -36,6 +36,15 @@ const roomTargetBanner = byId('roomTargetBanner');
 const closeButton = byId('multiplayerClose');
 const timerEnabledInput = byId('roomTimerEnabled');
 const timerSettings = byId('roomTimerSettings');
+let serverTimeOffset = 0;
+const countdown = window.BussoleRoundTimer.create(byId('roomCountdown'), roomTargetBanner, () => Date.now() + serverTimeOffset);
+function validateTimer() {
+  const input = byId('roomTimerDuration');
+  const valid = window.BussoleRoundTimer.validDuration(input.value);
+  byId('roomTimerError').classList.toggle('hidden', !timerEnabledInput.checked || valid);
+  input.setAttribute('aria-invalid', String(timerEnabledInput.checked && !valid));
+  return valid;
+}
 const pageParameters = new URLSearchParams(location.search);
 const resumeRequested = pageParameters.get('resume') === '1';
 
@@ -88,6 +97,7 @@ function setCloseButtonMode(mode) {
 
 function updateTimerSettingsVisibility() {
   timerSettings.classList.toggle('hidden', !timerEnabledInput.checked);
+  validateTimer();
 }
 
 async function refreshPresence() {
@@ -231,6 +241,7 @@ async function enterRoom(code) {
     if (snapshot.val() === true) refreshPresence();
   }));
   await refreshPresence();
+  subscriptions.push(onValue(ref(db, '.info/serverTimeOffset'), snapshot => { serverTimeOffset = Number(snapshot.val()) || 0; }));
 
   subscriptions.push(onValue(ref(db, roomPath('meta')), snapshot => {
     roomMeta = snapshot.val();
@@ -254,7 +265,7 @@ async function enterRoom(code) {
     byId('roomMode').value = settings.mode || 'medium';
     byId('roomMapStyle').value = settings.mapStyle === '3d' ? '3d' : '2d';
     byId('roomTimerEnabled').checked = Boolean(settings.timerEnabled);
-    byId('roomTimerDuration').value = settings.timerDuration || 60;
+    byId('roomTimerDuration').value = window.BussoleRoundTimer.duration(settings);
     updateTimerSettingsVisibility();
   }));
   subscriptions.push(onValue(ref(db, roomPath('target')), snapshot => {
@@ -274,6 +285,7 @@ async function enterRoom(code) {
 
 function renderRoom() {
   if (!roomMeta) return;
+  countdown.sync(roomMeta);
   const host = isHost();
   host ? show(hostControls) : hide(hostControls);
   byId('nextRoundBtn').classList.toggle('hidden', !host);
@@ -357,14 +369,18 @@ async function startRound() {
   if (!goalInput.checkValidity()) { goalInput.reportValidity(); return; }
   const round = (roomMeta.round || 0) + 1;
   const timerEnabled = byId('roomTimerEnabled').checked;
-  const timerDuration = Math.max(10, Number(byId('roomTimerDuration').value) || 60);
+  if (timerEnabled && !validateTimer()) { byId('roomTimerDuration').focus(); return; }
+  const timerSeconds = timerEnabled ? Number(byId('roomTimerDuration').value) : 60;
   const settings = {
     mode: byId('roomMode').value,
     mapStyle: byId('roomMapStyle').value === '3d' ? '3d' : '2d',
     scoreGoal: roomMeta.round > (roomMeta.matchStartRound || 0)
       ? window.BussoleScoring.goal(roomSettings.scoreGoal) : window.BussoleScoring.goal(goalInput.value),
     timerEnabled,
-    timerDuration
+    timerSeconds,
+    // Preserve the legacy field required by already deployed Firebase rules.
+    // timerSeconds and the room deadline carry the actual 3–60 second duration.
+    timerDuration: Math.max(10, timerSeconds)
   };
   const playerUpdates = {};
   Object.keys(players).forEach(uid => {
@@ -376,8 +392,8 @@ async function startRound() {
     settings,
     'meta/phase': 'aiming',
     'meta/round': round,
-    'meta/startedAt': Date.now(),
-    'meta/deadline': timerEnabled ? Date.now() + timerDuration * 1000 : null,
+    'meta/startedAt': Date.now() + serverTimeOffset,
+    'meta/deadline': timerEnabled ? Date.now() + serverTimeOffset + timerSeconds * 1000 : null,
     'meta/lastActiveAt': Date.now()
   });
 }
@@ -412,7 +428,7 @@ async function handlePhase() {
     window.BussoleGame.prepareMultiplayerRound(settings, target);
     if (isHost() && roomMeta.deadline) {
       clearTimeout(timerHandle);
-      timerHandle = setTimeout(() => revealRound(), Math.max(0, roomMeta.deadline - Date.now()));
+      timerHandle = setTimeout(() => revealRound(), Math.max(0, roomMeta.deadline - (Date.now() + serverTimeOffset)));
     }
   }
   if (roomMeta.phase === 'revealed' && revealedRound !== roomMeta.round) {
@@ -586,6 +602,7 @@ async function copyRoomLink() {
 async function leaveRoom() {
   if (leaving) return;
   leaving = true;
+  countdown.stop();
   const previousCode = roomCode;
   const previousUserId = user?.uid;
   const previousDisconnectHandle = disconnectHandle;
@@ -666,6 +683,7 @@ byId('roomTargetRandom').addEventListener('click', selectRandomTarget);
 byId('startRoomRound').addEventListener('click', startRound);
 byId('copyRoomLinkBtn').addEventListener('click', copyRoomLink);
 timerEnabledInput.addEventListener('change', updateTimerSettingsVisibility);
+byId('roomTimerDuration').addEventListener('input', validateTimer);
 byId('roomScoreGoal').addEventListener('change', async event => {
   if (!isHost() || roomMeta?.phase !== 'lobby' || roomMeta.round > (roomMeta.matchStartRound || 0)) return;
   if (!event.target.checkValidity()) { event.target.reportValidity(); return; }

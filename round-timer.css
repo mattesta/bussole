@@ -1,0 +1,16 @@
+.round-countdown {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left));
+  z-index: 600;
+  padding: 8px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-panel);
+  color: white;
+  font: 750 22px/1.2 system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.round-countdown.urgent { color: #ff8587; border-color: #ff8587; }
+#roomTimerError { color: #ff8587; font-size: 12px; }
+.room-timer-row { flex-wrap: wrap; }
