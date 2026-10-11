@@ -77,10 +77,11 @@ if (multiplayerMode) {
   async function submitLine(submission) {
     if (roomMeta?.phase !== 'aiming' || players[user.uid]?.locked) return;
     try {
-      await set(ref(db, roomPath(`submissions/${roomMeta.round}/${user.uid}`)), {
-        ...submission,
-        submittedAt: serverTimestamp()
-      });
+      const changes = { [`submissions/${roomMeta.round}/${user.uid}`]: { ...submission, submittedAt: serverTimestamp() } };
+      if (roomMeta.visibility === 'public') {
+        changes[`publicResults/${roomMeta.round}/${user.uid}`] = window.BussoleGlobe.publicResult(submission, target, settings.mode || 'medium');
+      }
+      await update(ref(db, roomPath()), changes);
       await update(ref(db, roomPath(`players/${user.uid}`)), { locked: true, ready: true });
       window.BussoleGlobe.setStatus('Line locked. Waiting for the other explorers…');
     } catch (error) {
@@ -127,8 +128,11 @@ if (multiplayerMode) {
     shownRound = roomMeta.round;
     clearTimeout(timerHandle);
     countdown.stop();
-    const snapshot = await get(ref(db, roomPath(`submissions/${roomMeta.round}`)));
+    const publicRoom = roomMeta.visibility === 'public';
+    const resultPath = publicRoom ? 'publicResults' : 'submissions';
+    const snapshot = await get(ref(db, roomPath(`${resultPath}/${roomMeta.round}`)));
     const submissions = snapshot.val() || {};
+    const ownSubmission = publicRoom ? (await get(ref(db, roomPath(`submissions/${roomMeta.round}/${user.uid}`)))).val() : null;
     const entries = Object.entries(players)
       .filter(([, player]) => (player.eligibleRound || 1) <= roomMeta.round)
       .map(([uid, player]) => ({
@@ -136,7 +140,8 @@ if (multiplayerMode) {
         name: player.name,
         color: COLOURS[player.colorIndex],
         errorColor: ERROR_COLOURS[player.colorIndex],
-        submission: submissions[uid] || null
+        submission: publicRoom ? (uid === user.uid ? ownSubmission : null) : submissions[uid] || null,
+        publicResult: publicRoom ? submissions[uid] || null : null
       }));
     const round = roomMeta.round;
     const results = window.BussoleGlobe.revealMultiplayer(entries, target, settings.mode || 'medium');
@@ -155,11 +160,12 @@ if (multiplayerMode) {
       const item = document.createElement('li');
       item.style.color = result.color;
       const error = result.errorMeters === null
-        ? 'DNF'
+        ? ' · DNF'
+        : result.errorMeters === undefined ? ''
         : result.errorMeters >= 1000
-          ? `${(result.errorMeters / 1000).toFixed(1)} km`
-          : `${Math.round(result.errorMeters)} m`;
-      item.textContent = `${result.name} — ${result.points} pts · ${error} · Total: ${result.totalPoints} pts`;
+          ? ` · ${(result.errorMeters / 1000).toFixed(1)} km`
+          : ` · ${Math.round(result.errorMeters)} m`;
+      item.textContent = `${result.name} — ${result.points} pts${error} · Total: ${result.totalPoints} pts`;
       rankingList.appendChild(item);
     });
     nextRoundButton.classList.toggle('hidden', !isHost());

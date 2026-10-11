@@ -27,10 +27,11 @@
         },
         "submissions": {
           "$round": {
-            ".read": "auth != null && root.child('rooms').child($room).child('meta/phase').val() === 'revealed'",
+            ".read": "auth != null && root.child('rooms').child($room).child('meta/visibility').val() !== 'public' && root.child('rooms').child($room).child('meta/phase').val() === 'revealed'",
             "$uid": {
-              ".write": "auth.uid === $uid && root.child('rooms').child($room).child('meta/phase').val() === 'aiming'",
-              ".validate": "newData.hasChildren(['lat', 'lon', 'heading', 'distanceMeters']) && newData.child('lat').isNumber() && newData.child('lat').val() >= -90 && newData.child('lat').val() <= 90 && newData.child('lon').isNumber() && newData.child('lon').val() >= -180 && newData.child('lon').val() <= 180 && newData.child('heading').isNumber() && newData.child('heading').val() >= 0 && newData.child('heading').val() < 360 && newData.child('distanceMeters').isNumber() && newData.child('distanceMeters').val() > 0 && newData.child('distanceMeters').val() <= 100000000000"
+              ".write": "auth != null && auth.uid === $uid && root.child('rooms').child($room).child('players').child(auth.uid).exists() && root.child('rooms').child($room).child('meta/phase').val() === 'aiming'",
+              ".validate": "newData.hasChildren(['lat', 'lon', 'heading', 'distanceMeters']) && newData.child('lat').isNumber() && newData.child('lat').val() >= -90 && newData.child('lat').val() <= 90 && newData.child('lon').isNumber() && newData.child('lon').val() >= -180 && newData.child('lon').val() <= 180 && newData.child('heading').isNumber() && newData.child('heading').val() >= 0 && newData.child('heading').val() < 360 && newData.child('distanceMeters').isNumber() && newData.child('distanceMeters').val() > 0 && newData.child('distanceMeters').val() <= 100000000000",
+              ".read": "auth != null && auth.uid === $uid && root.child('rooms').child($room).child('meta/visibility').val() === 'public' && root.child('rooms').child($room).child('players').child(auth.uid).exists()"
             }
           }
         },
@@ -41,6 +42,42 @@
             ".validate": "$slot.matches(/^[0-7]$/) && newData.hasChildren(['uid','claimedAt']) && newData.child('uid').isString() && newData.child('claimedAt').isNumber() && newData.child('claimedAt').val() <= now + 5000 && newData.child('claimedAt').val() >= now - 5000",
             "$other": {
               ".validate": "$other === 'uid' || $other === 'claimedAt'"
+            }
+          }
+        },
+        "publicResults": {
+          "$round": {
+            ".read": "auth != null && root.child('rooms').child($room).child('players').child(auth.uid).exists() && root.child('rooms').child($room).child('meta/visibility').val() === 'public' && root.child('rooms').child($room).child('meta/phase').val() === 'revealed'",
+            "$uid": {
+              ".write": "auth != null && auth.uid === $uid && root.child('rooms').child($room).child('players').child(auth.uid).exists() && root.child('rooms').child($room).child('meta/visibility').val() === 'public' && root.child('rooms').child($room).child('meta/phase').val() === 'aiming' && $round === root.child('rooms').child($room).child('meta/round').val() + ''",
+              ".validate": "newData.hasChildren(['version','points']) && newData.child('version').val() === 1 && newData.child('points').isNumber() && newData.child('points').val() >= 0 && newData.child('points').val() <= 1000 && newData.child('points').val() % 1 === 0 && ((!newData.child('route').exists() && !newData.child('errorArc').exists()) || (newData.child('points').val() >= 200 && newData.hasChildren(['route','errorArc'])))",
+              "route": {
+                ".validate": "newData.hasChildren(['0','60'])",
+                "$point": {
+                  ".validate": "$point.matches(/^([0-9]|[1-5][0-9]|60)$/) && newData.hasChildren(['0','1']) && newData.child('0').isNumber() && newData.child('0').val() >= -90 && newData.child('0').val() <= 90 && newData.child('1').isNumber() && newData.child('1').val() >= -180 && newData.child('1').val() <= 180",
+                  "$other": {
+                    ".validate": "$other === '0' || $other === '1'"
+                  },
+                  "0": {
+                    ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90"
+                  },
+                  "1": {
+                    ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180"
+                  }
+                }
+              },
+              "errorArc": {
+                ".validate": "newData.hasChildren(['0','1'])",
+                "$point": {
+                  ".validate": "$point.matches(/^([0-9]|[1-9][0-9]|1[0-7][0-9]|180)$/) && newData.hasChildren(['0','1']) && newData.child('0').isNumber() && newData.child('0').val() >= -90 && newData.child('0').val() <= 90 && newData.child('1').isNumber() && newData.child('1').val() >= -180 && newData.child('1').val() <= 180",
+                  "$other": {
+                    ".validate": "$other === '0' || $other === '1'"
+                  }
+                }
+              },
+              "$other": {
+                ".validate": "$other === 'version' || $other === 'points'"
+              }
             }
           }
         }

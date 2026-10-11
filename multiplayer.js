@@ -157,7 +157,10 @@ async function joinPublicRoom() {
   byId('multiplayerEntryMessage').textContent = 'Finding a public room…';
   try {
     user = await ensureUser();
-    serverTimeOffset = Number((await get(ref(db, '.info/serverTimeOffset'))).val()) || 0;
+    // .info lives in the SDK's local info tree; get() sends an invalid server path.
+    serverTimeOffset = await new Promise((resolve, reject) => {
+      onValue(ref(db, '.info/serverTimeOffset'), snapshot => resolve(Number(snapshot.val()) || 0), reject, { onlyOnce: true });
+    });
     const directory = await requirePublicDirectory();
     for (const [code, advertised] of window.BussolePublicRooms.candidates(directory, serverNow())) {
       const meta = (await get(ref(db, `rooms/${code}/meta`))).val();
@@ -581,7 +584,8 @@ async function handlePhase() {
     revealedRound = roomMeta.round;
     clearTimeout(timerHandle);
     if (revealSubscription) revealSubscription();
-    revealSubscription = onValue(ref(db, roomPath(`submissions/${roomMeta.round}`)), snapshot => {
+    const resultPath = roomMeta.visibility === 'public' ? 'publicResults' : 'submissions';
+    revealSubscription = onValue(ref(db, roomPath(`${resultPath}/${roomMeta.round}`)), snapshot => {
       showResults(snapshot.val() || {});
     }, { onlyOnce: true });
   }
@@ -594,10 +598,13 @@ async function markReady() {
 
 async function submitLine(submission) {
   if (!roomCode || roomMeta?.phase !== 'aiming' || players[user.uid]?.locked) return;
-  await set(ref(db, roomPath(`submissions/${roomMeta.round}/${user.uid}`)), {
-    ...submission,
-    submittedAt: serverTimestamp()
-  });
+  const changes = { [`submissions/${roomMeta.round}/${user.uid}`]: { ...submission, submittedAt: serverTimestamp() } };
+  if (roomMeta.visibility === 'public') {
+    changes[`publicResults/${roomMeta.round}/${user.uid}`] = window.BussoleGame.publicResult(submission, selectedTarget, roomSettings.mode);
+  }
+  // Atomic write: an older rule set cannot save the location without also
+  // accepting the reduced result. Public submissions are owner-readable only.
+  await update(ref(db, roomPath()), changes);
   await update(ref(db, roomPath(`players/${user.uid}`)), { locked: true, ready: true });
 }
 
@@ -615,12 +622,15 @@ async function revealRound() {
 async function showResults(submissions) {
   const settings = (await get(ref(db, roomPath('settings')))).val();
   const target = (await get(ref(db, roomPath('target')))).val();
+  const publicRoom = roomMeta.visibility === 'public';
+  const ownSubmission = publicRoom ? (await get(ref(db, roomPath(`submissions/${roomMeta.round}/${user.uid}`)))).val() : null;
   const entries = Object.entries(players).filter(([, player]) => (player.eligibleRound || 1) <= roomMeta.round).map(([uid, player]) => ({
     uid,
     name: player.name,
     color: COLOURS[player.colorIndex],
     errorColor: ERROR_COLOURS[player.colorIndex],
-    submission: submissions[uid] || null
+    submission: publicRoom ? (uid === user.uid ? ownSubmission : null) : submissions[uid] || null,
+    publicResult: publicRoom ? submissions[uid] || null : null
   }));
   const round = roomMeta.round;
   const results = window.BussoleGame.revealMultiplayer(entries, target, settings.mode);
@@ -638,8 +648,8 @@ async function showResults(submissions) {
   ranking.forEach(result => {
     const item = document.createElement('li');
     item.style.color = result.color;
-    const error = result.errorMeters === null ? 'DNF' : result.errorMeters >= 1000 ? `${(result.errorMeters / 1000).toFixed(1)} km` : `${Math.round(result.errorMeters)} m`;
-    item.textContent = `${result.name} — ${result.points} pts · ${error} · Total: ${result.totalPoints} pts`;
+    const error = result.errorMeters === null ? ' · DNF' : result.errorMeters === undefined ? '' : result.errorMeters >= 1000 ? ` · ${(result.errorMeters / 1000).toFixed(1)} km` : ` · ${Math.round(result.errorMeters)} m`;
+    item.textContent = `${result.name} — ${result.points} pts${error} · Total: ${result.totalPoints} pts`;
     byId('roundRanking').appendChild(item);
   });
   openResultsPanel();

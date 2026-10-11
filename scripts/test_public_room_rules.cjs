@@ -3,13 +3,18 @@ for (const key of ['HTTP_PROXY', 'http_proxy', 'HTTPS_PROXY', 'https_proxy']) de
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
 const { initializeTestEnvironment, assertFails, assertSucceeds } = require('@firebase/rules-unit-testing');
-const { ref, set, get, update, runTransaction } = require('firebase/database');
+const { ref, set, get, update, runTransaction, onValue } = require('firebase/database');
 const player = (name, slot) => ({ name, colorIndex: slot, slotId: String(slot), connected: true, joinedAt: Date.now(), ready: false, locked: false, wins: 0, eligibleRound: 1 });
 (async () => {
   const [host, port] = process.env.FIREBASE_DATABASE_EMULATOR_HOST.split(':');
   const env = await initializeTestEnvironment({ projectId: 'demo-bussole', database: { host, port: Number(port), rules: fs.readFileSync('database.rules.json', 'utf8') } });
   try {
     const db = uid => env.authenticatedContext(uid).database();
+    // Reproduce the production path error with the actual SDK, then verify
+    // the virtual .info listener used by public matchmaking.
+    await assert.rejects(get(ref(db('clock'), '.info/serverTimeOffset')), /invalid token in path/i);
+    const offset = await new Promise((resolve,reject)=>onValue(ref(db('clock'),'.info/serverTimeOffset'),snapshot=>resolve(snapshot.val()),reject,{onlyOnce:true}));
+    assert.equal(typeof offset,'number');
     const room = { meta: { hostId: 'host', visibility: 'public', phase: 'lobby', round: 0, createdAt: Date.now() }, settings: { mode: 'medium', timerEnabled: false, timerDuration: 60 }, players: { host: player('Host', 0) }, seats: { 0: { uid: 'host', claimedAt: Date.now() } } };
     await assertSucceeds(set(ref(db('host'), 'rooms/ABCDEF'), room));
     await assertFails(get(ref(env.unauthenticatedContext().database(), 'publicRooms')));
@@ -48,6 +53,27 @@ const player = (name, slot) => ({ name, colorIndex: slot, slotId: String(slot), 
       settings: room.settings, 'players/host/ready': false, 'players/host/locked': false
     }));
     await assertSucceeds(update(ref(db('host'), 'rooms/ABCDEF/players/host'), { roundScores: { 1: 900 }, totalPoints: 900 }));
+    const raw = { lat: 41.12345, lon: 12.98765, heading: 20, distanceMeters: 20000000 };
+    const reduced = { version: 1, points: 700, route: Array.from({length:61},(_,i)=>[45,i/10]), errorArc: [[45,3],[46,3]] };
+    await assertSucceeds(update(ref(db('new'), 'rooms/ABCDEF'), {
+      'submissions/1/new': raw, 'publicResults/1/new': reduced
+    }));
+    await assertSucceeds(get(ref(db('new'), 'rooms/ABCDEF/submissions/1/new')));
+    await assertFails(get(ref(db('host'), 'rooms/ABCDEF/submissions/1/new')));
+    await assertFails(get(ref(db(owner), 'rooms/ABCDEF/submissions/1/new')));
+    await assertFails(get(ref(db('new'), 'rooms/ABCDEF/publicResults/1'))); // reveal barrier
+    await assertFails(set(ref(db('new'), 'rooms/ABCDEF/publicResults/1/new'), {...reduced,lat:41}));
+    await assertFails(set(ref(db('new'), 'rooms/ABCDEF/publicResults/1/new'), {...reduced,heading:20}));
+    await assertFails(set(ref(db('new'), 'rooms/ABCDEF/publicResults/1/new'), {...reduced,points:199}));
+    await assertFails(set(ref(db('new'), 'rooms/ABCDEF/publicResults/1/new'), {...reduced,route:[[0,0]]}));
+    await assertSucceeds(set(ref(db('new'), 'rooms/ABCDEF/publicResults/1/new'), {version:1,points:100}));
+    await assertSucceeds(set(ref(db('new'), 'rooms/ABCDEF/publicResults/1/new'), reduced));
+    await assertSucceeds(update(ref(db('host'), 'rooms/ABCDEF/meta'), {phase:'revealed'}));
+    await assertSucceeds(get(ref(db('host'), 'rooms/ABCDEF/publicResults/1')));
+    await assertFails(get(ref(db('outsider'), 'rooms/ABCDEF/publicResults/1')));
+    await assertFails(get(ref(db('host'), 'rooms/ABCDEF/submissions/1')));
+    await assertFails(get(ref(db('host'), 'rooms/ABCDEF/submissions/1/new')));
+    await assertFails(get(ref(db('outsider'), 'rooms/ABCDEF/submissions/1/new')));
     await assertFails(set(ref(db('late'), 'rooms/ABCDEF/seats/1'), { uid: 'late', claimedAt: Date.now() }));
     await assertSucceeds(set(ref(db('host'), 'publicRooms/ABCDEF'), null));
     await assertFails(set(ref(db('host'), 'publicRooms/ABCDEF'), { count: 8, phase: 'lobby', createdAt: room.meta.createdAt, updatedAt: Date.now() }));
@@ -68,6 +94,10 @@ const player = (name, slot) => ({ name, colorIndex: slot, slotId: String(slot), 
     await assertSucceeds(set(ref(db('private'), 'rooms/PRIVATE'), { ...room, meta: { ...room.meta, hostId: 'private', visibility: 'private' }, players: { private: { ...player('Private', 0), slotId: null } }, seats: null }));
     await assertFails(set(ref(db('private'), 'publicRooms/PRIVATE'), { count: 1, phase: 'lobby', createdAt: room.meta.createdAt, updatedAt: Date.now() }));
     await assertSucceeds(set(ref(db('guest'), 'rooms/PRIVATE/players/guest'), { ...player('Guest', 1), slotId: null }));
-    console.log('Firebase public directory, private isolation, slot races, capacity, grace, phase and private compatibility tests passed.');
+    await assertSucceeds(update(ref(db('private'), 'rooms/PRIVATE/meta'), {phase:'aiming',round:1}));
+    await assertSucceeds(set(ref(db('guest'), 'rooms/PRIVATE/submissions/1/guest'), raw));
+    await assertSucceeds(update(ref(db('private'), 'rooms/PRIVATE/meta'), {phase:'revealed'}));
+    assert.equal((await assertSucceeds(get(ref(db('private'), 'rooms/PRIVATE/submissions/1')))).val().guest.lat,raw.lat);
+    console.log('Firebase info-path regression, public directory, reservations, owner-only origins, reduced results, reveal barrier and private full-route compatibility tests passed.');
   } finally { await env.cleanup(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

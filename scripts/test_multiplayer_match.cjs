@@ -16,6 +16,10 @@ async function checkController(file, globe) {
     };
   }
   const updates = [];
+  const reads = [];
+  let capturedEntries;
+  const raw = {lat:41.12345,lon:12.98765,heading:20,distanceMeters:20000000};
+  const shared = {a:{version:1,points:400},b:{version:1,points:900}};
   const players = {
     a: { name: 'A', colorIndex: 0, connected: true, roundScores: { 1: 4700 } },
     b: { name: 'B', colorIndex: 1, connected: true, roundScores: { 1: 4500 } }
@@ -30,7 +34,10 @@ async function checkController(file, globe) {
     },
     initializeApp() {}, firebaseConfig: {}, getAuth() { return {}; }, getDatabase() {},
     onAuthStateChanged() {}, ref(db, path) { return path; }, serverTimestamp() { return 123; },
-    async get(path) { return { val() { return path.endsWith('settings') ? settings : {}; } }; },
+    async get(path) {
+      reads.push(path);
+      return { val() { return path.endsWith('settings') ? settings : path.includes('submissions/2/a') ? raw : path.includes('publicResults/2') ? shared : {}; } };
+    },
     async runTransaction(path, callback) {
       const uid = path.split('/').at(-1);
       players[uid] = callback(players[uid]) || players[uid];
@@ -38,8 +45,8 @@ async function checkController(file, globe) {
     async update(path, changes) { updates.push(changes); },
     window: {
       addEventListener() {},
-      BussoleGame: { registerMultiplayer() {}, resetMultiplayerRound() {}, revealMultiplayer() { return results; } },
-      BussoleGlobe: { isReady() { return true; }, revealMultiplayer() { return results; } }
+      BussoleGame: { registerMultiplayer() {}, resetMultiplayerRound() {}, publicResult(){return shared.a}, revealMultiplayer(entries) { capturedEntries=entries; return results; } },
+      BussoleGlobe: { isReady() { return true; }, setStatus(){}, publicResult(){return shared.a}, revealMultiplayer(entries) { capturedEntries=entries; return results; } }
     }
   });
   const results = [
@@ -52,8 +59,8 @@ async function checkController(file, globe) {
   vm.runInContext(fs.readFileSync('public-rooms.js', 'utf8'), context);
   let source = fs.readFileSync(file, 'utf8').replace(/^import[\s\S]*?;\s*/gm, '');
   const expose = `globalThis.test = {
-    setup(p, s) { user = { uid: 'a' }; roomMeta = { hostId: 'a', round: 2, phase: 'revealed' }; players = p; ${globe ? 'settings' : 'roomSettings'} = s; ${globe ? 'target' : 'selectedTarget'} = {}; ${globe ? '' : "roomCode = 'ABCDEF';"} },
-    showResults, nextRound${globe ? '' : ', startRound, validateTimer, setupLobby() { roomMeta.round = 0; roomMeta.phase = \"lobby\"; }'}
+    setup(p, s, publicRoom=false, phase='revealed') { user = { uid: 'a' }; roomMeta = { hostId: 'a', round: 2, phase, visibility:publicRoom?'public':'private' }; players = p; ${globe ? 'settings' : 'roomSettings'} = s; ${globe ? 'target' : 'selectedTarget'} = {}; ${globe ? 'shownRound=null;' : "roomCode = 'ABCDEF';"} },
+    showResults, nextRound, submitLine${globe ? '' : ', startRound, validateTimer, setupLobby() { roomMeta.round = 0; roomMeta.phase = \"lobby\"; }'}
   };`;
   source = globe ? source.replace('  initialize();', expose) : source + expose;
   vm.runInContext(source, context);
@@ -96,6 +103,19 @@ async function checkController(file, globe) {
       assert.equal(change['meta/deadline'] - change['meta/startedAt'], Number(seconds) * 1000);
     }
   }
+  context.test.setup(players,settings,true,'aiming');
+  await context.test.submitLine(raw);
+  const submitted = updates.findLast(change=>change['publicResults/2/a']);
+  assert.equal(submitted['submissions/2/a'].lat,raw.lat);
+  assert.equal(submitted['publicResults/2/a'].lat,undefined);
+  assert.equal(submitted['publicResults/2/a'].points,400);
+  context.test.setup(players,settings,true);
+  reads.length=0;
+  await context.test.showResults(shared);
+  assert.equal(capturedEntries.find(entry=>entry.uid==='a').submission.lat,raw.lat);
+  assert.equal(capturedEntries.find(entry=>entry.uid==='b').submission,null);
+  assert.equal(capturedEntries.find(entry=>entry.uid==='b').publicResult.points,900);
+  assert.ok(!reads.some(path=>path.endsWith('submissions/2')||path.endsWith('submissions/2/b')));
   console.log(`${file}: final results, whole-round winner and restart passed.`);
 }
 (async () => {

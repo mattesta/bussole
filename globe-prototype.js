@@ -587,6 +587,17 @@ function renderMultiplayerResults(entries, roundTarget, mode) {
   targetEl.textContent = targetLabel;
   const boundsPoints = [playerLatLng, targetLatLng];
   const results = entries.map((entry, index) => {
+    if (!entry.submission && entry.publicResult) {
+      const shared = entry.publicResult;
+      if (window.BussolePublicPrivacy.hasGeometry(shared)) {
+        window.BussolePublicPrivacy.fadeParts(shared.route).forEach((part, partIndex) => {
+          addMultiplayerLine(`multiplayer-route-${index}-${partIndex}`, part.points, window.BussolePublicPrivacy.alpha(entry.color, part.opacity), 3.5);
+        });
+        addMultiplayerLine(`multiplayer-error-${index}`, shared.errorArc, entry.errorColor || '#facf0a', 3.5);
+        boundsPoints.push(...shared.route, ...shared.errorArc);
+      }
+      return { ...entry, errorMeters: undefined, points: shared.points };
+    }
     if (!entry.submission) return { ...entry, errorMeters: null, points: 0 };
     const submission = entry.submission;
     const route = greatCirclePoints(
@@ -604,7 +615,7 @@ function renderMultiplayerResults(entries, roundTarget, mode) {
     addMultiplayerLine(`multiplayer-error-${index}`, errorArc, entry.errorColor || '#facf0a', 3.5);
     boundsPoints.push([submission.lat, submission.lon], errorOrigin);
     const initialDistance = angleBetween(toUnitVector([submission.lat, submission.lon]), toUnitVector(targetLatLng)) * EARTH_RADIUS;
-    return { ...entry, errorMeters, points: window.BussoleScoring.points(errorMeters, initialDistance) };
+    return { ...entry, errorMeters, points: entry.publicResult?.points ?? window.BussoleScoring.points(errorMeters, initialDistance) };
   });
 
   lineRevealed = true;
@@ -861,6 +872,13 @@ window.BussoleGlobe = {
   },
   revealMultiplayer(entries, target, mode) {
     return renderMultiplayerResults(entries, target, mode);
+  },
+  publicResult(submission, target, mode) {
+    return window.BussolePublicPrivacy.publish(submission, target, mode, {
+      route: value => greatCirclePoints(value.lat, value.lon, value.heading, value.distanceMeters),
+      destination: destLatLng, nearest: nearestPointOnLine, arc: greatCircleArcBetween,
+      distance: (from, to) => angleBetween(toUnitVector(from), toUnitVector(to)) * EARTH_RADIUS
+    });
   },
   setStatus(message) {
     statusEl.textContent = message;

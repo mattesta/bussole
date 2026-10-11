@@ -1261,6 +1261,20 @@ function renderMultiplayerResults(entries, roundTarget, mode) {
   const results = [];
 
   entries.forEach(entry => {
+    if (!entry.submission && entry.publicResult) {
+      const shared = entry.publicResult;
+      if (window.BussolePublicPrivacy.hasGeometry(shared)) {
+        window.BussolePublicPrivacy.fadeParts(shared.route).forEach(part => {
+          multiplayerLayers.push(L.polyline(part.points, { color: entry.color, weight: 3, opacity: part.opacity, interactive: false }).addTo(map));
+        });
+        multiplayerLayers.push(L.polyline(window.BussolePublicPrivacy.unwrap(shared.errorArc), {
+          color: entry.errorColor || '#facf0a', weight: 3, opacity: 0.95, interactive: false
+        }).addTo(map));
+        boundsPoints.push(...shared.route, ...shared.errorArc);
+      }
+      results.push({ ...entry, errorMeters: undefined, points: shared.points });
+      return;
+    }
     if (!entry.submission) {
       results.push({ ...entry, errorMeters: null, points: 0 });
       return;
@@ -1300,7 +1314,7 @@ function renderMultiplayerResults(entries, roundTarget, mode) {
     multiplayerLayers.push(errorLayer);
     boundsPoints.push([submission.lat, submission.lon], errorOrigin);
     const initialDistance = distance(submission.lat, submission.lon, roundTarget[0], roundTarget[1]);
-    results.push({ ...entry, errorMeters, points: window.BussoleScoring.points(errorMeters, initialDistance) });
+    results.push({ ...entry, errorMeters, points: entry.publicResult?.points ?? window.BussoleScoring.points(errorMeters, initialDistance) });
   });
 
   if (boundsPoints.length > 1) {
@@ -1339,6 +1353,13 @@ window.BussoleGame = {
   },
   revealMultiplayer(entries, roundTarget, mode) {
     return renderMultiplayerResults(entries, [roundTarget.lat, roundTarget.lon], mode);
+  },
+  publicResult(submission, target, mode) {
+    return window.BussolePublicPrivacy.publish(submission, target, mode, {
+      route: value => greatCirclePoints(value.lat, value.lon, value.heading, value.distanceMeters, 400),
+      destination: destLatLng, nearest: nearestPointOnLine, arc: greatCircleArcBetween,
+      distance: (from, to) => distance(from[0], from[1], to[0], to[1])
+    });
   },
   resetMultiplayerRound() {
     clearMultiplayerLayers();
