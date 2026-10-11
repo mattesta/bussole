@@ -77,7 +77,10 @@ let blurCircleEl = null;
 let errorLine = null;
 let errorOriginLatLng = null;
 let orientationTrackingStarted = false;
-let lastAbsoluteOrientationAt = 0;
+let compassUsable = false;
+let compassSubmitted = false;
+let compassWarning = null;
+let compassTracker = null;
 let pendingHeading = null;
 let orientationFrameId = null;
 let orientationPermissionGranted = false;
@@ -369,7 +372,7 @@ function closeSearchPanel() {
 }
 
 function updateGoButtonState() {
-  showLineBtn.disabled = Boolean(lineLocked || !lastPos || !targetLatLng);
+  showLineBtn.disabled = Boolean(lineLocked || compassSubmitted || !lastPos || !targetLatLng || !compassUsable || lastHeading === null);
 }
 
 function maybeStartTimer() {
@@ -552,7 +555,7 @@ async function requestDeviceOrientationPermission(){
   if (orientationPermissionRequest) return orientationPermissionRequest;
 
   if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-    orientationPermissionRequest = DeviceOrientationEvent.requestPermission()
+    orientationPermissionRequest = DeviceOrientationEvent.requestPermission(true)
       .then(resp => {
         orientationPermissionGranted = resp === 'granted';
         return orientationPermissionGranted;
@@ -846,38 +849,6 @@ function normalizeHeading(value) {
   return (value % 360 + 360) % 360;
 }
 
-function getScreenOrientationAngle() {
-  const angle = screen.orientation && typeof screen.orientation.angle === 'number'
-    ? screen.orientation.angle
-    : (typeof window.orientation === 'number' ? window.orientation : 0);
-  return angle || 0;
-}
-
-// Calculate a tilt-compensated heading from absolute W3C orientation angles.
-// When the phone is flat, alpha alone is both more stable and well-defined.
-function tiltCompensatedHeading(alpha, beta, gamma) {
-  if (typeof alpha !== 'number') return null;
-  if (typeof beta !== 'number' || typeof gamma !== 'number' ||
-      (Math.abs(beta) < 0.5 && Math.abs(gamma) < 0.5)) {
-    return normalizeHeading(360 - alpha);
-  }
-
-  const toRadians = Math.PI / 180;
-  const x = beta * toRadians;
-  const y = gamma * toRadians;
-  const z = alpha * toRadians;
-  const cX = Math.cos(x);
-  const cY = Math.cos(y);
-  const cZ = Math.cos(z);
-  const sX = Math.sin(x);
-  const sY = Math.sin(y);
-  const sZ = Math.sin(z);
-  const vectorX = -cZ * sY - sZ * sX * cY;
-  const vectorY = -sZ * sY + cZ * sX * cY;
-
-  return normalizeHeading(Math.atan2(vectorX, vectorY) * 180 / Math.PI);
-}
-
 function angularDistance(a, b) {
   return Math.abs(((b - a + 540) % 360) - 180);
 }
@@ -888,6 +859,7 @@ function applyOrientationFrame() {
 
   const heading = pendingHeading;
   lastHeading = heading;
+  updateGoButtonState();
 
   // Keep the phone's direction at the top of the map.
   if (roundActive) {
@@ -906,55 +878,40 @@ function applyOrientationFrame() {
   }
 }
 
-// Handle compass data. iOS supplies a native compass heading; Android uses
-// absolute alpha/beta/gamma values with tilt compensation. Rendering is synced
-// to requestAnimationFrame so sensor bursts cannot overwhelm Safari.
-function handleOrientationEvent(e) {
-  let heading = null;
-
-  if (typeof e.webkitCompassHeading === 'number') {
-    heading = e.webkitCompassHeading;
-  } else if (typeof e.alpha === 'number') {
-    heading = tiltCompensatedHeading(e.alpha, e.beta, e.gamma);
-  }
-
-  if (heading === null || !Number.isFinite(heading)) return;
-  heading = normalizeHeading(heading + getScreenOrientationAngle());
-
+function handleCompassHeading(heading) {
+  compassUsable = true;
+  if (compassWarning && roundActive && !lineLocked && !compassSubmitted) setStatus('Compass ready. Move phone to set direction.');
+  compassWarning = null;
   const change = smoothHeading === null ? 180 : angularDistance(smoothHeading, heading);
   const smoothing = change > 45 ? 0.65 : change > 15 ? 0.38 : 0.16;
   smoothHeading = smoothAngle(smoothHeading, heading, smoothing);
   pendingHeading = smoothHeading;
-
-  if (orientationFrameId === null) {
-    orientationFrameId = requestAnimationFrame(applyOrientationFrame);
-  }
+  if (orientationFrameId === null) orientationFrameId = requestAnimationFrame(applyOrientationFrame);
 }
 
-function handleAbsoluteOrientationEvent(e) {
-  if (typeof e.webkitCompassHeading !== 'number' && typeof e.alpha !== 'number') return;
-  lastAbsoluteOrientationAt = performance.now();
-  handleOrientationEvent(e);
-}
-
-function handleFallbackOrientationEvent(e) {
-  if (performance.now() - lastAbsoluteOrientationAt < 1000) return;
-  handleOrientationEvent(e);
+function handleCompassStatus(reason) {
+  compassUsable = false;
+  pendingHeading = null;
+  compassWarning = reason === 'tilted'
+    ? 'Hold the phone flatter to aim with its top edge.'
+    : 'Compass unavailable. Open in Chrome and allow motion sensors.';
+  if (roundActive && !lineLocked && !compassSubmitted) setStatus(compassWarning);
+  updateGoButtonState();
 }
 
 function startOrientationTracking() {
   if (orientationTrackingStarted) return;
   orientationTrackingStarted = true;
-  window.addEventListener('deviceorientationabsolute', handleAbsoluteOrientationEvent, true);
-  window.addEventListener('deviceorientation', handleFallbackOrientationEvent, true);
+  compassTracker = window.BussoleCompass.createTracker({ onHeading: handleCompassHeading, onStatus: handleCompassStatus });
+  compassTracker.start();
 }
 
 function stopOrientationTracking() {
-  if (!orientationTrackingStarted) return;
-  window.removeEventListener('deviceorientationabsolute', handleAbsoluteOrientationEvent, true);
-  window.removeEventListener('deviceorientation', handleFallbackOrientationEvent, true);
+  compassTracker?.stop();
+  compassTracker = null;
   orientationTrackingStarted = false;
-  lastAbsoluteOrientationAt = 0;
+  compassUsable = false;
+  compassWarning = null;
   pendingHeading = null;
   if (orientationFrameId !== null) {
     cancelAnimationFrame(orientationFrameId);
@@ -964,6 +921,7 @@ function stopOrientationTracking() {
 
 // Start tracking.
 function start() {
+  compassSubmitted = false;
   if (watchId !== null) {
     navigator.geolocation.clearWatch(watchId);
     watchId = null;
@@ -981,7 +939,7 @@ function start() {
     if (navigator.geolocation) {
       watchId = navigator.geolocation.watchPosition(pos=>{
         lastPos = pos;
-        setStatus('Position acquired. Move phone to set direction.');
+        setStatus(compassWarning || (compassUsable ? 'Position acquired. Move phone to set direction.' : 'Position acquired. Waiting for the compass…'));
         maybeStartTimer();
         // Enable controls when the position is ready.
         updateGoButtonState();
@@ -1077,6 +1035,7 @@ document.addEventListener('keydown', event => {
 
 // Show the locked line.
 showLineBtn.addEventListener('click', () => {
+  if (!compassUsable) return;
   if (multiplayerController && multiplayerController.isActive()) {
     if (!lastPos || lastHeading === null) return;
     const guessedKm = gameMode === 'hard' ? parseFloat(distanceInput.value) : null;
@@ -1085,11 +1044,16 @@ showLineBtn.addEventListener('click', () => {
       return;
     }
     if (gameMode === 'hard' && guessedKm > 40075) showDistanceEasterEgg();
+    compassSubmitted = true;
     multiplayerController.submitLine({
       lat: lastPos.coords.latitude,
       lon: lastPos.coords.longitude,
       heading: lastHeading,
       distanceMeters: gameMode === 'hard' ? guessedKm * 1000 : 20000000
+    }).catch(() => {
+      compassSubmitted = false;
+      updateGoButtonState();
+      setStatus('The line could not be saved. Please try again.');
     });
     showLineBtn.disabled = true;
     setStatus('Line locked. Waiting for the other explorers…');

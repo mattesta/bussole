@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Bussole · Compass test</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui,sans-serif; background:#020712; color:#fff; }
+    body { max-width:560px; margin:auto; padding:24px; }
+    h1 { font-size:24px; } p { color:#bbc3cf; line-height:1.5; }
+    button,a { color:#fff; } button { font:inherit; background:#841c25; border:1px solid #ad3841; padding:14px 18px; border-radius:12px; margin:8px 8px 8px 0; }
+    #heading { font-size:56px; margin:24px 0 12px; }
+    #compass { width:140px; height:140px; border:2px solid #647083; border-radius:50%; margin:24px auto; position:relative; }
+    #needle { position:absolute; width:8px; height:96px; top:50%; left:50%; background:linear-gradient(#e41a1c 50%,#fff 50%); border-radius:4px; transform:translate(-50%,-50%); }
+    pre { white-space:pre-wrap; overflow-wrap:anywhere; background:#0d1723; padding:16px; border-radius:12px; font-size:13px; }
+  </style>
+</head>
+<body>
+  <a href="./">← Home</a>
+  <h1>Compass test</h1>
+  <p>Open this page in your phone's browser. Hold the phone nearly flat and aim with its top edge. Compare north with the phone's Compass app.</p>
+  <button id="start">Start test</button><button id="copy">Copy report</button>
+  <div id="heading">—</div><div id="compass"><div id="needle"></div></div>
+  <p id="status">Tap Start test to read the sensors.</p>
+  <pre id="report"></pre>
+  <p>The report contains browser and sensor information. It contains no location data and is not sent anywhere automatically.</p>
+  <script src="compass.js?v=1"></script>
+  <script>
+    let tracker, latestHeading=null, source=null, status='Not started';
+    const samples={};
+    function record(e) {
+      samples[e.type]={absolute:e.absolute,alpha:e.alpha,beta:e.beta,gamma:e.gamma,webkitCompassHeading:e.webkitCompassHeading,webkitCompassAccuracy:e.webkitCompassAccuracy,events:(samples[e.type]?.events||0)+1};
+    }
+    function render() {
+      document.getElementById('heading').textContent=latestHeading===null?'—':`${Math.round(latestHeading)}°`;
+      document.getElementById('needle').style.transform=`translate(-50%,-50%) rotate(${-latestHeading||0}deg)`;
+      document.getElementById('status').textContent=status;
+      document.getElementById('report').textContent=JSON.stringify({browser:navigator.userAgent,screenAngle:screen.orientation?.angle??window.orientation??0,heading:latestHeading,source,status,samples},null,2);
+    }
+    document.getElementById('start').onclick=async()=>{
+      try {
+        if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function') {
+          if(await DeviceOrientationEvent.requestPermission(true)!=='granted') throw new Error('Motion permission denied');
+        }
+        tracker?.stop();
+        window.addEventListener('deviceorientationabsolute',record,true);
+        window.addEventListener('deviceorientation',record,true);
+        status='Waiting for an absolute compass heading…';
+        tracker=BussoleCompass.createTracker({
+          onHeading:(value,kind)=>{latestHeading=value;source=kind;status='Compass ready. Aim with the top edge of the phone.';},
+          onStatus:reason=>{latestHeading=null;status=reason==='tilted'?'Hold the phone flatter.':'No absolute compass heading received. Check motion sensor permissions.';}
+        });tracker.start();
+      } catch(e) {status=e.message;}
+      render();
+    };
+    document.getElementById('copy').onclick=async()=>{
+      try {await navigator.clipboard.writeText(document.getElementById('report').textContent);document.getElementById('copy').textContent='Copied!';}
+      catch {document.getElementById('copy').textContent='Take a screenshot';}
+    };
+    setInterval(render,250);render();
+  </script>
+</body>
+</html>
