@@ -1,0 +1,17 @@
+.blur-circle {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  background: rgba(255,255,255,.04);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  mask-image: radial-gradient(circle, #000 0%, #000 55%, transparent 72%);
+  -webkit-mask-image: radial-gradient(circle, #000 0%, #000 55%, transparent 72%);
+}
+#map .blur-circle { z-index: 450; }
+#globeMap .blur-circle { z-index: 1; }
+#globeMap .maplibregl-marker { z-index: 2; }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .blur-circle { background: rgba(5,11,23,.9); }
+}

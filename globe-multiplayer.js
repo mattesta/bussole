@@ -215,6 +215,7 @@ if (multiplayerMode) {
       if (settings.mapStyle !== '3d' || !target) return goHome();
 
       window.BussoleGlobe.registerMultiplayer({ isActive: () => true, submitLine });
+      window.BussoleGlobe.setBlurEnabled(settings.blurEnabled);
       window.BussoleGlobe.setMultiplayerTarget(target);
       await refreshPresence();
       updateProgress();
@@ -235,6 +236,7 @@ if (multiplayerMode) {
       unsubscribers.push(onValue(ref(db, '.info/serverTimeOffset'), snapshot => { serverTimeOffset = Number(snapshot.val()) || 0; }));
       unsubscribers.push(onValue(ref(db, roomPath('settings')), settingsSnapshot => {
         settings = settingsSnapshot.val() || settings;
+        window.BussoleGlobe.setBlurEnabled(settings.blurEnabled);
       }));
       unsubscribers.push(onValue(ref(db, roomPath('meta')), metaSnapshot => {
         const previousPhase = roomMeta?.phase;

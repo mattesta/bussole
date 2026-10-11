@@ -21,8 +21,9 @@ assert.equal(element.textContent, '15 s');
 assert.equal(classes.has('urgent'), false);
 assert.equal(element.style.top, '108px');
 now = 5000; callback(); assert.equal(classes.has('urgent'), false);
-now = 10000; callback(); assert.equal(element.textContent, '5 s'); assert.equal(classes.has('urgent'), false);
-now = 10001; callback(); assert.equal(classes.has('urgent'), false);
+now = 9000; callback(); assert.equal(element.textContent, '6 s'); assert.equal(classes.has('urgent'), false);
+now = 10000; callback(); assert.equal(element.textContent, '5 s'); assert.equal(classes.has('urgent'), true);
+now = 10001; callback(); assert.equal(classes.has('urgent'), true);
 now = 11000; callback(); assert.equal(element.textContent, '4 s'); assert.equal(classes.has('urgent'), true);
 now = 14000; callback(); assert.equal(element.textContent, '1 s');
 // Returning from a background tab catches up against the deadline immediately.

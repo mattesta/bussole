@@ -44,8 +44,8 @@ const targetMarkerIcon = L.divIcon({
   iconAnchor: [9, 9]
 });
 
-map.on('move', () => {
-  if (blurEnabled && blurCircleEl && lastPos) {
+map.on('move zoom rotate', () => {
+  if (blurEnabled && roundActive && !lineVisible && lastPos) {
     updateBlurPosition(
       lastPos.coords.latitude,
       lastPos.coords.longitude
@@ -72,7 +72,7 @@ let timerDuration = 0;
 let timerActive = false;
 let roundActive = false;
 let blurEnabled = false;
-let blurCircleEl = null;
+const playerBlur = window.BussolePlayerBlur.create(document.getElementById('map'), point => map.latLngToContainerPoint(point), destLatLng);
 let errorLine = null;
 let errorOriginLatLng = null;
 let orientationTrackingStarted = false;
@@ -156,6 +156,7 @@ async function launchGlobeMode(mode, sourceButton) {
 
   const parameters = new URLSearchParams({ mode, integrated: '1' });
   if (timerEnabled) parameters.set('timer', String(timerDuration));
+  if (blurEnabled) parameters.set('blur', '1');
   window.location.href = `globe-prototype.html?${parameters}`;
 }
 
@@ -397,48 +398,14 @@ function dismissSearchKeyboard() {
 }
 
 function showBlurCircle(lat, lon) {
-
-  if (!blurEnabled) return;
-
-  if (!blurCircleEl) {
-    blurCircleEl = document.createElement('div');
-    blurCircleEl.className = 'blur-circle';
-    document.getElementById('map').appendChild(blurCircleEl);
-  }
-
-  updateBlurPosition(lat, lon);
+  if (blurEnabled && roundActive && !lineVisible) playerBlur.show(lat, lon);
+  else playerBlur.hide();
 }
-
 function updateBlurPosition(lat, lon) {
-  if (!blurCircleEl) return;
-
-  const point = map.latLngToContainerPoint([lat, lon]);
-
-  blurCircleEl.style.left = point.x + 'px';
-  blurCircleEl.style.top = point.y + 'px';
-
-  // dynamically adjust circle radius for ~2 km
-  const metersPerPixel = 40075016.686 / (256 * Math.pow(2, map.getZoom()));
-  const radiusPixels = 400 / metersPerPixel;
-
-  blurCircleEl.style.width = (radiusPixels * 2) + 'px';
-  blurCircleEl.style.height = (radiusPixels * 2) + 'px';
+  showBlurCircle(lat, lon);
 }
-
 function hideBlurCircle() {
-  if (blurCircleEl) {
-    blurCircleEl.remove();
-    blurCircleEl = null;
-  }
-}
-
-function lockMap() {
-  map.dragging.disable();
-  map.touchZoom.disable();
-  map.scrollWheelZoom.disable();
-  map.doubleClickZoom.disable();
-  map.boxZoom.disable();
-  map.keyboard.disable();
+  playerBlur.hide();
 }
 
 function unlockMap() {
@@ -1287,6 +1254,7 @@ function clearMultiplayerLayers() {
 function renderMultiplayerResults(entries, roundTarget, mode) {
   clearMultiplayerLayers();
   roundActive = false;
+  hideBlurCircle();
   unlockMap();
   map.setBearing(0);
   const boundsPoints = [roundTarget];
@@ -1361,7 +1329,7 @@ window.BussoleGame = {
     // Multiplayer uses the shared room deadline, including after Go is locked.
     timerCheckbox.checked = false;
     timerDurationInput.value = settings.timerDuration || 60;
-    blurCheckbox.checked = false;
+    blurCheckbox.checked = Boolean(settings.blurEnabled);
     document.querySelector(`.modeBtn[data-mode="${settings.mode}"]`).click();
     setTarget(roundTarget.lat, roundTarget.lon, roundTarget.label);
     resetBtn.disabled = true;

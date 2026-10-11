@@ -21,7 +21,7 @@ window.BussoleRoundTimer = {
       const remaining = Math.max(0, deadline - now());
       const seconds = Math.ceil(remaining / 1000);
       element.textContent = `${seconds} s`;
-      element.classList.toggle('urgent', seconds < 5);
+      element.classList.toggle('urgent', seconds <= 5);
       element.setAttribute('aria-label', `${Math.ceil(remaining / 1000)} seconds remaining`);
       element.style.top = `${Math.max(12, anchor.getBoundingClientRect().bottom + 8)}px`;
       if (!remaining && !expired) {

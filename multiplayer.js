@@ -152,7 +152,7 @@ async function createRoom() {
       if (!existing.exists()) {
         await set(roomRef, {
           meta: { hostId: user.uid, phase: 'lobby', round: 0, createdAt: Date.now(), lastActiveAt: Date.now() },
-          settings: { mode: 'medium', mapStyle: initialMapStyle, timerEnabled: false, timerDuration: 60, scoreGoal: 5000 },
+          settings: { mode: 'medium', mapStyle: initialMapStyle, timerEnabled: false, timerDuration: 60, scoreGoal: 5000, blurEnabled: false },
           players: { [user.uid]: newPlayer }
         });
       } else {
@@ -173,7 +173,7 @@ async function createRoom() {
           matchStartRound: 0
         });
         await set(ref(db, `rooms/${code}/settings`), {
-          mode: 'medium', mapStyle: initialMapStyle, timerEnabled: false, timerDuration: 60, scoreGoal: 5000
+          mode: 'medium', mapStyle: initialMapStyle, timerEnabled: false, timerDuration: 60, scoreGoal: 5000, blurEnabled: false
         });
         await Promise.all([
           remove(ref(db, `rooms/${code}/target`)),
@@ -265,6 +265,7 @@ async function enterRoom(code) {
     byId('roomMode').value = settings.mode || 'medium';
     byId('roomMapStyle').value = settings.mapStyle === '3d' ? '3d' : '2d';
     byId('roomTimerEnabled').checked = Boolean(settings.timerEnabled);
+    byId('roomBlurEnabled').checked = Boolean(settings.blurEnabled);
     byId('roomTimerDuration').value = window.BussoleRoundTimer.duration(settings);
     updateTimerSettingsVisibility();
   }));
@@ -377,6 +378,7 @@ async function startRound() {
     scoreGoal: roomMeta.round > (roomMeta.matchStartRound || 0)
       ? window.BussoleScoring.goal(roomSettings.scoreGoal) : window.BussoleScoring.goal(goalInput.value),
     timerEnabled,
+    blurEnabled: Boolean(byId('roomBlurEnabled').checked),
     timerSeconds,
     // Preserve the legacy field required by already deployed Firebase rules.
     // timerSeconds and the room deadline carry the actual 3–60 second duration.
