@@ -77,6 +77,7 @@ async function checkController(file, globe) {
     elements.get('roomTimerEnabled').checked = true;
     context.document.getElementById('roomMode').value = 'medium';
     context.document.getElementById('roomMapStyle').value = '2d';
+    context.document.getElementById('roomBlurEnabled').checked = true;
     for (const seconds of ['2', '61']) {
       context.document.getElementById('roomTimerDuration').value = seconds;
       const count = updates.length;
@@ -88,6 +89,7 @@ async function checkController(file, globe) {
       await context.test.startRound();
       const change = updates.at(-1);
       assert.equal(change.settings.timerSeconds, Number(seconds));
+      assert.equal(change.settings.blurEnabled, true);
       assert.ok(change.settings.timerDuration >= 10); // Existing rules remain compatible.
       assert.equal(change['meta/deadline'] - change['meta/startedAt'], Number(seconds) * 1000);
     }

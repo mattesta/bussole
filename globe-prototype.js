@@ -9,6 +9,7 @@ const pageParameters = new URLSearchParams(window.location.search);
 const integratedMode = pageParameters.get('integrated') === '1';
 const multiplayerMode = pageParameters.get('multiplayer') === '1';
 const debugMode = pageParameters.get('debug') === '1';
+let blurEnabled = !multiplayerMode && pageParameters.get('blur') === '1';
 const soloTimerSeconds = !multiplayerMode && window.BussoleRoundTimer.validDuration(pageParameters.get('timer'))
   ? Number(pageParameters.get('timer')) : 0;
 let soloTimerActive = false;
@@ -130,6 +131,16 @@ const map = new maplibregl.Map({
   pitchWithRotate: false,
   touchZoomRotate: true
 });
+
+const playerBlur = window.BussolePlayerBlur.create(
+  document.getElementById('globeMap'), point => map.project([point[1], point[0]]), destLatLng
+);
+function updatePlayerBlur() {
+  if (blurEnabled && mapReady && !lineRevealed) playerBlur.show(...playerLatLng);
+  else playerBlur.hide();
+}
+map.on('move', updatePlayerBlur);
+map.on('zoom', updatePlayerBlur);
 
 map.getCanvas().addEventListener('pointerdown', () => {
   if (lineRevealed) map.stop();
@@ -305,6 +316,7 @@ function markerElement(type) {
 }
 
 function updatePlayerMarker() {
+  updatePlayerBlur();
   if (!mapReady) return;
   const lngLat = [normalizeLongitude(playerLatLng[1]), playerLatLng[0]];
   if (!playerMarker) {
@@ -558,6 +570,7 @@ function showPrototypeLine() {
   errorEl.textContent = `${window.BussoleScoring.points(errorMeters, initialDistance)} / 1000 points · Error: ${(errorMeters / 1000).toFixed(1)} km`;
   statusEl.textContent = `Line locked at ${Math.round(heading)}°. Drag the globe to inspect it.`;
   lineRevealed = true;
+  updatePlayerBlur();
   if (!multiplayerMode) stopSoloTimer();
   updateGoButtonState();
   updateTargetMarker();
@@ -595,6 +608,7 @@ function renderMultiplayerResults(entries, roundTarget, mode) {
   });
 
   lineRevealed = true;
+  updatePlayerBlur();
   updateTargetMarker();
   setMapInteraction(true);
   frameResult(boundsPoints);
@@ -611,6 +625,7 @@ function resetPrototype() {
   clearMultiplayerLayers();
   removeTargetMarker();
   lineRevealed = false;
+  updatePlayerBlur();
   updateGoButtonState();
   setMapInteraction(false);
   frameAimingView();
@@ -835,6 +850,10 @@ window.BussoleGlobe = {
   },
   registerMultiplayer(controller) {
     multiplayerController = controller;
+  },
+  setBlurEnabled(enabled) {
+    blurEnabled = Boolean(enabled);
+    updatePlayerBlur();
   },
   setMultiplayerTarget(target) {
     if (!target) return;

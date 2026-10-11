@@ -31,8 +31,9 @@
   </style>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <link rel="stylesheet" href="style.css?v=20"/>
+  <link rel="stylesheet" href="style.css?v=21"/>
   <link rel="stylesheet" href="round-timer.css?v=2">
+  <link rel="stylesheet" href="player-blur.css?v=1">
 </head>
 
 <body>
@@ -54,7 +55,7 @@
       <span class="map-style-label">MAP STYLE</span>
       <div class="map-style-picker" role="group" aria-label="Map style">
         <button type="button" data-map-style="2d" class="selected" aria-pressed="true">2D Map</button>
-        <button type="button" data-map-style="3d" aria-pressed="false">3D Globe <small>TEST</small></button>
+        <button type="button" data-map-style="3d" aria-pressed="false">3D Globe</button>
       </div>
       <span id="mapStyleHint">Classic game. All features are available.</span>
     </div>
@@ -121,6 +122,7 @@
         <label>Points to win
           <input id="roomScoreGoal" type="number" min="1" max="1000000" step="1" value="5000" inputmode="numeric">
         </label>
+        <label><span>Blur around player</span><input id="roomBlurEnabled" type="checkbox"></label>
         <div class="room-timer-row">
           <label class="room-timer-toggle"><input id="roomTimerEnabled" type="checkbox"><span>Timer</span></label>
           <label id="roomTimerSettings" class="room-timer-settings hidden">
@@ -215,10 +217,11 @@
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
   <script src="targets.js"></script>
-  <script src="round-timer.js?v=2"></script>
+  <script src="player-blur.js?v=1"></script>
+  <script src="round-timer.js?v=3"></script>
   <script src="scoring.js?v=2"></script>
   <script src="compass.js?v=1"></script>
-  <script src="app.js?v=22"></script>
-  <script type="module" src="multiplayer.js?v=7"></script>
+  <script src="app.js?v=23"></script>
+  <script type="module" src="multiplayer.js?v=8"></script>
 </body>
 </html>
