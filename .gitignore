@@ -1,2 +1,5 @@
 __pycache__/
 *.pyc
+
+firebase-debug.log
+database-debug.log

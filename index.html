@@ -31,7 +31,7 @@
   </style>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <link rel="stylesheet" href="style.css?v=21"/>
+  <link rel="stylesheet" href="style.css?v=22"/>
   <link rel="stylesheet" href="round-timer.css?v=2">
   <link rel="stylesheet" href="player-blur.css?v=1">
 </head>
@@ -89,9 +89,12 @@
     <button id="multiplayerClose" class="panel-close" type="button" aria-label="Close">×</button>
     <section id="multiplayerEntry">
       <h2>Multiplayer</h2>
-      <p>Create a room or join your friends.</p>
+      <p>Invite friends or find other explorers.</p>
+      <label class="room-visibility-choice">Create a <select id="roomVisibility"><option value="private">Private room</option><option value="public">Public room</option></select></label>
       <button id="createRoomBtn" type="button">Create room</button>
-      <button id="showJoinRoomBtn" type="button">Join room</button>
+      <button id="showJoinRoomBtn" type="button">Join private room</button>
+      <button id="joinPublicRoomBtn" type="button">Join public room</button>
+      <p id="multiplayerEntryMessage" role="status"></p>
       <div id="joinRoomForm" class="hidden">
         <input id="roomCodeInput" inputmode="text" maxlength="8" placeholder="XX-XX-XX" autocomplete="off">
         <button id="joinRoomBtn" type="button">Join</button>
@@ -106,7 +109,9 @@
           </svg>
         </button>
       </div>
-      <label class="player-name-label">Explorer name
+      <p id="roomVisibilityLabel"></p>
+      <p id="roomSettingsSummary"></p>
+      <label class="player-name-label"><span>Explorer name <button id="myExplorerInfo" class="explorer-info" type="button" aria-label="About your explorer">i</button></span>
         <input id="playerNameInput" maxlength="24" autocomplete="off">
       </label>
       <h3 id="roomStandingsTitle">Explorers</h3>
@@ -149,6 +154,12 @@
     </section>
   </div>
 
+  <dialog id="explorerDialog" class="explorer-dialog" aria-labelledby="explorerTitle">
+    <button id="explorerClose" class="panel-close" type="button" aria-label="Close explorer information">×</button>
+    <h2 id="explorerTitle"></h2>
+    <p id="explorerBiography"></p>
+    <a id="explorerWikipedia" target="_blank" rel="noopener noreferrer">Read more on Wikipedia ↗</a>
+  </dialog>
   <div id="roomCountdown" class="round-countdown hidden" role="timer"></div>
   <div id="roomTargetBanner" class="room-target-banner hidden" aria-live="polite"></div>
   <div id="roomBadge" class="room-badge hidden"><span id="roomProgress"></span></div>
@@ -222,6 +233,8 @@
   <script src="scoring.js?v=2"></script>
   <script src="compass.js?v=1"></script>
   <script src="app.js?v=23"></script>
-  <script type="module" src="multiplayer.js?v=8"></script>
+  <script src="explorers.js?v=1"></script>
+  <script src="public-rooms.js?v=1"></script>
+  <script type="module" src="multiplayer.js?v=9"></script>
 </body>
 </html>

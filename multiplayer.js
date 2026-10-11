@@ -10,10 +10,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-const EXPLORERS = [
-  'Magellan', 'Zheng He', 'Nellie Bly', 'Ibn Battuta',
-  'Sacagawea', 'Cook', 'Amundsen', 'Gertrude Bell'
-];
+const EXPLORERS = window.BussoleExplorers.catalogue.map(explorer => explorer.name);
 const COLOURS = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#00a6a6', '#f781bf', '#6b4c2a'];
 const ERROR_COLOURS = ['#ff8587', '#86c5f4', '#92dc8f', '#d29ddd', '#ffc06a', '#70dada', '#ffc0df', '#b99a78'];
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -64,6 +61,119 @@ let leaving = false;
 let presenceRefreshPromise = null;
 let presenceUiTimer = null;
 let hostTransferTimer = null;
+let directoryTimer = null;
+let directoryBusy = false;
+let autoStarting = false;
+let startingRound = false;
+let matchmaking = false;
+let settingsReady = false;
+const serverNow = () => Date.now() + serverTimeOffset;
+function entryError(error) {
+  const message = friendlyError(error);
+  byId('multiplayerEntryMessage').textContent = message;
+  roomMessage.textContent = message;
+}
+async function requirePublicDirectory() {
+  try { return (await get(ref(db, 'publicRooms'))).val() || {}; }
+  catch (error) {
+    if (error.code === 'PERMISSION_DENIED' || error.code === 'database/permission-denied') {
+      throw new Error('Public rooms need the updated Firebase rules. Private rooms are available.');
+    }
+    throw error;
+  }
+}
+async function reservePublicSeat(code, meta, currentPlayers) {
+  const slots = (await get(ref(db, `rooms/${code}/seats`))).val() || {};
+  const owned = Object.entries(slots).find(([, owner]) => owner?.uid === user.uid);
+  if (owned && currentPlayers[user.uid]) return Number(owned[0]);
+  if (!window.BussolePublicRooms.waiting(meta)) throw new Error('This public match has already started.');
+  const candidates = [...Array(MAX_PLAYERS).keys()].filter(slot =>
+    window.BussolePublicRooms.canClaim(slots[slot], user.uid, currentPlayers, serverNow())
+  );
+  while (candidates.length) {
+    const slot = candidates.splice(randomIndex(candidates.length), 1)[0];
+    try {
+      const result = await runTransaction(ref(db, `rooms/${code}/seats/${slot}`), owner =>
+        window.BussolePublicRooms.canClaim(owner, user.uid, currentPlayers, serverNow()) ? { uid: user.uid, claimedAt: serverTimestamp() } : undefined
+      );
+      if (result.committed) return slot;
+    } catch (error) {
+      if (!String(error.code).toLowerCase().includes('permission')) throw error;
+    }
+  }
+  throw new Error('This room is full.');
+}
+async function addPublicPlayer(code, meta, currentPlayers) {
+  const slot = await reservePublicSeat(code, meta, currentPlayers);
+  const previous = currentPlayers[user.uid];
+  if (previous?.slotId === String(slot)) return;
+  const newPlayer = { ...playerTemplate(slot, (meta.round || 0) + 1), slotId: String(slot) };
+  try { await set(ref(db, `rooms/${code}/players/${user.uid}`), newPlayer); }
+  catch (error) {
+    await runTransaction(ref(db, `rooms/${code}/seats/${slot}`), owner => owner?.uid === user.uid ? null : undefined).catch(() => {});
+    throw error;
+  }
+}
+async function publishPublicLobby() {
+  if (leaving || directoryBusy || !roomCode || !isHost() || roomMeta.visibility !== 'public') return;
+  const code = roomCode;
+  directoryBusy = true;
+  try {
+    if (!window.BussolePublicRooms.waiting(roomMeta)) {
+      await remove(ref(db, `publicRooms/${code}`));
+      return;
+    }
+    // Seats from disconnected tabs are kept for 30 s, then can be reused.
+    for (const [uid, player] of Object.entries(players)) {
+      if (uid !== user.uid && !window.BussolePublicRooms.online(player, serverNow())) {
+        await remove(ref(db, `rooms/${code}/players/${uid}`));
+        if (player.slotId) {
+          await runTransaction(ref(db, `rooms/${code}/seats/${player.slotId}`), seat => seat?.uid === uid ? null : undefined);
+        }
+      }
+    }
+    if (roomCode !== code || roomMeta?.phase !== 'lobby' || !isHost()) return;
+    const count = Object.values(players).filter(player => window.BussolePublicRooms.online(player, serverNow())).length;
+    if (!count) return;
+    await set(ref(db, `publicRooms/${code}`), {
+      phase: 'lobby', count, createdAt: roomMeta.createdAt, updatedAt: serverTimestamp()
+    });
+  } catch (error) { console.warn('Could not publish public lobby.', error); }
+  finally { directoryBusy = false; }
+}
+async function maybeAutoStart() {
+  if (!settingsReady || autoStarting || !isHost() || !window.BussolePublicRooms.shouldAutoStart(roomMeta, players, serverNow())) return;
+  autoStarting = true;
+  try {
+    if (!selectedTarget) await selectRandomTarget();
+    await startRound();
+  } catch (error) { roomMessage.textContent = friendlyError(error); }
+  finally { autoStarting = false; }
+}
+async function joinPublicRoom() {
+  if (matchmaking || roomCode) return;
+  matchmaking = true;
+  byId('joinPublicRoomBtn').disabled = true;
+  byId('multiplayerEntryMessage').textContent = 'Finding a public room…';
+  try {
+    user = await ensureUser();
+    serverTimeOffset = Number((await get(ref(db, '.info/serverTimeOffset'))).val()) || 0;
+    const directory = await requirePublicDirectory();
+    for (const [code, advertised] of window.BussolePublicRooms.candidates(directory, serverNow())) {
+      const meta = (await get(ref(db, `rooms/${code}/meta`))).val();
+      const currentPlayers = (await get(ref(db, `rooms/${code}/players`))).val() || {};
+      if (meta?.visibility !== 'public' || !window.BussolePublicRooms.waiting(meta) || meta.createdAt !== advertised.createdAt ||
+          !Object.values(currentPlayers).some(player => window.BussolePublicRooms.online(player, serverNow()))) continue;
+      try {
+        await addPublicPlayer(code, meta, currentPlayers);
+        await enterRoom(code);
+        return;
+      } catch (error) { console.info('Public room filled or closed; trying another.', error.message); }
+    }
+    await createRoom('public');
+  } catch (error) { entryError(error); }
+  finally { matchmaking = false; byId('joinPublicRoomBtn').disabled = false; }
+}
 
 function show(element) { element.classList.remove('hidden'); }
 function hide(element) { element.classList.add('hidden'); }
@@ -139,21 +249,26 @@ function playerTemplate(index, eligibleRound = 1) {
   };
 }
 
-async function createRoom() {
+async function createRoom(visibility = byId('roomVisibility').value) {
   try {
     user = await ensureUser();
+    visibility = visibility === 'public' ? 'public' : 'private';
+    if (visibility === 'public') await requirePublicDirectory();
     const initialMapStyle = window.BussoleGame.getSelectedMapStyle?.() === '3d' ? '3d' : '2d';
     let code;
     for (let attempt = 0; attempt < 8; attempt++) {
       code = makeCode();
       const roomRef = ref(db, `rooms/${code}`);
       const existing = await get(ref(db, `rooms/${code}/meta`));
+      if (existing.exists() && (visibility === 'public' || existing.val().visibility === 'public')) { code = null; continue; }
       const newPlayer = playerTemplate(randomIndex(MAX_PLAYERS), 1);
+      if (visibility === 'public') newPlayer.slotId = String(newPlayer.colorIndex);
       if (!existing.exists()) {
         await set(roomRef, {
-          meta: { hostId: user.uid, phase: 'lobby', round: 0, createdAt: Date.now(), lastActiveAt: Date.now() },
+          meta: { hostId: user.uid, visibility, phase: 'lobby', round: 0, createdAt: Date.now(), lastActiveAt: Date.now() },
           settings: { mode: 'medium', mapStyle: initialMapStyle, timerEnabled: false, timerDuration: 60, scoreGoal: 5000, blurEnabled: false },
-          players: { [user.uid]: newPlayer }
+          players: { [user.uid]: newPlayer },
+          ...(visibility === 'public' ? { seats: { [newPlayer.colorIndex]: { uid: user.uid, claimedAt: serverTimestamp() } } } : {})
         });
       } else {
         const stalePlayersSnapshot = await get(ref(db, `rooms/${code}/players`));
@@ -165,6 +280,7 @@ async function createRoom() {
         await set(ref(db, `rooms/${code}/players/${user.uid}`), newPlayer);
         await update(ref(db, `rooms/${code}/meta`), {
           hostId: user.uid,
+          visibility,
           phase: 'lobby',
           round: 0,
           createdAt: Date.now(),
@@ -188,7 +304,7 @@ async function createRoom() {
     if (!code) throw new Error('Could not create a unique room.');
     await enterRoom(code);
   } catch (error) {
-    roomMessage.textContent = friendlyError(error);
+    entryError(error);
   }
 }
 
@@ -207,10 +323,12 @@ async function joinRoom() {
     if (joinedMeta.phase === 'closed' || (!hasConnectedPlayer && !canResumeOwnSeat)) {
       throw new Error('This room is no longer active. Ask the host to create a new room.');
     }
-    if (!currentPlayers[user.uid] && Object.keys(currentPlayers).length >= MAX_PLAYERS) {
+    if (joinedMeta.visibility !== 'public' && !currentPlayers[user.uid] && Object.keys(currentPlayers).length >= MAX_PLAYERS) {
       throw new Error('This room is full.');
     }
-    if (!currentPlayers[user.uid]) {
+    if (joinedMeta.visibility === 'public') {
+      await addPublicPlayer(code, joinedMeta, currentPlayers);
+    } else if (!currentPlayers[user.uid]) {
       const used = new Set(Object.values(currentPlayers).map(player => player.colorIndex));
       const available = [...Array(MAX_PLAYERS).keys()].filter(candidate => !used.has(candidate));
       const index = available[randomIndex(available.length)] ?? 0;
@@ -222,19 +340,23 @@ async function joinRoom() {
       byId('roomResumeLoading').querySelector('span').textContent =
         'Could not return to the room. Go Home and rejoin.';
     }
-    roomMessage.textContent = friendlyError(error);
+    entryError(error);
   }
 }
 
 async function enterRoom(code) {
   roomCode = code;
   leaving = false;
+  settingsReady = false;
+  byId('multiplayerEntryMessage').textContent = '';
   hide(entry); show(lobby); hide(resultsPanel);
   panel.classList.add('lobby-mode');
   panel.classList.remove('results-mode');
   setCloseButtonMode('leave');
   byId('roomCodeLabel').textContent = displayCode(code);
   hide(roomBadge);
+  clearInterval(directoryTimer);
+  directoryTimer = setInterval(() => { publishPublicLobby(); maybeAutoStart(); }, 15000);
   history.replaceState(null, '', `${location.pathname}?room=${displayCode(code)}`);
 
   subscriptions.push(onValue(ref(db, '.info/connected'), snapshot => {
@@ -247,11 +369,15 @@ async function enterRoom(code) {
     roomMeta = snapshot.val();
     if (!roomMeta) return leaveRoom();
     renderRoom();
+    publishPublicLobby();
+    maybeAutoStart();
     handlePhase();
   }));
   subscriptions.push(onValue(ref(db, roomPath('players')), snapshot => {
     players = snapshot.val() || {};
     renderPlayers();
+    publishPublicLobby();
+    maybeAutoStart();
     tryHostTransfer();
     maybeReveal();
     handlePhase();
@@ -260,6 +386,7 @@ async function enterRoom(code) {
     const settings = snapshot.val();
     if (!settings) return;
     roomSettings = settings;
+    settingsReady = true;
     byId('roomScoreGoal').value = window.BussoleScoring.goal(settings.scoreGoal);
     renderRoom();
     byId('roomMode').value = settings.mode || 'medium';
@@ -268,6 +395,8 @@ async function enterRoom(code) {
     byId('roomBlurEnabled').checked = Boolean(settings.blurEnabled);
     byId('roomTimerDuration').value = window.BussoleRoundTimer.duration(settings);
     updateTimerSettingsVisibility();
+    renderRoom();
+    maybeAutoStart();
   }));
   subscriptions.push(onValue(ref(db, roomPath('target')), snapshot => {
     selectedTarget = snapshot.val();
@@ -287,7 +416,10 @@ async function enterRoom(code) {
 function renderRoom() {
   if (!roomMeta) return;
   countdown.sync(roomMeta);
+  if (roomMeta.phase !== 'lobby') window.BussoleExplorers.close();
   const host = isHost();
+  byId('roomVisibilityLabel').textContent = roomMeta.visibility === 'public' ? 'Public room · First round starts at 8 explorers' : 'Private room · Invite by code or link';
+  byId('roomSettingsSummary').textContent = window.BussolePublicRooms.summary(roomSettings);
   host ? show(hostControls) : hide(hostControls);
   byId('nextRoundBtn').classList.toggle('hidden', !host);
   byId('roomScoreGoal').disabled = roomMeta.round > (roomMeta.matchStartRound || 0);
@@ -301,7 +433,7 @@ function renderRoom() {
     show(panel); show(lobby); hide(entry); hide(resultsPanel);
     hide(roomBadge);
     hide(roomTargetBanner);
-    roomMessage.textContent = host ? 'Choose a target, then start the round.' : 'Waiting for the host to start…';
+    roomMessage.textContent = host ? (roomMeta.visibility === 'public' ? (window.BussolePublicRooms.waiting(roomMeta) ? 'Choose a target. Start with at least 2 explorers, or automatically at 8.' : 'Choose a target, then start the next round.') : 'Choose a target, then start the round.') : 'Waiting for the host to start…';
     document.documentElement.classList.remove('room-resuming');
   }
 }
@@ -326,6 +458,11 @@ function renderPlayers() {
         PRESENCE_GRACE_MS - (Date.now() - Number(player.lastSeenAt))
       );
     }
+    const info = document.createElement('button');
+    info.type = 'button'; info.className = 'explorer-info'; info.textContent = 'i';
+    info.setAttribute('aria-label', `About ${EXPLORERS[player.colorIndex]}`);
+    info.addEventListener('click', () => window.BussoleExplorers.open(player.colorIndex, info));
+    item.appendChild(info);
     roomPlayers.appendChild(item);
   });
   const me = players[user?.uid];
@@ -364,7 +501,10 @@ async function tryHostTransfer() {
 }
 
 async function startRound() {
-  if (!isHost() || !selectedTarget) return;
+  if (startingRound || !isHost() || !selectedTarget || roomMeta.phase !== 'lobby') return;
+  if (roomMeta.visibility === 'public' && Object.values(players).filter(player => window.BussolePublicRooms.online(player, serverNow())).length < 2) {
+    roomMessage.textContent = 'At least 2 explorers are needed for a public match.'; return;
+  }
   if (window.BussoleScoring.outcome(window.BussoleScoring.standings(players), roomSettings.scoreGoal).length) return;
   const goalInput = byId('roomScoreGoal');
   if (!goalInput.checkValidity()) { goalInput.reportValidity(); return; }
@@ -389,6 +529,9 @@ async function startRound() {
     playerUpdates[`players/${uid}/ready`] = false;
     playerUpdates[`players/${uid}/locked`] = false;
   });
+  startingRound = true;
+  try {
+  if (roomMeta.visibility === 'public') await remove(ref(db, `publicRooms/${roomCode}`));
   await update(ref(db, roomPath()), {
     ...playerUpdates,
     settings,
@@ -398,6 +541,7 @@ async function startRound() {
     'meta/deadline': timerEnabled ? Date.now() + serverTimeOffset + timerSeconds * 1000 : null,
     'meta/lastActiveAt': Date.now()
   });
+  } finally { startingRound = false; }
 }
 
 async function handlePhase() {
@@ -612,6 +756,15 @@ async function leaveRoom() {
     uid !== previousUserId && player.connected
   );
   clearTimeout(timerHandle);
+  clearInterval(directoryTimer);
+  directoryTimer = null;
+  window.BussoleExplorers.close();
+  if (isHost() && roomMeta?.visibility === 'public') {
+    await Promise.race([
+      remove(ref(db, `publicRooms/${previousCode}`)).catch(() => {}),
+      new Promise(resolve => setTimeout(resolve, 500))
+    ]);
+  }
   clearTimeout(presenceUiTimer);
   clearTimeout(hostTransferTimer);
   presenceUiTimer = null;
@@ -676,13 +829,25 @@ closeButton.addEventListener('click', () => {
   if (closeResultsPanel()) return;
   roomCode ? leaveRoom() : (hide(panel), show(menu));
 });
-byId('createRoomBtn').addEventListener('click', createRoom);
+byId('createRoomBtn').addEventListener('click', () => createRoom());
+byId('joinPublicRoomBtn').addEventListener('click', joinPublicRoom);
+byId('myExplorerInfo').addEventListener('click', event => {
+  const me = players[user?.uid];
+  if (me) window.BussoleExplorers.open(me.colorIndex, event.currentTarget);
+});
+byId('explorerClose').addEventListener('click', () => window.BussoleExplorers.close());
+byId('explorerDialog').addEventListener('click', event => {
+  if (event.target === byId('explorerDialog')) {
+    const bounds = event.target.getBoundingClientRect();
+    if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) window.BussoleExplorers.close();
+  }
+});
 byId('showJoinRoomBtn').addEventListener('click', () => show(byId('joinRoomForm')));
 byId('roomCodeInput').addEventListener('input', event => { event.target.value = displayCode(compactCode(event.target.value)); });
 byId('joinRoomBtn').addEventListener('click', joinRoom);
 byId('roomTargetSearch').addEventListener('click', searchTarget);
 byId('roomTargetRandom').addEventListener('click', selectRandomTarget);
-byId('startRoomRound').addEventListener('click', startRound);
+byId('startRoomRound').addEventListener('click', () => startRound().catch(error => { roomMessage.textContent = friendlyError(error); }));
 byId('copyRoomLinkBtn').addEventListener('click', copyRoomLink);
 timerEnabledInput.addEventListener('change', updateTimerSettingsVisibility);
 byId('roomTimerDuration').addEventListener('input', validateTimer);
@@ -691,6 +856,19 @@ byId('roomScoreGoal').addEventListener('change', async event => {
   if (!event.target.checkValidity()) { event.target.reportValidity(); return; }
   await set(ref(db, roomPath('settings/scoreGoal')), window.BussoleScoring.goal(event.target.value));
 });
+for (const id of ['roomMode', 'roomMapStyle', 'roomTimerEnabled', 'roomTimerDuration', 'roomBlurEnabled']) {
+  byId(id).addEventListener('change', async () => {
+    if (!isHost() || roomMeta?.phase !== 'lobby' || (timerEnabledInput.checked && !validateTimer())) return;
+    await update(ref(db, roomPath('settings')), {
+      mode: byId('roomMode').value, mapStyle: byId('roomMapStyle').value,
+      timerEnabled: timerEnabledInput.checked,
+      timerSeconds: Number(byId('roomTimerDuration').value),
+      timerDuration: Math.max(10, Number(byId('roomTimerDuration').value) || 60),
+      blurEnabled: Boolean(byId('roomBlurEnabled').checked)
+    });
+    maybeAutoStart();
+  });
+}
 byId('resultsLeaveBtn').addEventListener('click', leaveRoom);
 byId('nextRoundBtn').addEventListener('click', nextRound);
 roomBadge.addEventListener('click', openResultsPanel);
