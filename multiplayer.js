@@ -44,6 +44,7 @@ let roomCode = null;
 let roomMeta = null;
 let players = {};
 let selectedTarget = null;
+let roomSettings = {};
 let preparedRound = null;
 let revealedRound = null;
 let disconnectHandle = null;
@@ -141,7 +142,7 @@ async function createRoom() {
       if (!existing.exists()) {
         await set(roomRef, {
           meta: { hostId: user.uid, phase: 'lobby', round: 0, createdAt: Date.now(), lastActiveAt: Date.now() },
-          settings: { mode: 'medium', mapStyle: initialMapStyle, timerEnabled: false, timerDuration: 60 },
+          settings: { mode: 'medium', mapStyle: initialMapStyle, timerEnabled: false, timerDuration: 60, scoreGoal: 5000 },
           players: { [user.uid]: newPlayer }
         });
       } else {
@@ -158,10 +159,11 @@ async function createRoom() {
           round: 0,
           createdAt: Date.now(),
           lastActiveAt: Date.now(),
-          deadline: null
+          deadline: null,
+          matchStartRound: 0
         });
         await set(ref(db, `rooms/${code}/settings`), {
-          mode: 'medium', mapStyle: initialMapStyle, timerEnabled: false, timerDuration: 60
+          mode: 'medium', mapStyle: initialMapStyle, timerEnabled: false, timerDuration: 60, scoreGoal: 5000
         });
         await Promise.all([
           remove(ref(db, `rooms/${code}/target`)),
@@ -246,6 +248,9 @@ async function enterRoom(code) {
   subscriptions.push(onValue(ref(db, roomPath('settings')), snapshot => {
     const settings = snapshot.val();
     if (!settings) return;
+    roomSettings = settings;
+    byId('roomScoreGoal').value = window.BussoleScoring.goal(settings.scoreGoal);
+    renderRoom();
     byId('roomMode').value = settings.mode || 'medium';
     byId('roomMapStyle').value = settings.mapStyle === '3d' ? '3d' : '2d';
     byId('roomTimerEnabled').checked = Boolean(settings.timerEnabled);
@@ -268,9 +273,13 @@ async function enterRoom(code) {
 }
 
 function renderRoom() {
+  if (!roomMeta) return;
   const host = isHost();
   host ? show(hostControls) : hide(hostControls);
   byId('nextRoundBtn').classList.toggle('hidden', !host);
+  byId('roomScoreGoal').disabled = roomMeta.round > (roomMeta.matchStartRound || 0);
+  byId('roomGoalSummary').textContent = `First to ${window.BussoleScoring.goal(roomSettings.scoreGoal)} points`;
+  byId('roomStandingsTitle').textContent = roomMeta.round > (roomMeta.matchStartRound || 0) ? 'Total standings' : 'Explorers';
   if (roomMeta.phase === 'lobby') {
     setResultsCollapsed(false);
     panel.classList.remove('results-mode');
@@ -288,13 +297,13 @@ function renderPlayers() {
   clearTimeout(presenceUiTimer);
   presenceUiTimer = null;
   roomPlayers.innerHTML = '';
-  const list = Object.entries(players).sort((a, b) => a[1].joinedAt - b[1].joinedAt);
+  const list = window.BussoleScoring.standings(players).map(player => [player.uid, player]);
   let nextPresenceExpiry = Infinity;
-  list.forEach(([uid, player]) => {
+  list.forEach(([uid, player], index) => {
     const item = document.createElement('li');
     item.className = 'room-player';
     item.innerHTML = `<span class="player-colour" style="background:${COLOURS[player.colorIndex]}"></span><span></span><span class="player-state"></span>`;
-    item.children[1].textContent = `${player.name}${uid === roomMeta?.hostId ? ' ★' : ''} · ${window.BussoleScoring.total(player.roundScores)} points`;
+    item.children[1].textContent = `${index + 1}. ${player.name}${uid === roomMeta?.hostId ? ' ★' : ''} · ${window.BussoleScoring.total(player.roundScores)} points`;
     const spectator = roomMeta?.phase === 'aiming' && (player.eligibleRound || 1) > roomMeta.round;
     const online = isPlayerOnline(player);
     item.children[2].textContent = !online ? 'offline' : spectator ? 'next round' : player.locked ? 'locked' : player.ready ? 'aiming' : 'Ready';
@@ -343,12 +352,17 @@ async function tryHostTransfer() {
 
 async function startRound() {
   if (!isHost() || !selectedTarget) return;
+  if (window.BussoleScoring.outcome(window.BussoleScoring.standings(players), roomSettings.scoreGoal).length) return;
+  const goalInput = byId('roomScoreGoal');
+  if (!goalInput.checkValidity()) { goalInput.reportValidity(); return; }
   const round = (roomMeta.round || 0) + 1;
   const timerEnabled = byId('roomTimerEnabled').checked;
   const timerDuration = Math.max(10, Number(byId('roomTimerDuration').value) || 60);
   const settings = {
     mode: byId('roomMode').value,
     mapStyle: byId('roomMapStyle').value === '3d' ? '3d' : '2d',
+    scoreGoal: roomMeta.round > (roomMeta.matchStartRound || 0)
+      ? window.BussoleScoring.goal(roomSettings.scoreGoal) : window.BussoleScoring.goal(goalInput.value),
     timerEnabled,
     timerDuration
   };
@@ -454,6 +468,10 @@ async function showResults(submissions) {
       window.BussoleScoring.record(player, round, result.points)
     )
   ));
+  const finished = window.BussoleScoring.outcome(ranking, settings.scoreGoal).length > 0;
+  byId('roundResultsTitle').textContent = finished ? 'Match results' : 'Round results';
+  byId('matchOutcome').textContent = window.BussoleScoring.matchMessage(ranking, settings.scoreGoal);
+  byId('nextRoundBtn').textContent = finished ? 'New match' : 'Next round';
   byId('roundRanking').innerHTML = '';
   ranking.forEach(result => {
     const item = document.createElement('li');
@@ -498,15 +516,12 @@ function closeResultsPanel() {
 
 async function nextRound() {
   if (!isHost()) return;
-  const updates = {
-    'meta/phase': 'lobby',
-    'meta/deadline': null,
-    'meta/lastActiveAt': serverTimestamp()
-  };
-  Object.keys(players).forEach(uid => {
-    updates[`players/${uid}/ready`] = false;
-    updates[`players/${uid}/locked`] = false;
-  });
+  if (roomMeta?.phase !== 'revealed') return;
+  const newMatch = window.BussoleScoring.outcome(
+    window.BussoleScoring.standings(players), roomSettings.scoreGoal
+  ).length > 0;
+  const updates = window.BussoleScoring.lobbyUpdates(players, roomMeta.round, newMatch);
+  updates['meta/lastActiveAt'] = serverTimestamp();
   await update(ref(db, roomPath()), updates);
   window.BussoleGame.resetMultiplayerRound();
   document.body.classList.remove('multiplayer-round');
@@ -651,6 +666,11 @@ byId('roomTargetRandom').addEventListener('click', selectRandomTarget);
 byId('startRoomRound').addEventListener('click', startRound);
 byId('copyRoomLinkBtn').addEventListener('click', copyRoomLink);
 timerEnabledInput.addEventListener('change', updateTimerSettingsVisibility);
+byId('roomScoreGoal').addEventListener('change', async event => {
+  if (!isHost() || roomMeta?.phase !== 'lobby' || roomMeta.round > (roomMeta.matchStartRound || 0)) return;
+  if (!event.target.checkValidity()) { event.target.reportValidity(); return; }
+  await set(ref(db, roomPath('settings/scoreGoal')), window.BussoleScoring.goal(event.target.value));
+});
 byId('resultsLeaveBtn').addEventListener('click', leaveRoom);
 byId('nextRoundBtn').addEventListener('click', nextRound);
 roomBadge.addEventListener('click', openResultsPanel);

@@ -128,6 +128,10 @@ if (multiplayerMode) {
         window.BussoleScoring.record(player, round, result.points)
       )
     ));
+    const finished = window.BussoleScoring.outcome(ranking, settings.scoreGoal).length > 0;
+    document.getElementById('globeResultsTitle').textContent = finished ? 'Match results' : 'Round results';
+    document.getElementById('globeMatchOutcome').textContent = window.BussoleScoring.matchMessage(ranking, settings.scoreGoal);
+    nextRoundButton.textContent = finished ? 'New match' : 'Next round';
     rankingList.replaceChildren();
     ranking.forEach(result => {
       const item = document.createElement('li');
@@ -147,15 +151,12 @@ if (multiplayerMode) {
 
   async function nextRound() {
     if (!isHost()) return;
-    const changes = {
-      'meta/phase': 'lobby',
-      'meta/deadline': null,
-      'meta/lastActiveAt': serverTimestamp()
-    };
-    Object.keys(players).forEach(uid => {
-      changes[`players/${uid}/ready`] = false;
-      changes[`players/${uid}/locked`] = false;
-    });
+    if (roomMeta?.phase !== 'revealed') return;
+    const newMatch = window.BussoleScoring.outcome(
+      window.BussoleScoring.standings(players), settings.scoreGoal
+    ).length > 0;
+    const changes = window.BussoleScoring.lobbyUpdates(players, roomMeta.round, newMatch);
+    changes['meta/lastActiveAt'] = serverTimestamp();
     await update(ref(db, roomPath()), changes);
   }
 
