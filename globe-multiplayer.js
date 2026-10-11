@@ -35,6 +35,7 @@ if (multiplayerMode) {
   let timerHandle;
   let shownRound = null;
   let leaving = false;
+  let hostTransferTimer;
   const unsubscribers = [];
 
   const roomPath = suffix => `rooms/${roomCode}${suffix ? `/${suffix}` : ''}`;
@@ -86,6 +87,20 @@ if (multiplayerMode) {
       console.error(error);
       window.BussoleGlobe.setGoEnabled(true);
       window.BussoleGlobe.setStatus('The line could not be saved. Please try again.');
+    }
+  }
+
+  async function tryHostTransfer() {
+    clearTimeout(hostTransferTimer);
+    if (!roomMeta || roomMeta.phase === 'closed' || players[roomMeta.hostId]?.connected !== false) return;
+    const host = players[roomMeta.hostId];
+    if (window.BussolePublicRooms.online(host, Date.now() + serverTimeOffset)) {
+      hostTransferTimer = setTimeout(tryHostTransfer, Math.max(250, 30100 - (Date.now() + serverTimeOffset - Number(host.lastSeenAt))));
+      return;
+    }
+    const successor = Object.entries(players).filter(([, player]) => player.connected).sort((a, b) => a[1].joinedAt - b[1].joinedAt)[0];
+    if (successor?.[0] === user.uid) {
+      await runTransaction(ref(db, roomPath('meta/hostId')), current => current === roomMeta.hostId ? user.uid : undefined);
     }
   }
 
@@ -168,6 +183,7 @@ if (multiplayerMode) {
     leaving = true;
     countdown.stop();
     clearTimeout(timerHandle);
+    clearTimeout(hostTransferTimer);
     unsubscribers.forEach(unsubscribe => unsubscribe());
     const otherOnlinePlayers = Object.entries(players).some(([uid, player]) =>
       uid !== user?.uid && player.connected
@@ -225,6 +241,7 @@ if (multiplayerMode) {
         players = playerSnapshot.val() || {};
         countdown.sync(roomMeta);
         updateProgress();
+        tryHostTransfer();
         maybeReveal();
       }));
       unsubscribers.push(onValue(ref(db, roomPath('target')), targetSnapshot => {
@@ -244,6 +261,7 @@ if (multiplayerMode) {
         if (!roomMeta || roomMeta.phase === 'closed') return goHome();
         countdown.sync(roomMeta);
         updateProgress();
+        nextRoundButton.classList.toggle('hidden', !isHost());
         if (roomMeta.phase === 'revealed') showResults();
         if (roomMeta.phase === 'lobby' && previousPhase !== 'lobby') {
           const lobbyUrl = new URL('./', location.href);

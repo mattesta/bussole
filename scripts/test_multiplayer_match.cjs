@@ -48,6 +48,8 @@ async function checkController(file, globe) {
   ];
   vm.runInContext(fs.readFileSync('scoring.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('round-timer.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('explorers.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('public-rooms.js', 'utf8'), context);
   let source = fs.readFileSync(file, 'utf8').replace(/^import[\s\S]*?;\s*/gm, '');
   const expose = `globalThis.test = {
     setup(p, s) { user = { uid: 'a' }; roomMeta = { hostId: 'a', round: 2, phase: 'revealed' }; players = p; ${globe ? 'settings' : 'roomSettings'} = s; ${globe ? 'target' : 'selectedTarget'} = {}; ${globe ? '' : "roomCode = 'ABCDEF';"} },
