@@ -8,6 +8,7 @@ async function checkController(file, globe) {
     return {
       classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
       style: {}, children: [], value: '', textContent: '',
+      focus() {}, checkValidity() { return true; }, reportValidity() {},
       addEventListener() {}, setAttribute() {}, removeAttribute() {},
       appendChild(child) { this.children.push(child); },
       replaceChildren() { this.children = []; },
@@ -21,11 +22,11 @@ async function checkController(file, globe) {
   };
   const settings = { mode: 'medium', scoreGoal: 5000 };
   const context = vm.createContext({
-    console, URLSearchParams, setTimeout, clearTimeout,
+    console, URLSearchParams, setTimeout, clearTimeout, setInterval, clearInterval,
     location: { search: globe ? '?multiplayer=1&room=ABCDEF' : '' },
     document: {
       getElementById(id) { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); },
-      createElement: element, addEventListener() {}, body: element()
+      querySelector: element, createElement: element, addEventListener() {}, body: element()
     },
     initializeApp() {}, firebaseConfig: {}, getAuth() { return {}; }, getDatabase() {},
     onAuthStateChanged() {}, ref(db, path) { return path; }, serverTimestamp() { return 123; },
@@ -46,10 +47,11 @@ async function checkController(file, globe) {
     { uid: 'b', name: 'B', points: 900, errorMeters: 2, color: 'blue' }
   ];
   vm.runInContext(fs.readFileSync('scoring.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('round-timer.js', 'utf8'), context);
   let source = fs.readFileSync(file, 'utf8').replace(/^import[\s\S]*?;\s*/gm, '');
   const expose = `globalThis.test = {
     setup(p, s) { user = { uid: 'a' }; roomMeta = { hostId: 'a', round: 2, phase: 'revealed' }; players = p; ${globe ? 'settings' : 'roomSettings'} = s; ${globe ? 'target' : 'selectedTarget'} = {}; ${globe ? '' : "roomCode = 'ABCDEF';"} },
-    showResults, nextRound
+    showResults, nextRound${globe ? '' : ', startRound, validateTimer, setupLobby() { roomMeta.round = 0; roomMeta.phase = \"lobby\"; }'}
   };`;
   source = globe ? source.replace('  initialize();', expose) : source + expose;
   vm.runInContext(source, context);
@@ -68,6 +70,28 @@ async function checkController(file, globe) {
   context.test.setup({ a: { name: 'A', roundScores: { 1: 100 } } }, settings);
   await context.test.nextRound();
   assert.equal(Object.hasOwn(updates.at(-1), 'players/a/roundScores'), false);
+  if (!globe) {
+    context.test.setup({}, settings);
+    context.test.setupLobby();
+    context.document.getElementById('roomScoreGoal').value = '5000';
+    elements.get('roomTimerEnabled').checked = true;
+    context.document.getElementById('roomMode').value = 'medium';
+    context.document.getElementById('roomMapStyle').value = '2d';
+    for (const seconds of ['2', '61']) {
+      context.document.getElementById('roomTimerDuration').value = seconds;
+      const count = updates.length;
+      await context.test.startRound();
+      assert.equal(updates.length, count);
+    }
+    for (const seconds of ['3', '60']) {
+      context.document.getElementById('roomTimerDuration').value = seconds;
+      await context.test.startRound();
+      const change = updates.at(-1);
+      assert.equal(change.settings.timerSeconds, Number(seconds));
+      assert.ok(change.settings.timerDuration >= 10); // Existing rules remain compatible.
+      assert.equal(change['meta/deadline'] - change['meta/startedAt'], Number(seconds) * 1000);
+    }
+  }
   console.log(`${file}: final results, whole-round winner and restart passed.`);
 }
 (async () => {

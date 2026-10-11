@@ -1377,7 +1377,8 @@ window.BussoleGame = {
   },
   prepareMultiplayerRound(settings, roundTarget) {
     clearMultiplayerLayers();
-    timerCheckbox.checked = Boolean(settings.timerEnabled);
+    // Multiplayer uses the shared room deadline, including after Go is locked.
+    timerCheckbox.checked = false;
     timerDurationInput.value = settings.timerDuration || 60;
     blurCheckbox.checked = false;
     document.querySelector(`.modeBtn[data-mode="${settings.mode}"]`).click();

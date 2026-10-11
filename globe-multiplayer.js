@@ -24,6 +24,8 @@ if (multiplayerMode) {
   const roomProgress = document.getElementById('globeRoomProgress');
   const homeLink = document.getElementById('prototypeBackLink');
 
+  let serverTimeOffset = 0;
+  const countdown = window.BussoleRoundTimer.create(document.getElementById('globeCountdown'), document.querySelector('.target-card'), () => Date.now() + serverTimeOffset);
   let user;
   let roomMeta;
   let settings;
@@ -109,6 +111,7 @@ if (multiplayerMode) {
     }
     shownRound = roomMeta.round;
     clearTimeout(timerHandle);
+    countdown.stop();
     const snapshot = await get(ref(db, roomPath(`submissions/${roomMeta.round}`)));
     const submissions = snapshot.val() || {};
     const entries = Object.entries(players)
@@ -163,6 +166,7 @@ if (multiplayerMode) {
   async function leaveRoom() {
     if (leaving) return;
     leaving = true;
+    countdown.stop();
     clearTimeout(timerHandle);
     unsubscribers.forEach(unsubscribe => unsubscribe());
     const otherOnlinePlayers = Object.entries(players).some(([uid, player]) =>
@@ -218,6 +222,7 @@ if (multiplayerMode) {
 
       unsubscribers.push(onValue(ref(db, roomPath('players')), playerSnapshot => {
         players = playerSnapshot.val() || {};
+        countdown.sync(roomMeta);
         updateProgress();
         maybeReveal();
       }));
@@ -227,6 +232,7 @@ if (multiplayerMode) {
           window.BussoleGlobe.setMultiplayerTarget(target);
         }
       }));
+      unsubscribers.push(onValue(ref(db, '.info/serverTimeOffset'), snapshot => { serverTimeOffset = Number(snapshot.val()) || 0; }));
       unsubscribers.push(onValue(ref(db, roomPath('settings')), settingsSnapshot => {
         settings = settingsSnapshot.val() || settings;
       }));
@@ -234,6 +240,7 @@ if (multiplayerMode) {
         const previousPhase = roomMeta?.phase;
         roomMeta = metaSnapshot.val();
         if (!roomMeta || roomMeta.phase === 'closed') return goHome();
+        countdown.sync(roomMeta);
         updateProgress();
         if (roomMeta.phase === 'revealed') showResults();
         if (roomMeta.phase === 'lobby' && previousPhase !== 'lobby') {
@@ -252,7 +259,7 @@ if (multiplayerMode) {
                 lastActiveAt: serverTimestamp()
               });
             }
-          }, Math.max(0, roomMeta.deadline - Date.now()));
+          }, Math.max(0, roomMeta.deadline - (Date.now() + serverTimeOffset)));
         }
       }));
       if (roomMeta.phase === 'revealed') showResults();
