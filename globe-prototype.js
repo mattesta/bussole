@@ -61,7 +61,11 @@ let mapReady = false;
 let playerMarker = null;
 let targetMarker = null;
 let orientationStarted = false;
-let lastAbsoluteOrientationAt = 0;
+let compassUsable = false;
+let compassSubmitted = false;
+let compassWarning = null;
+let compassTracker = null;
+let manualBearing = false;
 let smoothHeading = null;
 let pendingHeading = null;
 let orientationFrameId = null;
@@ -352,7 +356,7 @@ function setRandomButtonState(isRandomTarget) {
 }
 
 function updateGoButtonState() {
-  showLineBtn.disabled = Boolean(!mapReady || !targetLatLng || lineRevealed);
+  showLineBtn.disabled = Boolean(!mapReady || !targetLatLng || lineRevealed || compassSubmitted || (!compassUsable && !manualBearing));
 }
 
 function setTarget(lat, lon, label, isRandomTarget = false) {
@@ -486,6 +490,7 @@ function chooseRandomTarget() {
 }
 
 function showPrototypeLine() {
+  if (!compassUsable && !manualBearing) return;
   if (!mapReady || !targetLatLng) return;
   let distanceMeters = ROUTE_DISTANCE_METERS;
   if (gameMode === 'hard') {
@@ -498,6 +503,7 @@ function showPrototypeLine() {
     distanceMeters = distanceKm * 1000;
   }
   if (multiplayerController?.isActive()) {
+    compassSubmitted = true;
     multiplayerController.submitLine({
       lat: playerLatLng[0],
       lon: playerLatLng[1],
@@ -572,6 +578,7 @@ function renderMultiplayerResults(entries, roundTarget, mode) {
 }
 
 function resetPrototype() {
+  compassSubmitted = false;
   clearLines();
   clearMultiplayerLayers();
   removeTargetMarker();
@@ -592,11 +599,6 @@ function updateBearing(value, rotateMap = false) {
   }
 }
 
-function screenOrientationAngle() {
-  if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
-  return typeof window.orientation === 'number' ? window.orientation : 0;
-}
-
 function smoothAngle(previous, next, amount) {
   if (previous === null) return next;
   const previousRadians = previous * Math.PI / 180;
@@ -610,42 +612,17 @@ function angularDistanceDegrees(first, second) {
   return Math.abs(((second - first + 540) % 360) - 180);
 }
 
-function tiltCompensatedHeading(alpha, beta, gamma) {
-  if (typeof alpha !== 'number') return null;
-  if (typeof beta !== 'number' || typeof gamma !== 'number' ||
-      (Math.abs(beta) < .5 && Math.abs(gamma) < .5)) {
-    return normalizeHeading(360 - alpha);
-  }
-  const radians = Math.PI / 180;
-  const x = beta * radians;
-  const y = gamma * radians;
-  const z = alpha * radians;
-  const cX = Math.cos(x);
-  const cY = Math.cos(y);
-  const cZ = Math.cos(z);
-  const sX = Math.sin(x);
-  const sY = Math.sin(y);
-  const sZ = Math.sin(z);
-  const vectorX = -cZ * sY - sZ * sX * cY;
-  const vectorY = -sZ * sY + cZ * sX * cY;
-  return normalizeHeading(Math.atan2(vectorX, vectorY) * 180 / Math.PI);
-}
-
 function applyOrientationFrame() {
   orientationFrameId = null;
   if (pendingHeading === null) return;
   updateBearing(pendingHeading, true);
+  updateGoButtonState();
 }
 
-function handleOrientation(event) {
-  let nextHeading = null;
-  if (typeof event.webkitCompassHeading === 'number') {
-    nextHeading = event.webkitCompassHeading;
-  } else if (typeof event.alpha === 'number') {
-    nextHeading = tiltCompensatedHeading(event.alpha, event.beta, event.gamma);
-  }
-  if (!Number.isFinite(nextHeading)) return;
-  nextHeading = normalizeHeading(nextHeading + screenOrientationAngle());
+function handleCompassHeading(nextHeading) {
+  compassUsable = true;
+  if (compassWarning && !lineRevealed && !compassSubmitted) statusEl.textContent = 'Compass ready. Move phone to set direction.';
+  compassWarning = null;
   const change = smoothHeading === null ? 180 : angularDistanceDegrees(smoothHeading, nextHeading);
   const smoothing = change > 45 ? .65 : change > 15 ? .38 : .16;
   smoothHeading = smoothAngle(smoothHeading, nextHeading, smoothing);
@@ -653,15 +630,14 @@ function handleOrientation(event) {
   if (orientationFrameId === null) orientationFrameId = requestAnimationFrame(applyOrientationFrame);
 }
 
-function handleAbsoluteOrientation(event) {
-  if (typeof event.webkitCompassHeading !== 'number' && typeof event.alpha !== 'number') return;
-  lastAbsoluteOrientationAt = performance.now();
-  handleOrientation(event);
-}
-
-function handleFallbackOrientation(event) {
-  if (performance.now() - lastAbsoluteOrientationAt < 1000) return;
-  handleOrientation(event);
+function handleCompassStatus(reason) {
+  compassUsable = false;
+  pendingHeading = null;
+  compassWarning = reason === 'tilted'
+    ? 'Hold the phone flatter to aim with its top edge.'
+    : 'Compass unavailable. Open in Chrome and allow motion sensors.';
+  if (!lineRevealed && !manualBearing && !compassSubmitted) statusEl.textContent = compassWarning;
+  updateGoButtonState();
 }
 
 async function startOrientation(permissionAlreadyGranted = false) {
@@ -669,11 +645,11 @@ async function startOrientation(permissionAlreadyGranted = false) {
   if (!permissionAlreadyGranted &&
       typeof DeviceOrientationEvent !== 'undefined' &&
       typeof DeviceOrientationEvent.requestPermission === 'function') {
-    const permission = await DeviceOrientationEvent.requestPermission();
+    const permission = await DeviceOrientationEvent.requestPermission(true);
     if (permission !== 'granted') return false;
   }
-  window.addEventListener('deviceorientationabsolute', handleAbsoluteOrientation, true);
-  window.addEventListener('deviceorientation', handleFallbackOrientation, true);
+  compassTracker = window.BussoleCompass.createTracker({ onHeading: handleCompassHeading, onStatus: handleCompassStatus });
+  compassTracker.start();
   orientationStarted = true;
   return true;
 }
@@ -775,7 +751,11 @@ function setMode(mode) {
   }
 }
 
-bearingInput.addEventListener('input', event => updateBearing(event.target.value, true));
+bearingInput.addEventListener('input', event => {
+  manualBearing = true;
+  updateBearing(event.target.value, true);
+  updateGoButtonState();
+});
 randomTargetBtn.addEventListener('click', chooseRandomTarget);
 showLineBtn.addEventListener('click', showPrototypeLine);
 resetBtn.addEventListener('click', resetPrototype);
@@ -839,7 +819,8 @@ window.BussoleGlobe = {
     statusEl.textContent = message;
   },
   setGoEnabled(enabled) {
-    showLineBtn.disabled = !enabled;
+    compassSubmitted = !enabled;
+    updateGoButtonState();
   },
   refreshLocation() {
     return useMyLocation();
