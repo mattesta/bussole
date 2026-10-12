@@ -61,7 +61,7 @@ for (const globe of [false,true]) {
   Object.assign(c, {
     mapReady:true,playerLatLng:[0,0],targetLatLng:null,targetLabel:'',lineRevealed:false,roundActive:true,
     targetEl:{},statusEl:{},multiplayerLayers:[],
-    clearLines(){},clearMultiplayerLayers(){},hideBlurCircle(){},unlockMap(){},updatePlayerBlur(){},updateTargetMarker(){},setMapInteraction(){},setStatus(){},
+    clearLines(){},clearMultiplayerLayers(){},hideBlurCircle(){},unlockMap(){},updatePlayerBlur(){},updateTargetMarker(){},updateAccessPanel(){},setMapInteraction(){},setStatus(){},
     frameResult(points){bounds.push(...points)},
     hudEl:{getBoundingClientRect(){return{height:100}}},
     map:{setBearing(){},fitBounds(){}},

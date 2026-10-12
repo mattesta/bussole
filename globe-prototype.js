@@ -64,6 +64,16 @@ const searchBtn = document.getElementById('globeSearchBtn');
 const searchBox = document.getElementById('globeSearchBox');
 const clearSearchBtn = document.getElementById('globeClearSearch');
 const suggestionsEl = document.getElementById('globeSuggestions');
+const accessPanel = document.getElementById('globeAccessPanel');
+const accessMessage = document.getElementById('globeAccessMessage');
+const accessRetry = document.getElementById('globeAccessRetry');
+// Saved coordinates frame the initial view; a fresh browser check enables Go.
+let locationReady = false;
+let locationError = null;
+let locationRequest = null;
+let accessRequest = null;
+let accessBusy = false;
+let orientationPermissionGranted = Boolean(launchData?.orientationGranted);
 
 let playerLatLng = hasLaunchCoordinates
   ? [launchCoordinates.latitude, launchCoordinates.longitude]
@@ -157,14 +167,12 @@ map.on('load', () => {
   }
   updatePlayerMarker();
   frameAimingView(false);
-  if (hasLaunchCoordinates) {
-    statusEl.textContent = 'Position acquired. Choose a target.';
-  } else if (integratedMode) {
-    statusEl.textContent = 'Location unavailable. Using Calimera as a fallback.';
-  } else {
-    useMyLocation();
+  // Geolocation may prompt without a tap. iOS motion permission may not:
+  // missing motion access is recovered with the visible user-gesture button.
+  refreshPlayerLocation();
+  if (orientationPermissionGranted || (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission !== 'function')) {
+    startOrientation(orientationPermissionGranted).catch(() => handleCompassStatus('unavailable'));
   }
-  if (launchData?.orientationGranted) startOrientation(true);
   updateGoButtonState();
 });
 
@@ -389,7 +397,8 @@ function setRandomButtonState(isRandomTarget) {
 }
 
 function updateGoButtonState() {
-  showLineBtn.disabled = Boolean(!mapReady || !targetLatLng || lineRevealed || compassSubmitted || (!compassUsable && !manualBearing));
+  updateAccessPanel();
+  showLineBtn.disabled = Boolean(!locationReady || !mapReady || !targetLatLng || lineRevealed || compassSubmitted || (!compassUsable && !manualBearing));
   if (soloTimerSeconds && !soloTimerActive && !showLineBtn.disabled) {
     soloTimerActive = true;
     soloCountdown.sync({ phase: 'aiming', deadline: Date.now() + soloTimerSeconds * 1000 });
@@ -528,6 +537,7 @@ function chooseRandomTarget() {
 }
 
 function showPrototypeLine() {
+  if (!locationReady) return;
   if (!compassUsable && !manualBearing) return;
   if (!mapReady || !targetLatLng) return;
   let distanceMeters = ROUTE_DISTANCE_METERS;
@@ -621,6 +631,7 @@ function renderMultiplayerResults(entries, roundTarget, mode) {
   lineRevealed = true;
   updatePlayerBlur();
   updateTargetMarker();
+  updateAccessPanel();
   setMapInteraction(true);
   frameResult(boundsPoints);
   statusEl.textContent = 'All routes revealed. Drag the globe to inspect them.';
@@ -689,19 +700,28 @@ function handleCompassStatus(reason) {
   pendingHeading = null;
   compassWarning = reason === 'tilted'
     ? 'Hold the phone flatter to aim with its top edge.'
-    : 'Compass unavailable. Open in Chrome and allow motion sensors.';
+    : 'Compass unavailable. Open in Safari or Chrome and allow motion sensors.';
   if (!lineRevealed && !manualBearing && !compassSubmitted) statusEl.textContent = compassWarning;
   updateGoButtonState();
 }
 
 async function startOrientation(permissionAlreadyGranted = false) {
   if (orientationStarted) return true;
+  if (typeof DeviceOrientationEvent === 'undefined') {
+    compassWarning = 'Motion sensors are unavailable in this browser.';
+    return false;
+  }
   if (!permissionAlreadyGranted &&
       typeof DeviceOrientationEvent !== 'undefined' &&
       typeof DeviceOrientationEvent.requestPermission === 'function') {
     const permission = await DeviceOrientationEvent.requestPermission(true);
-    if (permission !== 'granted') return false;
+    if (permission !== 'granted') {
+      orientationPermissionGranted = false;
+      compassWarning = 'Motion access was denied. Allow motion sensors in this site’s settings, then retry.';
+      return false;
+    }
   }
+  orientationPermissionGranted = true;
   compassTracker = window.BussoleCompass.createTracker({ onHeading: handleCompassHeading, onStatus: handleCompassStatus });
   compassTracker.start();
   orientationStarted = true;
@@ -774,25 +794,94 @@ async function searchTarget() {
   }
 }
 
-async function useMyLocation() {
-  statusEl.textContent = 'Requesting location and compass access…';
+function updateAccessPanel() {
+  const missing = !locationReady || (!compassUsable && !manualBearing);
+  accessPanel.classList.toggle('hidden', !missing || lineRevealed || compassSubmitted);
+  accessRetry.disabled = accessBusy;
+  accessRetry.textContent = accessBusy ? 'Checking access…' : 'Enable location & compass';
+  accessMessage.textContent = locationError || compassWarning || (!locationReady
+    ? 'Allow location access to play from your real position.'
+    : 'Allow motion access, then hold the phone fairly flat to aim.');
+}
+
+function persistAccess() {
   try {
-    await startOrientation().catch(() => false);
-    const position = await new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
-        enableHighAccuracy: true,
-        maximumAge: 5000,
-        timeout: 12000
-      });
-    });
-    playerLatLng = [position.coords.latitude, position.coords.longitude];
-    updatePlayerMarker();
-    resetPrototype();
-    statusEl.textContent = 'Your position is active. Choose a target.';
-  } catch (error) {
-    statusEl.textContent = `Location unavailable: ${error.message || 'permission denied'}. Using Calimera for the demo.`;
+    sessionStorage.setItem('bussoleGlobeLaunch', JSON.stringify({
+      coordinates: locationReady ? { latitude: playerLatLng[0], longitude: playerLatLng[1] } : null,
+      orientationGranted: orientationPermissionGranted, acquiredAt: Date.now()
+    }));
+  } catch { /* A new page can recover access through the retry button. */ }
+}
+
+function refreshPlayerLocation(recenter = true) {
+  if (locationRequest) return locationRequest;
+  locationRequest = (async () => {
+    try {
+      if (!navigator.geolocation) throw new Error('Location is unavailable in this browser.');
+      const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true, maximumAge: 5000, timeout: 12000
+      }));
+      const { latitude, longitude } = position.coords;
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) throw new Error('No valid location was received.');
+      playerLatLng = [latitude, longitude];
+      locationReady = true;
+      locationError = null;
+      updatePlayerMarker();
+      if (recenter && !lineRevealed && !compassSubmitted) frameAimingView(false);
+      updatePlayerBlur();
+      persistAccess();
+      return true;
+    } catch (error) {
+      locationReady = false;
+      stopSoloTimer();
+      locationError = error.code === 1 ? 'Location access was denied. Allow location in this site’s settings, then retry.'
+        : error.code === 3 ? 'Location timed out. Check that location services are enabled, then retry.'
+        : `Location unavailable: ${error.message || 'please retry'}`;
+      statusEl.textContent = locationError;
+      return false;
+    } finally { updateGoButtonState(); }
+  })();
+  locationRequest.finally(() => { locationRequest = null; });
+  return locationRequest;
+}
+
+function useMyLocation() {
+  if (accessRequest) return accessRequest;
+  accessBusy = true;
+  compassUsable = false;
+  pendingHeading = null;
+  smoothHeading = null;
+  if (orientationFrameId !== null) cancelAnimationFrame(orientationFrameId);
+  orientationFrameId = null;
+  compassTracker?.stop();
+  orientationStarted = false;
+  statusEl.textContent = 'Requesting location and compass access…';
+  // Call before any await: iOS requires the current button's user activation.
+  const orientation = startOrientation().catch(() => {
+    orientationPermissionGranted = false;
+    compassWarning = 'Motion access is blocked. Check this site’s sensor permissions, then retry.';
+    return false;
+  });
+  const location = refreshPlayerLocation();
+  updateAccessPanel();
+  accessRequest = Promise.all([orientation, location]).then(() => persistAccess()).finally(() => {
+    accessBusy = false; accessRequest = null; updateGoButtonState();
+  });
+  return accessRequest;
+}
+accessRetry.addEventListener('click', useMyLocation);
+
+function recheckAccess() {
+  if (!mapReady || lineRevealed || compassSubmitted || document.visibilityState === 'hidden') return;
+  refreshPlayerLocation();
+  if (orientationPermissionGranted && !accessBusy) {
+    compassTracker?.stop(); orientationStarted = false; compassUsable = false;
+    startOrientation(true).catch(() => handleCompassStatus('unavailable'));
+    updateGoButtonState();
   }
 }
+document.addEventListener('visibilitychange', recheckAccess);
+window.addEventListener('pageshow', recheckAccess);
 
 function setMode(mode) {
   gameMode = mode;

@@ -312,6 +312,18 @@ button:focus-visible, input:focus-visible, .home-button:focus-visible { outline:
 }
 .globe-room-badge.results-available { box-shadow: 0 0 0 2px rgba(255,255,255,.72); }
 
+.access-panel {
+  position: fixed; z-index: 15; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(360px, calc(100% - 32px)); box-sizing: border-box;
+  padding: 20px; border: 1px solid rgba(255,255,255,.24); border-radius: 20px;
+  background: rgba(5,12,23,.97); color: white; box-shadow: 0 10px 40px rgba(0,0,0,.4);
+}
+.access-panel h2 { margin: 0 0 12px; font-size: 20px; }
+.access-panel p { line-height: 1.45; font-size: 14px; }
+.access-panel button { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #e41a1c; background: #71181d; color: white; font: inherit; }
+.access-panel button:disabled { opacity: .6; }
+.access-panel .access-help { color: rgba(255,255,255,.65); font-size: 12px; margin-bottom: 0; }
+
 @media (max-width: 600px) {
   .game-controls { right: 6px; bottom: max(6px, env(safe-area-inset-bottom)); left: 6px; }
   .action-bar { gap: 4px; padding: 6px; }

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Bussole!</title>
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="globe-prototype.css?v=18">
+  <link rel="stylesheet" href="globe-prototype.css?v=19">
   <link rel="stylesheet" href="round-timer.css?v=2">
   <link rel="stylesheet" href="player-blur.css?v=1">
 </head>
@@ -13,6 +13,12 @@
   <main id="globeMap" aria-label="Interactive 3D globe"></main>
 
   <div id="globeCountdown" class="round-countdown hidden" role="timer"></div>
+  <section id="globeAccessPanel" class="access-panel hidden" aria-labelledby="globeAccessTitle">
+    <h2 id="globeAccessTitle">Enable location & compass</h2>
+    <p id="globeAccessMessage" role="status">Allow location and motion access to play from your real position.</p>
+    <button id="globeAccessRetry" type="button">Enable location & compass</button>
+    <p class="access-help">If access is blocked, check this site's permissions. If you opened the link from a chat, try opening it in Safari or Chrome.</p>
+  </section>
   <aside class="target-card" aria-live="polite">
     <span class="target-label">TARGET</span>
     <strong id="prototypeTarget">Choose a target</strong>
@@ -89,7 +95,7 @@
   <script src="globe-lines.js?v=1"></script>
   <script src="compass.js?v=1"></script>
   <script src="public-privacy.js?v=1"></script>
-  <script src="globe-prototype.js?v=27"></script>
+  <script src="globe-prototype.js?v=28"></script>
   <script src="public-rooms.js?v=2"></script>
   <script type="module" src="globe-multiplayer.js?v=9"></script>
 </body>

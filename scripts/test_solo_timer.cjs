@@ -44,6 +44,7 @@ context.timerDurationInput.value = '3'; context.tapMode(); assert.equal(launches
 assert.equal(context.timerDuration, 3);
 // The globe starts its clock only once it can accept a line, and never in multiplayer.
 Object.assign(context, { showLineBtn: {}, mapReady: true, targetLatLng: [0,0], lineRevealed: false,
+  locationReady: true, updateAccessPanel(){},
   compassSubmitted: false, compassUsable: false, manualBearing: false,
   soloTimerSeconds: 3, soloTimerActive: false });
 vm.runInContext(actualFunction(globe, 'updateGoButtonState'), context);
