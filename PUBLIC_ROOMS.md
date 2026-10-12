@@ -22,6 +22,14 @@ The full submission and reduced result are written atomically. Before the new ru
 
 Public matchmaking reads Firebase's virtual `.info/serverTimeOffset` through `onValue`, not `get`, which sends an invalid path to the server.
 
+## Match summaries
+
+At the match goal, **My guesses** shows all of the owner's attempts together on a globe. Target dots open place-name popups. Private rooms also offer **Room rounds**, with a round picker and full routes/errors for all participants. Public reports read only `submissions/<round>/<owner uid>`; they never request another player's raw submission or the round parent. A public report contains only its owner's entries.
+
+The host archives each round's target, difficulty and participant names/colours under `meta/roundHistory` when starting the round. This archive contains no starting positions, bearings or guesses, and is compatible with the existing database rules. Each match is separated using `matchStartRound`. Matches begun before this feature can only show rounds whose targets were recorded and display a partial-history notice.
+
+The summary opens in an embedded viewer while the parent game retains its Firebase presence. Returning to results keeps the same round and camera. The report is also cached in the current browser tab's session storage; if storage is unavailable the parent sends it directly to the viewer. No extra location or motion permission is requested to inspect a summary.
+
 ## Validation
 
 Run the pure and controller tests with `node scripts/test_public_rooms.cjs`, `node scripts/test_public_matchmaking.cjs`, `node scripts/test_public_privacy.cjs`, and `node scripts/test_multiplayer_match.cjs`, alongside the existing test scripts.

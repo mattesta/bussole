@@ -23,9 +23,15 @@ if (multiplayerMode) {
   const roomBadge = document.getElementById('globeRoomBadge');
   const roomProgress = document.getElementById('globeRoomProgress');
   const homeLink = document.getElementById('prototypeBackLink');
+  const summaryActions = document.getElementById('globeSummaryActions');
+  const personalSummary = document.getElementById('globePersonalSummary');
+  const roomSummary = document.getElementById('globeRoomSummary');
+  const summaryStatus = document.getElementById('globeSummaryStatus');
+  const summaryFrame = document.getElementById('matchSummaryFrame');
+  let matchReport = null;
 
   let serverTimeOffset = 0;
-  const countdown = window.BussoleRoundTimer.create(document.getElementById('globeCountdown'), document.querySelector('.target-card'), () => Date.now() + serverTimeOffset);
+  const countdown = window.BussoleRoundTimer.create(document.getElementById('globeCountdown'), document.querySelector('.target-card'), () => Date.now() + serverTimeOffset, () => {}, element => window.BussoleMobileLayout.positionTimer(element));
   let user;
   let roomMeta;
   let settings;
@@ -171,7 +177,54 @@ if (multiplayerMode) {
     nextRoundButton.classList.toggle('hidden', !isHost());
     roomBadge.classList.remove('results-available');
     show(resultsPanel);
+    summaryActions.classList.toggle('hidden', !finished);
+    if (finished) await prepareReport();
   }
+
+  let reportLoading = null;
+  function prepareReport() {
+    if (reportLoading) return reportLoading;
+    const publicRoom = roomMeta.visibility === 'public';
+    personalSummary.disabled = true; roomSummary.disabled = true;
+    roomSummary.classList.toggle('hidden', publicRoom);
+    summaryStatus.textContent = 'Preparing your match summary…';
+    nextRoundButton.disabled = true;
+    reportLoading = (async () => {
+      try {
+        matchReport = await window.BussoleMatchReport.load({
+          publicRoom, uid: user.uid, meta: structuredClone(roomMeta), target, settings, players,
+          read: async path => (await get(ref(db, roomPath(path)))).val()
+        });
+        window.BussoleMatchReport.save(matchReport, displayCode(roomCode));
+        summaryStatus.textContent = publicRoom ? 'Your complete guesses stay personal.' : 'Review your guesses or explore the room round by round.';
+      } catch (error) {
+        console.warn('Match summary unavailable.', error.code || error.message);
+        summaryStatus.textContent = 'Summary unavailable. Tap My guesses to retry.';
+      } finally {
+        personalSummary.disabled = false; roomSummary.disabled = false;
+        nextRoundButton.disabled = false; reportLoading = null;
+      }
+    })();
+    return reportLoading;
+  }
+
+  function openSummary(view) {
+    if (!matchReport || (view === 'room' && matchReport.publicRoom)) return;
+    hide(resultsPanel);
+    summaryFrame.src = `match-summary.html?embedded=1&view=${view}`;
+    show(summaryFrame);
+  }
+  personalSummary.addEventListener('click', async () => { if (!matchReport) await prepareReport(); openSummary('personal'); });
+  roomSummary.addEventListener('click', async () => { if (!matchReport) await prepareReport(); openSummary('room'); });
+  summaryFrame.addEventListener('load', () => {
+    if (matchReport) summaryFrame.contentWindow.postMessage({type:'bussole-match-report', report:{...matchReport,roomCode:displayCode(roomCode)}}, location.origin);
+  });
+  window.addEventListener('message', event => {
+    if (event.origin !== location.origin || event.source !== summaryFrame.contentWindow) return;
+    if (event.data?.type === 'bussole-summary-close') {
+      hide(summaryFrame); summaryFrame.src = 'about:blank'; show(resultsPanel);
+    } else if (event.data?.type === 'bussole-summary-home') leaveRoom();
+  });
 
   async function nextRound() {
     if (!isHost()) return;

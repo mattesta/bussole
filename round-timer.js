@@ -8,7 +8,7 @@ window.BussoleRoundTimer = {
     const value = settings.timerSeconds ?? settings.timerDuration;
     return this.validDuration(value) ? Number(value) : 60;
   },
-  create(element, anchor, now = () => Date.now(), onExpire = () => {}) {
+  create(element, anchor, now = () => Date.now(), onExpire = () => {}, position = null) {
     let interval;
     let deadline;
     let expired = false;
@@ -23,7 +23,8 @@ window.BussoleRoundTimer = {
       element.textContent = `${seconds} s`;
       element.classList.toggle('urgent', seconds <= 5);
       element.setAttribute('aria-label', `${Math.ceil(remaining / 1000)} seconds remaining`);
-      element.style.top = `${Math.max(12, anchor.getBoundingClientRect().bottom + 8)}px`;
+      if (position) position(element);
+      else element.style.top = `${Math.max(12, anchor.getBoundingClientRect().bottom + 8)}px`;
       if (!remaining && !expired) {
         expired = true;
         clearInterval(interval);

@@ -27,7 +27,7 @@ async function checkController(file, globe) {
   };
   const settings = { mode: 'medium', scoreGoal: 5000 };
   const context = vm.createContext({
-    console, URLSearchParams, setTimeout, clearTimeout, setInterval, clearInterval,
+    console, structuredClone, URLSearchParams, setTimeout, clearTimeout, setInterval, clearInterval,
     location: { search: globe ? '?multiplayer=1&room=ABCDEF' : '', replace(url){redirects.push(url)} },
     document: {
       getElementById(id) { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); },
@@ -59,6 +59,7 @@ async function checkController(file, globe) {
   vm.runInContext(fs.readFileSync('round-timer.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('explorers.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('public-rooms.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('match-report.js', 'utf8'), context);
   let source = fs.readFileSync(file, 'utf8').replace(/^import[\s\S]*?;\s*/gm, '');
   const expose = `globalThis.test = {
     setup(p, s, publicRoom=false, phase='revealed') { user = { uid: 'a' }; roomMeta = { hostId: 'a', round: 2, phase, visibility:publicRoom?'public':'private' }; players = p; ${globe ? 'settings' : 'roomSettings'} = s; ${globe ? 'target' : 'selectedTarget'} = {}; ${globe ? 'shownRound=null;' : "roomCode = 'ABCDEF';preparedRound=null;"} },

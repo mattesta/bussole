@@ -129,12 +129,14 @@ button:focus-visible, input:focus-visible, .home-button:focus-visible { outline:
   inset: 0;
   z-index: 10;
   display: grid;
-  place-items: start center;
-  padding: max(72px, calc(env(safe-area-inset-top) + 50px)) 12px 12px;
+  place-items: end center;
+  padding: 12px 12px calc(var(--keyboard-inset, 0px) + var(--search-gap, 100px));
   background: rgba(0,0,0,.42);
 }
 .search-card {
   width: min(560px, 100%);
+  max-height: calc(var(--visible-height, 100dvh) - var(--search-gap, 100px) - 24px);
+  overflow-y: auto;
   padding: 14px;
   border: 1px solid var(--ui-border);
   border-radius: 14px;
@@ -311,6 +313,9 @@ button:focus-visible, input:focus-visible, .home-button:focus-visible { outline:
   font-size: 13px;
 }
 .globe-room-badge.results-available { box-shadow: 0 0 0 2px rgba(255,255,255,.72); }
+.summary-frame {position:fixed;inset:0;width:100%;height:100dvh;border:0;background:#020712;z-index:700;}
+#globeSummaryActions button {margin:5px 6px 5px 0;}
+#globeSummaryStatus {font-size:13px;color:var(--ui-muted);}
 
 .access-panel {
   position: fixed; z-index: 15; top: 50%; left: 50%; transform: translate(-50%, -50%);

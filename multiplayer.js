@@ -539,6 +539,10 @@ async function startRound() {
     settings,
     'meta/phase': 'aiming',
     'meta/round': round,
+    [`meta/roundHistory/${round}`]: {
+      round, target: selectedTarget, mode: settings.mode, matchStartRound: roomMeta.matchStartRound || 0,
+      players: Object.fromEntries(Object.entries(players).filter(([,player]) => (player.eligibleRound || 1) <= round).map(([uid,player]) => [uid, {name:player.name,colorIndex:player.colorIndex}]))
+    },
     'meta/startedAt': Date.now() + serverTimeOffset,
     'meta/deadline': timerEnabled ? Date.now() + serverTimeOffset + timerSeconds * 1000 : null,
     'meta/lastActiveAt': Date.now()

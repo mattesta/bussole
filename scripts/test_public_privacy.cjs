@@ -57,10 +57,11 @@ for (const globe of [false,true]) {
 
   // Exercise the actual renderer with a full own route, reduced rival route,
   // hidden rival result, and DNF. Hidden rivals add no layers or camera points.
-  const lines=[], bounds=[];
+  const lines=[], bounds=[], targetStyle={};let blurred=false, distanceHidden=false;
   Object.assign(c, {
     mapReady:true,playerLatLng:[0,0],targetLatLng:null,targetLabel:'',lineRevealed:false,roundActive:true,
     targetEl:{},statusEl:{},multiplayerLayers:[],
+    distanceInput:{blur(){blurred=true}},distanceInputWrap:{classList:{add(){distanceHidden=true}}},targetMarker:{getElement(){return{style:targetStyle}}},
     clearLines(){},clearMultiplayerLayers(){},hideBlurCircle(){},unlockMap(){},updatePlayerBlur(){},updateTargetMarker(){},updateAccessPanel(){},setMapInteraction(){},setStatus(){},
     frameResult(points){bounds.push(...points)},
     hudEl:{getBoundingClientRect(){return{height:100}}},
@@ -83,5 +84,6 @@ for (const globe of [false,true]) {
   assert.equal(lines.length,15); // two own lines + twelve faded parts + rival error
   assert.ok(results.find(r=>r.uid==='own').errorMeters>0);
   assert.ok(!lines.slice(2).some(line=>line.points.some(p=>p[0]===0 && p[1]===0)));
+  if(globe){assert.equal(blurred,true);assert.equal(distanceHidden,true);assert.equal(targetStyle.background,'#4daf4a')}
   console.log(`${globe?'3D':'2D'}: reduced payload, low-score/near-origin safety, poles, revolutions, fading, own route and hidden rivals passed.`);
 }
