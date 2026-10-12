@@ -19,7 +19,7 @@ assert.equal(rooms.shouldAutoStart({ visibility: 'private', phase: 'lobby', roun
 assert.equal(rooms.shouldAutoStart({ visibility: 'public', phase: 'aiming', round: 0 }, full, now), false);
 assert.equal(rooms.shouldAutoStart({ visibility: 'public', phase: 'lobby', round: 2 }, full, now), false);
 assert.equal(rooms.shouldAutoStart({ visibility: 'public', phase: 'lobby', round: 2, matchStartRound: 2 }, full, now), true);
-assert.match(rooms.summary({ mode: 'medium', mapStyle: '3d', timerEnabled: true, timerSeconds: 3, scoreGoal: 5000 }), /3D Globe · Normal · 3 s timer · 5000 points/);
+assert.match(rooms.summary({ mode: 'medium', mapStyle: '3d', timerEnabled: true, timerSeconds: 3, scoreGoal: 5000 }), /Normal · 3 s timer · 5000 points/);
 const catalogue = context.window.BussoleExplorers.catalogue;
 assert.equal(catalogue.length, 8);
 for (const explorer of catalogue) { assert.ok(explorer.text.length > 150); assert.ok(explorer.article); }

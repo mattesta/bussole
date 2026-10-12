@@ -234,7 +234,7 @@ if (multiplayerMode) {
       target = targetSnapshot.val();
       players = playersSnapshot.val() || {};
       if (!roomMeta || roomMeta.phase === 'closed' || !players[user.uid]) return goHome();
-      if (settings.mapStyle !== '3d' || !target) return goHome();
+      if (!target) return goHome();
 
       window.BussoleGlobe.registerMultiplayer({ isActive: () => true, submitLine });
       window.BussoleGlobe.setBlurEnabled(settings.blurEnabled);
