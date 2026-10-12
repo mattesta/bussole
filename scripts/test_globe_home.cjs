@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const html=fs.readFileSync('index.html','utf8');
 assert.ok(!/leaflet|data-map-style|roomMapStyle|src="app.js/.test(html));
-assert.ok(html.includes('src="home.js?v=1"'));
+assert.ok(html.includes('src="home.js?v=2"'));
 function fixture({noLocation=false,blockedStorage=false}={}) {
   const ids=[...html.matchAll(/id="([^"]+)"/g)].map(match=>match[1]);
   const elements=new Map(ids.map(id=>[id,{value:'60',checked:false,disabled:false,style:{},classList:{toggle(){}},events:{},setAttribute(){},focus(){this.focused=true},addEventListener(type,fn){(this.events[type]||=[]).push(fn)}}]));
@@ -25,11 +25,15 @@ function fixture({noLocation=false,blockedStorage=false}={}) {
     assert.equal(u.pathname,'/bussole/globe-prototype.html');assert.equal(u.searchParams.get('mode'),f.modes[index].dataset.mode);
     assert.equal(u.searchParams.get('timer'),'3');assert.equal(u.searchParams.get('blur'),'1');assert.equal(u.searchParams.get('integrated'),'1');
     assert.deepEqual(f.order,['orientation','location']);
-    assert.deepEqual(JSON.parse(f.storage.bussoleGlobeLaunch),{coordinates:{latitude:48.1,longitude:11.6},orientationGranted:true});
+    const saved=JSON.parse(f.storage.bussoleGlobeLaunch);
+    assert.deepEqual(saved.coordinates,{latitude:48.1,longitude:11.6});assert.equal(saved.orientationGranted,true);assert.ok(saved.acquiredAt>0);
   }
   for(const duration of ['2','61']) {
     const f=fixture();f.e.get('timerCheckbox').checked=true;f.e.get('timerDuration').value=duration;
     await f.modes[0].events.click[0]();assert.equal(f.c.window.location.href,undefined);assert.equal(f.order.length,0);
+  }
+  for(const id of ['multiplayerBtn','createRoomBtn','joinRoomBtn','joinPublicRoomBtn']) {
+    const f=fixture();await f.e.get(id).events.click[0]();assert.deepEqual(f.order,['orientation','location']);
   }
   const invite=fixture();
   await invite.e.get('joinRoomBtn').events.click[0]();
@@ -37,5 +41,12 @@ function fixture({noLocation=false,blockedStorage=false}={}) {
   assert.deepEqual(invite.order,['orientation','location']); // one permission hand-off per home visit
   const denied=fixture({noLocation:true,blockedStorage:true});
   await denied.modes[0].events.click[0]();assert.ok(denied.c.window.location.href.includes('globe-prototype.html'));
+  const retry=fixture();
+  retry.c.DeviceOrientationEvent.requestPermission=()=>Promise.resolve('denied');
+  await retry.e.get('joinRoomBtn').events.click[0]();
+  assert.equal(JSON.parse(retry.storage.bussoleGlobeLaunch).orientationGranted,false);
+  retry.c.DeviceOrientationEvent.requestPermission=()=>Promise.resolve('granted');
+  await retry.e.get('joinRoomBtn').events.click[0]();
+  assert.equal(JSON.parse(retry.storage.bussoleGlobeLaunch).orientationGranted,true);
   console.log('Globe-only home, all difficulties, timer/blur hand-off, early permissions, direct invite join and unavailable storage/location passed.');
 })().catch(error=>{console.error(error);process.exitCode=1});

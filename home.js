@@ -24,15 +24,21 @@
     accessPromise = (async () => {
       const orientationGranted = await orientation;
       const coordinates = navigator.geolocation ? await new Promise(resolve => {
-        navigator.geolocation.getCurrentPosition(
-          position => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
-          () => resolve(null), { enableHighAccuracy: true, maximumAge: 1000, timeout: 12000 }
-        );
+        try {
+          navigator.geolocation.getCurrentPosition(
+            position => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
+            () => resolve(null), { enableHighAccuracy: true, maximumAge: 1000, timeout: 12000 }
+          );
+        } catch { resolve(null); }
       }) : null;
-      const data = { coordinates, orientationGranted };
+      const data = { coordinates, orientationGranted, acquiredAt: Date.now() };
       try { sessionStorage.setItem('bussoleGlobeLaunch', JSON.stringify(data)); } catch { /* The globe can request access again. */ }
       return data;
     })();
+    accessPromise.then(data => {
+      // Failed access must be retryable from the next user gesture.
+      if (!data.coordinates || !data.orientationGranted) accessPromise = null;
+    });
     return accessPromise;
   }
 
