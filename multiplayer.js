@@ -257,7 +257,7 @@ async function createRoom(visibility = byId('roomVisibility').value) {
     user = await ensureUser();
     visibility = visibility === 'public' ? 'public' : 'private';
     if (visibility === 'public') await requirePublicDirectory();
-    const initialMapStyle = window.BussoleGame.getSelectedMapStyle?.() === '3d' ? '3d' : '2d';
+    const initialMapStyle = '3d';
     let code;
     for (let attempt = 0; attempt < 8; attempt++) {
       code = makeCode();
@@ -393,7 +393,6 @@ async function enterRoom(code) {
     byId('roomScoreGoal').value = window.BussoleScoring.goal(settings.scoreGoal);
     renderRoom();
     byId('roomMode').value = settings.mode || 'medium';
-    byId('roomMapStyle').value = settings.mapStyle === '3d' ? '3d' : '2d';
     byId('roomTimerEnabled').checked = Boolean(settings.timerEnabled);
     byId('roomBlurEnabled').checked = Boolean(settings.blurEnabled);
     byId('roomTimerDuration').value = window.BussoleRoundTimer.duration(settings);
@@ -517,7 +516,7 @@ async function startRound() {
   const timerSeconds = timerEnabled ? Number(byId('roomTimerDuration').value) : 60;
   const settings = {
     mode: byId('roomMode').value,
-    mapStyle: byId('roomMapStyle').value === '3d' ? '3d' : '2d',
+    mapStyle: '3d',
     scoreGoal: roomMeta.round > (roomMeta.matchStartRound || 0)
       ? window.BussoleScoring.goal(roomSettings.scoreGoal) : window.BussoleScoring.goal(goalInput.value),
     timerEnabled,
@@ -548,47 +547,23 @@ async function startRound() {
 }
 
 async function handlePhase() {
-  if (roomMeta.phase === 'aiming' && preparedRound !== roomMeta.round) {
-    if (!players[user.uid]) return;
-    if ((players[user.uid]?.eligibleRound || 1) > roomMeta.round) {
-      show(panel); show(lobby); hide(entry); hide(resultsPanel);
-      roomMessage.textContent = 'Round in progress. You will join the next one.';
-      return;
-    }
-    preparedRound = roomMeta.round;
-    revealedRound = null;
-    const settings = (await get(ref(db, roomPath('settings')))).val();
-    const target = (await get(ref(db, roomPath('target')))).val();
-    if (settings?.mapStyle === '3d') {
-      const parameters = new URLSearchParams({
-        integrated: '1',
-        multiplayer: '1',
-        room: displayCode(roomCode),
-        mode: settings.mode || 'medium'
-      });
-      window.location.replace(`globe-prototype.html?${parameters}`);
-      return;
-    }
-    panel.classList.remove('lobby-mode');
-    hide(panel);
-    show(roomBadge);
-    if (selectedTarget) show(roomTargetBanner);
-    document.body.classList.add('multiplayer-round');
-    window.BussoleGame.prepareMultiplayerRound(settings, target);
-    if (isHost() && roomMeta.deadline) {
-      clearTimeout(timerHandle);
-      timerHandle = setTimeout(() => revealRound(), Math.max(0, roomMeta.deadline - (Date.now() + serverTimeOffset)));
-    }
+  if (!['aiming', 'revealed'].includes(roomMeta.phase) || preparedRound === roomMeta.round || !players[user.uid]) return;
+  if ((players[user.uid]?.eligibleRound || 1) > roomMeta.round) {
+    show(panel); show(lobby); hide(entry); hide(resultsPanel);
+    roomMessage.textContent = 'Round in progress. You will join the next one.';
+    return;
   }
-  if (roomMeta.phase === 'revealed' && revealedRound !== roomMeta.round) {
-    revealedRound = roomMeta.round;
-    clearTimeout(timerHandle);
-    if (revealSubscription) revealSubscription();
-    const resultPath = roomMeta.visibility === 'public' ? 'publicResults' : 'submissions';
-    revealSubscription = onValue(ref(db, roomPath(`${resultPath}/${roomMeta.round}`)), snapshot => {
-      showResults(snapshot.val() || {});
-    }, { onlyOnce: true });
-  }
+  preparedRound = roomMeta.round;
+  const round = roomMeta.round;
+  const [settingsSnapshot, targetSnapshot] = await Promise.all([
+    get(ref(db, roomPath('settings'))), get(ref(db, roomPath('target')))
+  ]);
+  const settings = settingsSnapshot.val();
+  if (!targetSnapshot.val()) { preparedRound = null; return; }
+  await window.BussoleHome?.accessReady();
+  if (leaving || !roomCode || roomMeta.round !== round || !['aiming', 'revealed'].includes(roomMeta.phase)) { preparedRound = null; return; }
+  const parameters = new URLSearchParams({ integrated: '1', multiplayer: '1', room: displayCode(roomCode), mode: settings?.mode || 'medium' });
+  window.location.replace(`globe-prototype.html?${parameters}`);
 }
 
 async function markReady() {
@@ -866,11 +841,11 @@ byId('roomScoreGoal').addEventListener('change', async event => {
   if (!event.target.checkValidity()) { event.target.reportValidity(); return; }
   await set(ref(db, roomPath('settings/scoreGoal')), window.BussoleScoring.goal(event.target.value));
 });
-for (const id of ['roomMode', 'roomMapStyle', 'roomTimerEnabled', 'roomTimerDuration', 'roomBlurEnabled']) {
+for (const id of ['roomMode', 'roomTimerEnabled', 'roomTimerDuration', 'roomBlurEnabled']) {
   byId(id).addEventListener('change', async () => {
     if (!isHost() || roomMeta?.phase !== 'lobby' || (timerEnabledInput.checked && !validateTimer())) return;
     await update(ref(db, roomPath('settings')), {
-      mode: byId('roomMode').value, mapStyle: byId('roomMapStyle').value,
+      mode: byId('roomMode').value, mapStyle: '3d',
       timerEnabled: timerEnabledInput.checked,
       timerSeconds: Number(byId('roomTimerDuration').value),
       timerDuration: Math.max(10, Number(byId('roomTimerDuration').value) || 60),

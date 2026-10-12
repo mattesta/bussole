@@ -16,6 +16,7 @@ async function checkController(file, globe) {
     };
   }
   const updates = [];
+  const redirects = [];
   const reads = [];
   let capturedEntries;
   const raw = {lat:41.12345,lon:12.98765,heading:20,distanceMeters:20000000};
@@ -27,7 +28,7 @@ async function checkController(file, globe) {
   const settings = { mode: 'medium', scoreGoal: 5000 };
   const context = vm.createContext({
     console, URLSearchParams, setTimeout, clearTimeout, setInterval, clearInterval,
-    location: { search: globe ? '?multiplayer=1&room=ABCDEF' : '' },
+    location: { search: globe ? '?multiplayer=1&room=ABCDEF' : '', replace(url){redirects.push(url)} },
     document: {
       getElementById(id) { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); },
       querySelector: element, createElement: element, addEventListener() {}, body: element()
@@ -49,6 +50,7 @@ async function checkController(file, globe) {
       BussoleGlobe: { isReady() { return true; }, setStatus(){}, publicResult(){return shared.a}, revealMultiplayer(entries) { capturedEntries=entries; return results; } }
     }
   });
+  context.window.location=context.location;
   const results = [
     { uid: 'a', name: 'A', points: 400, errorMeters: 10, color: 'red' },
     { uid: 'b', name: 'B', points: 900, errorMeters: 2, color: 'blue' }
@@ -59,8 +61,8 @@ async function checkController(file, globe) {
   vm.runInContext(fs.readFileSync('public-rooms.js', 'utf8'), context);
   let source = fs.readFileSync(file, 'utf8').replace(/^import[\s\S]*?;\s*/gm, '');
   const expose = `globalThis.test = {
-    setup(p, s, publicRoom=false, phase='revealed') { user = { uid: 'a' }; roomMeta = { hostId: 'a', round: 2, phase, visibility:publicRoom?'public':'private' }; players = p; ${globe ? 'settings' : 'roomSettings'} = s; ${globe ? 'target' : 'selectedTarget'} = {}; ${globe ? 'shownRound=null;' : "roomCode = 'ABCDEF';"} },
-    showResults, nextRound, submitLine${globe ? '' : ', startRound, validateTimer, setupLobby() { roomMeta.round = 0; roomMeta.phase = \"lobby\"; }'}
+    setup(p, s, publicRoom=false, phase='revealed') { user = { uid: 'a' }; roomMeta = { hostId: 'a', round: 2, phase, visibility:publicRoom?'public':'private' }; players = p; ${globe ? 'settings' : 'roomSettings'} = s; ${globe ? 'target' : 'selectedTarget'} = {}; ${globe ? 'shownRound=null;' : "roomCode = 'ABCDEF';preparedRound=null;"} },
+    showResults, nextRound, submitLine${globe ? '' : ', handlePhase, startRound, validateTimer, setupLobby() { roomMeta.round = 0; roomMeta.phase = \"lobby\"; }'}
   };`;
   source = globe ? source.replace('  initialize();', expose) : source + expose;
   vm.runInContext(source, context);
@@ -116,6 +118,16 @@ async function checkController(file, globe) {
   assert.equal(capturedEntries.find(entry=>entry.uid==='b').submission,null);
   assert.equal(capturedEntries.find(entry=>entry.uid==='b').publicResult.points,900);
   assert.ok(!reads.some(path=>path.endsWith('submissions/2')||path.endsWith('submissions/2/b')));
+  if(!globe) {
+    for(const phase of ['aiming','revealed']) {
+      context.test.setup(players,{...settings,mapStyle:'2d'},false,phase);
+      await context.test.handlePhase();
+      assert.ok(redirects.at(-1).startsWith('globe-prototype.html?'));
+      assert.ok(redirects.at(-1).includes('multiplayer=1'));
+    }
+    context.test.setup(players,settings,false,'lobby');
+    const before=redirects.length;await context.test.handlePhase();assert.equal(redirects.length,before);
+  }
   console.log(`${file}: final results, whole-round winner and restart passed.`);
 }
 (async () => {
