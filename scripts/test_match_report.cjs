@@ -1,0 +1,27 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const c=vm.createContext({window:{},sessionStorage:{setItem(){}},Date});
+for(const file of ['scoring.js','match-report.js','report-geometry.js'])vm.runInContext(fs.readFileSync(file,'utf8'),c);
+const players={a:{name:'Magellan',colorIndex:0},b:{name:'Nellie Bly',colorIndex:2}};
+const target={lat:2,lon:30,label:'Test target'};
+const raw={lat:0,lon:0,heading:90,distanceMeters:20000000};
+const meta={round:4,matchStartRound:2,roundHistory:{1:{round:1,matchStartRound:0,target,players},3:{round:3,matchStartRound:2,target,mode:'medium',players},4:{round:4,matchStartRound:2,target,mode:'hard',players}}};
+(async()=>{
+  const paths=[];
+  const report=await c.window.BussoleMatchReport.load({publicRoom:true,uid:'a',meta,target,settings:{mode:'medium'},players,read:async path=>{paths.push(path);return raw}});
+  assert.deepEqual(paths,['submissions/3/a','submissions/4/a']);
+  assert.equal(report.rounds.length,2);assert.equal(report.rounds[0].round,1);assert.equal(report.rounds[1].round,2);
+  assert.ok(report.rounds.every(round=>round.entries.length===1&&round.entries[0].uid==='a'));
+  assert.equal(report.partial,false);
+  paths.length=0;
+  const privateReport=await c.window.BussoleMatchReport.load({publicRoom:false,uid:'a',meta,target,settings:{mode:'medium'},players,read:async path=>{paths.push(path);return{a:raw,b:null}}});
+  assert.deepEqual(paths,['submissions/3','submissions/4']);
+  assert.equal(privateReport.rounds[0].entries.length,2);assert.equal(privateReport.rounds[0].entries[1].submission,null);
+  const old=await c.window.BussoleMatchReport.load({publicRoom:true,uid:'a',meta:{round:3},target,settings:{mode:'easy'},players,read:async()=>raw});
+  assert.equal(old.partial,true);assert.equal(old.rounds.length,1);
+  const measured=c.window.BussoleReportGeometry.measure(raw,target,'medium');assert.ok(measured.points>500);assert.ok(measured.errorMeters>0);
+  const hard=c.window.BussoleReportGeometry.measure({...raw,distanceMeters:3000000},target,'hard');assert.ok(hard.route.length>=400);assert.ok(hard.errorArc.length>=2);
+  const archive=fs.readFileSync('multiplayer.js','utf8');
+  assert.ok(archive.includes('meta/roundHistory/${round}'));
+  assert.ok(archive.includes('{name:player.name,colorIndex:player.colorIndex}'));
+  console.log('Reports: match boundaries, per-round targets/modes, public owner-only paths, private full-room guesses, DNF, old-match fallback and spherical scoring passed.');
+})().catch(error=>{console.error(error);process.exitCode=1});

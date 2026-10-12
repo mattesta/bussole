@@ -50,6 +50,7 @@ const player = (name, slot) => ({ name, colorIndex: slot, slotId: String(slot), 
     });
     await assertSucceeds(update(ref(db('host'), 'rooms/ABCDEF'), {
       'meta/phase': 'aiming', 'meta/round': 1,
+      'meta/roundHistory/1': {round:1,matchStartRound:0,target:{lat:20,lon:30,label:'Round target'},mode:'medium',players:{host:{name:'Host',colorIndex:0},new:{name:'New',colorIndex:1}}},
       settings: room.settings, 'players/host/ready': false, 'players/host/locked': false
     }));
     await assertSucceeds(update(ref(db('host'), 'rooms/ABCDEF/players/host'), { roundScores: { 1: 900 }, totalPoints: 900 }));
