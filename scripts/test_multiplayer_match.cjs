@@ -100,12 +100,14 @@ async function checkController(file, globe) {
       const count = updates.length;
       await context.test.startRound();
       assert.equal(updates.length, count);
+      assert.equal(elements.get('startRoomRound').disabled,true);
     }
     for (const seconds of ['3', '60']) {
       context.document.getElementById('roomTimerDuration').value = seconds;
       await context.test.startRound();
       const change = updates.at(-1);
       assert.equal(change.settings.timerSeconds, Number(seconds));
+      assert.equal(elements.get('startRoomRound').disabled,false);
       assert.equal(change.settings.blurEnabled, true);
       assert.ok(change.settings.timerDuration >= 10); // Existing rules remain compatible.
       assert.equal(change['meta/deadline'] - change['meta/startedAt'], Number(seconds) * 1000);

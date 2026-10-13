@@ -38,7 +38,9 @@ const countdown = window.BussoleRoundTimer.create(byId('roomCountdown'), roomTar
 function validateTimer() {
   const input = byId('roomTimerDuration');
   const valid = window.BussoleRoundTimer.validDuration(input.value);
-  byId('roomTimerError').classList.toggle('hidden', !timerEnabledInput.checked || valid);
+  const invalid = timerEnabledInput.checked && !valid;
+  input.classList.toggle('invalid', invalid);
+  byId('startRoomRound').disabled = !selectedTarget || invalid;
   input.setAttribute('aria-invalid', String(timerEnabledInput.checked && !valid));
   return valid;
 }
@@ -396,7 +398,7 @@ async function enterRoom(code) {
     window.BussoleChoices?.sync('roomMode');
     byId('roomTimerEnabled').checked = Boolean(settings.timerEnabled);
     byId('roomBlurEnabled').checked = Boolean(settings.blurEnabled);
-    byId('roomTimerDuration').value = window.BussoleRoundTimer.duration(settings);
+    byId('roomTimerDuration').value = settings.timerEnabled ? window.BussoleRoundTimer.duration(settings) : '';
     updateTimerSettingsVisibility();
     renderRoom();
     maybeAutoStart();
@@ -413,11 +415,11 @@ async function enterRoom(code) {
       hide(roomTargetBanner);
     }
     renderLobbyTarget();
-    byId('startRoomRound').disabled = !selectedTarget;
   }));
 }
 
 function renderLobbyTarget() {
+  validateTimer();
   byId('roomLobbyTarget').textContent = selectedTarget ? `Target: ${selectedTarget.label}` : 'Target not chosen yet';
 }
 
@@ -432,7 +434,6 @@ function renderRoom() {
   host ? show(hostControls) : hide(hostControls);
   byId('nextRoundBtn').classList.toggle('hidden', !host);
   byId('roomScoreGoal').disabled = roomMeta.round > (roomMeta.matchStartRound || 0);
-  byId('roomGoalSummary').textContent = `First to ${window.BussoleScoring.goal(roomSettings.scoreGoal)} points`;
   byId('roomStandingsTitle').textContent = roomMeta.round > (roomMeta.matchStartRound || 0) ? 'Total standings' : 'Explorers';
   if (roomMeta.phase === 'lobby') {
     setResultsCollapsed(false);
@@ -460,18 +461,20 @@ function renderPlayers() {
     item.children[1].textContent = `${index + 1}. ${player.name}${uid === roomMeta?.hostId ? ' ★' : ''} · ${window.BussoleScoring.total(player.roundScores)} points`;
     const spectator = roomMeta?.phase === 'aiming' && (player.eligibleRound || 1) > roomMeta.round;
     const online = isPlayerOnline(player);
-    item.children[2].textContent = !online ? 'offline' : spectator ? 'next round' : player.locked ? 'locked' : player.ready ? 'aiming' : 'Ready';
+    item.children[2].textContent = !online ? 'Offline' : roomMeta?.phase === 'lobby' ? 'Ready' : spectator ? 'next round' : player.locked ? 'locked' : player.ready ? 'aiming' : 'Ready';
     if (player.connected === false && online) {
       nextPresenceExpiry = Math.min(
         nextPresenceExpiry,
         PRESENCE_GRACE_MS - (Date.now() - Number(player.lastSeenAt))
       );
     }
-    const info = document.createElement('button');
-    info.type = 'button'; info.className = 'explorer-info'; info.textContent = 'i';
-    info.setAttribute('aria-label', `About ${EXPLORERS[player.colorIndex]}`);
-    info.addEventListener('click', () => window.BussoleExplorers.open(player.colorIndex, info));
-    item.appendChild(info);
+    if (player.name === EXPLORERS[player.colorIndex]) {
+      const info = document.createElement('button');
+      info.type = 'button'; info.className = 'explorer-info'; info.textContent = 'i';
+      info.setAttribute('aria-label', `About ${EXPLORERS[player.colorIndex]}`);
+      info.addEventListener('click', () => window.BussoleExplorers.open(player.colorIndex, info));
+      item.appendChild(info);
+    }
     roomPlayers.appendChild(item);
   });
   const me = players[user?.uid];
@@ -829,10 +832,6 @@ closeButton.addEventListener('click', () => {
 byId('createRoomBtn').addEventListener('click', () => createRoom('private'));
 byId('createPublicRoomBtn').addEventListener('click', () => createRoom('public'));
 byId('joinPublicRoomBtn').addEventListener('click', joinPublicRoom);
-byId('myExplorerInfo').addEventListener('click', event => {
-  const me = players[user?.uid];
-  if (me) window.BussoleExplorers.open(me.colorIndex, event.currentTarget);
-});
 byId('explorerClose').addEventListener('click', () => window.BussoleExplorers.close());
 byId('explorerDialog').addEventListener('click', event => {
   if (event.target === byId('explorerDialog')) {
@@ -863,7 +862,7 @@ for (const id of ['roomMode', 'roomTimerEnabled', 'roomTimerDuration', 'roomBlur
     await update(ref(db, roomPath('settings')), {
       mode: byId('roomMode').value, mapStyle: '3d',
       timerEnabled: timerEnabledInput.checked,
-      timerSeconds: Number(byId('roomTimerDuration').value),
+      timerSeconds: window.BussoleRoundTimer.validDuration(byId('roomTimerDuration').value) ? Number(byId('roomTimerDuration').value) : 60,
       timerDuration: Math.max(10, Number(byId('roomTimerDuration').value) || 60),
       blurEnabled: Boolean(byId('roomBlurEnabled').checked)
     });
