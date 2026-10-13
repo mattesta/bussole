@@ -454,11 +454,17 @@ function renderPlayers() {
   roomPlayers.innerHTML = '';
   const list = window.BussoleScoring.standings(players).map(player => [player.uid, player]);
   let nextPresenceExpiry = Infinity;
-  list.forEach(([uid, player], index) => {
+  list.forEach(([uid, player]) => {
     const item = document.createElement('li');
     item.className = 'room-player';
     item.innerHTML = `<span class="player-colour" style="background:${COLOURS[player.colorIndex]}"></span><span></span><span class="player-state"></span>`;
-    item.children[1].textContent = `${index + 1}. ${player.name}${uid === roomMeta?.hostId ? ' ★' : ''} · ${window.BussoleScoring.total(player.roundScores)} points`;
+    item.children[1].textContent = `${player.name}${uid === user?.uid ? ' ★' : ''}`;
+    if (uid === roomMeta?.hostId) {
+      const host = document.createElement('span'); host.className = 'player-host'; host.textContent = 'Host';
+      item.children[1].appendChild(host);
+    }
+    const points = document.createElement('span'); points.textContent = ` · ${window.BussoleScoring.total(player.roundScores)} points`;
+    item.children[1].appendChild(points);
     const spectator = roomMeta?.phase === 'aiming' && (player.eligibleRound || 1) > roomMeta.round;
     const online = isPlayerOnline(player);
     item.children[2].textContent = !online ? 'Offline' : roomMeta?.phase === 'lobby' ? 'Ready' : spectator ? 'next round' : player.locked ? 'locked' : player.ready ? 'aiming' : 'Ready';
@@ -632,9 +638,9 @@ async function showResults(submissions) {
   const finished = window.BussoleScoring.outcome(ranking, settings.scoreGoal).length > 0;
   byId('roundResultsTitle').textContent = finished ? 'Match results' : 'Round results';
   byId('matchOutcome').textContent = window.BussoleScoring.matchMessage(ranking, settings.scoreGoal);
-  byId('nextRoundBtn').textContent = finished ? 'New match' : 'Next round';
+  byId('nextRoundBtn').textContent = finished ? 'Next Match' : 'Next round';
   byId('roundRanking').innerHTML = '';
-  ranking.forEach(result => {
+  (finished ? ranking : window.BussoleScoring.roundRanking(ranking)).forEach(result => {
     const item = document.createElement('li');
     item.style.color = result.color;
     const error = result.errorMeters === null ? ' · DNF' : result.errorMeters === undefined ? '' : result.errorMeters >= 1000 ? ` · ${(result.errorMeters / 1000).toFixed(1)} km` : ` · ${Math.round(result.errorMeters)} m`;
@@ -682,6 +688,7 @@ async function nextRound() {
     window.BussoleScoring.standings(players), roomSettings.scoreGoal
   ).length > 0;
   const updates = window.BussoleScoring.lobbyUpdates(players, roomMeta.round, newMatch);
+  updates.target = window.BussoleRoundTargets.next(selectedTarget);
   updates['meta/lastActiveAt'] = serverTimestamp();
   await update(ref(db, roomPath()), updates);
   window.BussoleGame.resetMultiplayerRound();

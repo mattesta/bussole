@@ -25,7 +25,6 @@ if (multiplayerMode) {
   const homeLink = document.getElementById('prototypeBackLink');
   const summaryActions = document.getElementById('globeSummaryActions');
   const personalSummary = document.getElementById('globePersonalSummary');
-  const roomSummary = document.getElementById('globeRoomSummary');
   const summaryStatus = document.getElementById('globeSummaryStatus');
   const summaryFrame = document.getElementById('matchSummaryFrame');
   let matchReport = null;
@@ -160,9 +159,9 @@ if (multiplayerMode) {
     const finished = window.BussoleScoring.outcome(ranking, settings.scoreGoal).length > 0;
     document.getElementById('globeResultsTitle').textContent = finished ? 'Match results' : 'Round results';
     document.getElementById('globeMatchOutcome').textContent = window.BussoleScoring.matchMessage(ranking, settings.scoreGoal);
-    nextRoundButton.textContent = finished ? 'New match' : 'Next round';
+    nextRoundButton.textContent = finished ? 'Next Match' : 'Next round';
     rankingList.replaceChildren();
-    ranking.forEach(result => {
+    (finished ? ranking : window.BussoleScoring.roundRanking(ranking)).forEach(result => {
       const item = document.createElement('li');
       item.style.color = result.color;
       const error = result.errorMeters === null
@@ -178,6 +177,7 @@ if (multiplayerMode) {
     roomBadge.classList.remove('results-available');
     show(resultsPanel);
     summaryActions.classList.toggle('hidden', !finished);
+    personalSummary.classList.toggle('hidden', !finished);
     if (finished) await prepareReport();
   }
 
@@ -185,8 +185,7 @@ if (multiplayerMode) {
   function prepareReport() {
     if (reportLoading) return reportLoading;
     const publicRoom = roomMeta.visibility === 'public';
-    personalSummary.disabled = true; roomSummary.disabled = true;
-    roomSummary.classList.toggle('hidden', publicRoom);
+    personalSummary.disabled = true;
     summaryStatus.textContent = 'Preparing your match summary…';
     nextRoundButton.disabled = true;
     reportLoading = (async () => {
@@ -199,9 +198,9 @@ if (multiplayerMode) {
         summaryStatus.textContent = publicRoom ? 'Your complete guesses stay personal.' : 'Review your guesses or explore the room round by round.';
       } catch (error) {
         console.warn('Match summary unavailable.', error.code || error.message);
-        summaryStatus.textContent = 'Summary unavailable. Tap My guesses to retry.';
+        summaryStatus.textContent = 'Summary unavailable. Tap Summary to retry.';
       } finally {
-        personalSummary.disabled = false; roomSummary.disabled = false;
+        personalSummary.disabled = false;
         nextRoundButton.disabled = false; reportLoading = null;
       }
     })();
@@ -215,7 +214,6 @@ if (multiplayerMode) {
     show(summaryFrame);
   }
   personalSummary.addEventListener('click', async () => { if (!matchReport) await prepareReport(); openSummary('personal'); });
-  roomSummary.addEventListener('click', async () => { if (!matchReport) await prepareReport(); openSummary('room'); });
   summaryFrame.addEventListener('load', () => {
     if (matchReport) summaryFrame.contentWindow.postMessage({type:'bussole-match-report', report:{...matchReport,roomCode:displayCode(roomCode)}}, location.origin);
   });
@@ -233,6 +231,7 @@ if (multiplayerMode) {
       window.BussoleScoring.standings(players), settings.scoreGoal
     ).length > 0;
     const changes = window.BussoleScoring.lobbyUpdates(players, roomMeta.round, newMatch);
+    changes.target = window.BussoleRoundTargets.next(target);
     changes['meta/lastActiveAt'] = serverTimestamp();
     await update(ref(db, roomPath()), changes);
   }

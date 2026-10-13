@@ -336,3 +336,6 @@ button:focus-visible, input:focus-visible, .home-button:focus-visible { outline:
   .prototype-attribution { display: none; }
   .globe-results { right: 6px; left: 6px; width: calc(100% - 12px); }
 }
+.globe-results-actions {display:flex;align-items:center;gap:10px;}
+.globe-results-actions button {flex:1;min-width:0;}
+#globeRoundRanking {list-style:none;padding-left:0;}
