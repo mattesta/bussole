@@ -1,10 +1,10 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const html=fs.readFileSync('index.html','utf8');
 assert.ok(!/leaflet|data-map-style|roomMapStyle|src="app.js/.test(html));
-assert.ok(html.includes('src="home.js?v=2"'));
+assert.ok(html.includes('src="home.js?v=3"'));
 function fixture({noLocation=false,blockedStorage=false}={}) {
   const ids=[...html.matchAll(/id="([^"]+)"/g)].map(match=>match[1]);
-  const elements=new Map(ids.map(id=>[id,{value:'60',checked:false,disabled:false,style:{},classList:{toggle(){}},events:{},setAttribute(){},focus(){this.focused=true},addEventListener(type,fn){(this.events[type]||=[]).push(fn)}}]));
+  const elements=new Map(ids.map(id=>[id,{value:'60',checked:false,disabled:false,style:{},classList:{hidden:false,toggle(){},add(){this.hidden=true},remove(){this.hidden=false}},events:{},setAttribute(){},focus(){this.focused=true},addEventListener(type,fn){(this.events[type]||=[]).push(fn)}}]));
   const modes=['easy','medium','hard'].map(mode=>({...elements.get('multiplayerBtn'),dataset:{mode},events:{}}));
   const order=[],storage={};
   const c=vm.createContext({console,URLSearchParams,
@@ -18,6 +18,16 @@ function fixture({noLocation=false,blockedStorage=false}={}) {
   return {c,e:elements,modes,order,storage};
 }
 (async()=>{
+  assert.ok(!/<select\b/i.test(html));
+  assert.ok(html.includes('Pro (guess the distance too)'));
+  const menu=fixture();
+  menu.e.get('singlePlayerBtn').events.click[0]();
+  assert.equal(menu.e.get('homePlayChoice').classList.hidden,true);
+  assert.equal(menu.e.get('singlePlayerPanel').classList.hidden,false);
+  assert.equal(menu.order.length,0);
+  menu.e.get('singlePlayerBack').events.click[0]();
+  assert.equal(menu.e.get('homePlayChoice').classList.hidden,false);
+  assert.equal(menu.e.get('singlePlayerPanel').classList.hidden,true);
   for(let index=0;index<3;index++) {
     const f=fixture();f.e.get('timerCheckbox').checked=true;f.e.get('timerDuration').value='3';f.e.get('blurCheckbox').checked=true;
     await f.modes[index].events.click[0]();

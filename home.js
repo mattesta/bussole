@@ -4,6 +4,14 @@
   const timer = byId('timerCheckbox'), duration = byId('timerDuration');
   let accessPromise;
   let launching = false;
+  byId('singlePlayerBtn').addEventListener('click', () => {
+    byId('homePlayChoice').classList.add('hidden');
+    byId('singlePlayerPanel').classList.remove('hidden');
+  });
+  byId('singlePlayerBack').addEventListener('click', () => {
+    byId('singlePlayerPanel').classList.add('hidden');
+    byId('homePlayChoice').classList.remove('hidden');
+  });
 
   function validateTimer() {
     const valid = window.BussoleRoundTimer.validDuration(duration.value);
