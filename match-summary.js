@@ -2,7 +2,7 @@
   const byId=id=>document.getElementById(id);
   const parameters=new URLSearchParams(location.search);
   const embedded=parameters.get('embedded')==='1';
-  let report,map,lines,ready=false,view='personal',markers=[],popup;
+  let report,map,lines,ready=false,view='personal',selectedRound=0,markers=[],popup;
   const geo=window.BussoleReportGeometry;
   function clear() {
     if(lines)for(const key of [...lines.lines.keys()])lines.removeLine(key);
@@ -25,8 +25,12 @@
     if(!ready)return;
     clear();
     const personal=view==='personal'||report.publicRoom;
-    const chosen=personal?report.rounds:[report.rounds[Number(byId('summaryRound').value)||0]];
+    const chosen=personal?report.rounds:[report.rounds[selectedRound]];
     byId('roundPicker').classList.toggle('hidden',personal);
+    for(const button of byId('summaryRound').querySelectorAll('button')) {
+      const selected=Number(button.dataset.roundIndex)===selectedRound;
+      button.classList.toggle('selected',selected);button.setAttribute('aria-pressed',String(selected));
+    }
     byId('personalView').classList.toggle('selected',personal);
     byId('roomView').classList.toggle('selected',!personal);
     const bounds=[];let total=0,count=0;
@@ -52,7 +56,7 @@
       const colour=personal?entries[0]?.errorColor||'#ff8587':colours.length>1?`linear-gradient(90deg,${colours.join(',')})`:colours[0]||'#ff8587';
       marker(target,colour,`Round ${round.round} · ${round.target.label}`);
     });
-    byId('summaryStatus').textContent=personal?`${count} guesses · ${total} points. Tap a target to see its name.`:'All explorers’ guesses for this round. Tap the target to see its name.';
+    byId('summaryStatus').textContent=personal?`${count} guesses · ${total} points. Tap a target to see its name.`:`${chosen[0].target.label} · All explorers’ guesses for this round.`;
     if(report.partial)byId('summaryStatus').textContent+=' Some earlier rounds predate this feature.';
     const vectors=bounds.map(geo.toUnitVector),sum=vectors.reduce((a,b)=>a.map((v,i)=>v+b[i]),[0,0,0]);
     const centerVector=geo.normalizeVector(sum)||vectors[0];
@@ -68,7 +72,11 @@
     if(report.publicRoom)report.rounds.forEach(round=>{round.entries=round.entries.filter(entry=>entry.uid===report.uid)});
     view=!report.publicRoom&&parameters.get('view')==='room'?'room':'personal';
     byId('roomView').classList.toggle('hidden',report.publicRoom);
-    report.rounds.forEach((round,index)=>{const option=document.createElement('option');option.value=String(index);option.textContent=`${round.round} — ${round.target.label}`;byId('summaryRound').appendChild(option)});
+    report.rounds.forEach((round,index)=>{
+      const button=document.createElement('button');button.type='button';button.textContent=`Round ${round.round}`;
+      button.dataset.roundIndex=String(index);button.setAttribute('aria-label',`Round ${round.round}: ${round.target.label}`);
+      button.addEventListener('click',()=>{selectedRound=index;render()});byId('summaryRound').appendChild(button);
+    });
     byId('summaryBack').href=`./?room=${encodeURIComponent(report.roomCode||'')}&resume=1`;
     map=new maplibregl.Map({container:'summaryMap',attributionControl:false,renderWorldCopies:false,center:[0,20],zoom:0,maxPitch:0,pitch:0,dragRotate:false,
       style:{version:8,sources:{satellite:{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,maxzoom:19}},layers:[{id:'space',type:'background',paint:{'background-color':'#020712'}},{id:'satellite',type:'raster',source:'satellite'}]}});
@@ -76,7 +84,6 @@
   }
   byId('personalView').addEventListener('click',()=>{view='personal';render()});
   byId('roomView').addEventListener('click',()=>{if(!report.publicRoom){view='room';render()}});
-  byId('summaryRound').addEventListener('change',render);
   if(embedded) {
     window.addEventListener('message',event=>{if(event.origin===location.origin&&event.source===parent&&event.data?.type==='bussole-match-report')initialize(event.data.report)});
     for(const link of document.querySelectorAll('.summary-links a'))link.addEventListener('click',event=>{event.preventDefault();parent.postMessage({type:link.id==='summaryBack'?'bussole-summary-close':'bussole-summary-home'},location.origin)});

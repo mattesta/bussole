@@ -30,7 +30,7 @@
     #roomResumeLoading a { color: rgba(255,255,255,.7); }
   </style>
 
-  <link rel="stylesheet" href="style.css?v=22"/>
+  <link rel="stylesheet" href="style.css?v=23"/>
   <link rel="stylesheet" href="round-timer.css?v=2">
   <link rel="stylesheet" href="player-blur.css?v=1">
 </head>
@@ -50,12 +50,18 @@
       Point your phone towards the target, and plot the most precise route possible. <br> Whoever gets closer wins.
     </p>
 
+    <div id="homePlayChoice" class="home-play-choice">
+      <button id="singlePlayerBtn" class="home-play-button" type="button">Single-player</button>
+      <button id="multiplayerBtn" class="home-play-button" type="button">Multiplayer</button>
+    </div>
+    <section id="singlePlayerPanel" class="single-player-panel hidden">
+      <button id="singlePlayerBack" class="home-back" type="button">← Back</button>
+      <h3>Choose difficulty</h3>
     <p id="launchStatus" role="status"></p>
 
     <button class="modeBtn" data-mode="easy">Easy (with compass)</button>
     <button class="modeBtn" data-mode="medium">Normal </button>
-    <button class="modeBtn" data-mode="hard">Difficult (guess the distance too)</button>
-    <button id="multiplayerBtn" type="button">Play multiplayer</button>
+    <button class="modeBtn" data-mode="hard">Pro (guess the distance too)</button>
     <hr/>
     <label>
       <input type="checkbox" id="timerCheckbox">
@@ -72,6 +78,8 @@
       Enable blur around player
     </label>
 
+    </section>
+
     <footer id="credits">
       By M Bonatesta
     </footer>
@@ -82,7 +90,13 @@
     <section id="multiplayerEntry">
       <h2>Multiplayer</h2>
       <p>Invite friends or find other explorers.</p>
-      <label class="room-visibility-choice">Create a <select id="roomVisibility"><option value="private">Private room</option><option value="public">Public room</option></select></label>
+      <fieldset class="choice-field"><legend>Create a room</legend>
+        <input id="roomVisibility" type="hidden" value="private">
+        <div class="choice-buttons" data-choice-input="roomVisibility" role="group" aria-label="Room privacy">
+          <button type="button" data-choice-value="private">Private room</button>
+          <button type="button" data-choice-value="public">Public room</button>
+        </div>
+      </fieldset>
       <button id="createRoomBtn" type="button">Create room</button>
       <button id="showJoinRoomBtn" type="button">Join private room</button>
       <button id="joinPublicRoomBtn" type="button">Join public room</button>
@@ -110,9 +124,14 @@
       <p id="roomGoalSummary"></p>
       <ul id="roomPlayers"></ul>
       <div id="hostControls" class="hidden">
-        <label>Difficulty
-          <select id="roomMode"><option value="easy">Easy</option><option value="medium" selected>Normal</option><option value="hard">Hard</option></select>
-        </label>
+        <fieldset class="choice-field"><legend>Difficulty</legend>
+          <input id="roomMode" type="hidden" value="medium">
+          <div class="choice-buttons" data-choice-input="roomMode" role="group" aria-label="Difficulty">
+            <button type="button" data-choice-value="easy">Easy</button>
+            <button type="button" data-choice-value="medium">Normal</button>
+            <button type="button" data-choice-value="hard">Pro</button>
+          </div>
+        </fieldset>
         <label>Points to win
           <input id="roomScoreGoal" type="number" min="1" max="1000000" step="1" value="5000" inputmode="numeric">
         </label>
@@ -158,9 +177,10 @@
   <script src="targets.js"></script>
   <script src="round-timer.js?v=4"></script>
   <script src="scoring.js?v=2"></script>
-  <script src="home.js?v=2"></script>
+  <script src="choice-buttons.js?v=1"></script>
+  <script src="home.js?v=3"></script>
   <script src="explorers.js?v=1"></script>
-  <script src="public-rooms.js?v=2"></script>
-  <script type="module" src="multiplayer.js?v=12"></script>
+  <script src="public-rooms.js?v=3"></script>
+  <script type="module" src="multiplayer.js?v=13"></script>
 </body>
 </html>

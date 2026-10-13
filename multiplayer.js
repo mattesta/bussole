@@ -393,6 +393,7 @@ async function enterRoom(code) {
     byId('roomScoreGoal').value = window.BussoleScoring.goal(settings.scoreGoal);
     renderRoom();
     byId('roomMode').value = settings.mode || 'medium';
+    window.BussoleChoices?.sync('roomMode');
     byId('roomTimerEnabled').checked = Boolean(settings.timerEnabled);
     byId('roomBlurEnabled').checked = Boolean(settings.blurEnabled);
     byId('roomTimerDuration').value = window.BussoleRoundTimer.duration(settings);

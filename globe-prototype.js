@@ -544,7 +544,7 @@ function showPrototypeLine() {
   if (gameMode === 'hard') {
     const distanceKm = Number.parseFloat(distanceInput.value);
     if (!Number.isFinite(distanceKm) || distanceKm <= 0) {
-      statusEl.textContent = 'Enter a valid distance for Hard mode.';
+      statusEl.textContent = 'Enter a valid distance for Pro mode.';
       distanceInput.focus();
       return;
     }
@@ -897,7 +897,7 @@ function setMode(mode) {
   compassEl.classList.toggle('hidden', mode !== 'easy');
   if (mapReady) {
     resetPrototype();
-    const modeLabel = mode === 'medium' ? 'Normal' : `${mode[0].toUpperCase()}${mode.slice(1)}`;
+    const modeLabel = { easy: 'Easy', medium: 'Normal', hard: 'Pro' }[mode];
     statusEl.textContent = `${modeLabel} mode ready. The target is unchanged.`;
   }
 }

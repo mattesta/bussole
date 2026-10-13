@@ -13,3 +13,7 @@
 .maplibregl-popup-content {background:#101927;color:white;border:1px solid #ffffff40;border-radius:12px;font-size:14px;padding:12px 28px 12px 12px;}
 .maplibregl-popup-close-button {color:white;font-size:20px;min-height:24px;}
 .summary-marker {cursor:pointer;min-height:0;padding:0;}
+#roundPicker {margin-top:12px;}
+#roundPicker > span {display:block;margin-bottom:8px;color:var(--ui-muted);font-size:14px;}
+.round-buttons {display:flex;gap:8px;overflow-x:auto;padding-bottom:5px;}
+.round-buttons button {flex-shrink:0;min-height:44px;}

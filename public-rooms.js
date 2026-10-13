@@ -25,7 +25,7 @@ window.BussolePublicRooms = {
     return meta?.visibility === 'public' && this.waiting(meta) && Object.values(players).filter(player => this.online(player, now)).length === this.maxPlayers;
   },
   summary(settings) {
-    const mode = { easy: 'Easy', medium: 'Normal', hard: 'Hard' }[settings.mode] || 'Normal';
+    const mode = { easy: 'Easy', medium: 'Normal', hard: 'Pro' }[settings.mode] || 'Normal';
     const timer = settings.timerEnabled ? `${window.BussoleRoundTimer.duration(settings)} s timer` : 'No timer';
     return `${mode} · ${timer} · ${window.BussoleScoring.goal(settings.scoreGoal)} points to win${settings.blurEnabled ? ' · Blur on' : ''}`;
   }
