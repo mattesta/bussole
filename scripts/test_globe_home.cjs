@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const html=fs.readFileSync('index.html','utf8');
 assert.ok(!/leaflet|data-map-style|roomMapStyle|src="app.js/.test(html));
-assert.ok(html.includes('src="home.js?v=3"'));
+assert.ok(html.includes('src="home.js?v=4"'));
 function fixture({noLocation=false,blockedStorage=false}={}) {
   const ids=[...html.matchAll(/id="([^"]+)"/g)].map(match=>match[1]);
   const elements=new Map(ids.map(id=>[id,{value:'60',checked:false,disabled:false,style:{},classList:{hidden:false,toggle(){},add(){this.hidden=true},remove(){this.hidden=false}},events:{},setAttribute(){},focus(){this.focused=true},addEventListener(type,fn){(this.events[type]||=[]).push(fn)}}]));
@@ -42,7 +42,7 @@ function fixture({noLocation=false,blockedStorage=false}={}) {
     const f=fixture();f.e.get('timerCheckbox').checked=true;f.e.get('timerDuration').value=duration;
     await f.modes[0].events.click[0]();assert.equal(f.c.window.location.href,undefined);assert.equal(f.order.length,0);
   }
-  for(const id of ['multiplayerBtn','createRoomBtn','joinRoomBtn','joinPublicRoomBtn']) {
+  for(const id of ['multiplayerBtn','createRoomBtn','createPublicRoomBtn','joinRoomBtn','joinPublicRoomBtn']) {
     const f=fixture();await f.e.get(id).events.click[0]();assert.deepEqual(f.order,['orientation','location']);
   }
   const invite=fixture();

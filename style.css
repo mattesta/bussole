@@ -502,7 +502,7 @@ select:focus-visible {
   width: 100%;
   height: 100%;
   max-height: none;
-  padding: max(70px, calc(env(safe-area-inset-top) + 56px)) max(16px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   transform: none;
   border: 0;
   border-radius: 0;
@@ -712,3 +712,18 @@ select:focus-visible {
 .choice-buttons {display:flex;gap:8px;}
 .multiplayer-panel .choice-buttons button {flex:1;min-width:0;min-height:44px;margin:0;padding:9px 8px;}
 .multiplayer-panel .choice-buttons button.selected {border-color:var(--ui-red);background:#71181d;}
+
+.room-entry-actions {margin:22px 0;}
+.room-entry-actions legend {color:white;font-weight:700;}
+.room-entry-actions .choice-buttons button {border-color:var(--ui-red);}
+.lobby-mode .room-code-label {min-height:40px;padding-right:108px;margin:0 0 8px;gap:6px;font-size:clamp(14px,4vw,17px);}
+.lobby-mode .room-code-label strong {letter-spacing:1px;white-space:nowrap;}
+.lobby-mode #roomVisibilityLabel,.lobby-mode #roomSettingsSummary {margin:3px 0;line-height:1.35;}
+.lobby-target {margin:8px 0 10px;padding:8px 10px;border-left:3px solid var(--ui-red);border-radius:4px;background:var(--ui-field);font-size:14px;line-height:1.35;overflow-wrap:anywhere;}
+.lobby-mode #roomStandingsTitle {margin:10px 0 3px;}
+.lobby-mode #roomPlayers {margin:6px 0;}
+.lobby-mode #hostControls {gap:7px;padding:9px 0;}
+.lobby-mode #hostControls .choice-field {margin:0;}
+.lobby-mode #hostControls .choice-field legend {margin-bottom:6px;}
+.lobby-mode #roomMessage {padding-top:10px;font-size:14px;line-height:1.35;}
+@media (max-width:480px) {.lobby-mode #roomPlayers {max-height:176px;}}

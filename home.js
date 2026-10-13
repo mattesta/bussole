@@ -62,7 +62,7 @@
     await prepareAccess();
     window.location.href = `globe-prototype.html?${parameters}`;
   }));
-  for (const id of ['multiplayerBtn','createRoomBtn','joinRoomBtn','joinPublicRoomBtn']) {
+  for (const id of ['multiplayerBtn','createRoomBtn','createPublicRoomBtn','joinRoomBtn','joinPublicRoomBtn']) {
     byId(id).addEventListener('click', prepareAccess);
   }
   timer.addEventListener('change', () => {

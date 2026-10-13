@@ -30,7 +30,7 @@
     #roomResumeLoading a { color: rgba(255,255,255,.7); }
   </style>
 
-  <link rel="stylesheet" href="style.css?v=23"/>
+  <link rel="stylesheet" href="style.css?v=24"/>
   <link rel="stylesheet" href="round-timer.css?v=2">
   <link rel="stylesheet" href="player-blur.css?v=1">
 </head>
@@ -90,16 +90,18 @@
     <section id="multiplayerEntry">
       <h2>Multiplayer</h2>
       <p>Invite friends or find other explorers.</p>
-      <fieldset class="choice-field"><legend>Create a room</legend>
-        <input id="roomVisibility" type="hidden" value="private">
-        <div class="choice-buttons" data-choice-input="roomVisibility" role="group" aria-label="Room privacy">
-          <button type="button" data-choice-value="private">Private room</button>
-          <button type="button" data-choice-value="public">Public room</button>
+      <fieldset class="choice-field room-entry-actions"><legend>Create a room</legend>
+        <div class="choice-buttons" role="group" aria-label="Create a room">
+          <button id="createRoomBtn" type="button">Private room</button>
+          <button id="createPublicRoomBtn" type="button">Public room</button>
         </div>
       </fieldset>
-      <button id="createRoomBtn" type="button">Create room</button>
-      <button id="showJoinRoomBtn" type="button">Join private room</button>
-      <button id="joinPublicRoomBtn" type="button">Join public room</button>
+      <fieldset class="choice-field room-entry-actions"><legend>Join a room</legend>
+        <div class="choice-buttons" role="group" aria-label="Join a room">
+          <button id="showJoinRoomBtn" type="button">Private room</button>
+          <button id="joinPublicRoomBtn" type="button">Public room</button>
+        </div>
+      </fieldset>
       <p id="multiplayerEntryMessage" role="status"></p>
       <div id="joinRoomForm" class="hidden">
         <input id="roomCodeInput" inputmode="text" maxlength="8" placeholder="XX-XX-XX" autocomplete="off">
@@ -117,6 +119,7 @@
       </div>
       <p id="roomVisibilityLabel"></p>
       <p id="roomSettingsSummary"></p>
+      <p id="roomLobbyTarget" class="lobby-target" role="status">Target not chosen yet</p>
       <label class="player-name-label"><span>Explorer name <button id="myExplorerInfo" class="explorer-info" type="button" aria-label="About your explorer">i</button></span>
         <input id="playerNameInput" maxlength="24" autocomplete="off">
       </label>
@@ -178,9 +181,9 @@
   <script src="round-timer.js?v=4"></script>
   <script src="scoring.js?v=2"></script>
   <script src="choice-buttons.js?v=1"></script>
-  <script src="home.js?v=3"></script>
+  <script src="home.js?v=4"></script>
   <script src="explorers.js?v=1"></script>
   <script src="public-rooms.js?v=3"></script>
-  <script type="module" src="multiplayer.js?v=13"></script>
+  <script type="module" src="multiplayer.js?v=14"></script>
 </body>
 </html>

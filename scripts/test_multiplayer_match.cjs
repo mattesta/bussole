@@ -63,7 +63,7 @@ async function checkController(file, globe) {
   let source = fs.readFileSync(file, 'utf8').replace(/^import[\s\S]*?;\s*/gm, '');
   const expose = `globalThis.test = {
     setup(p, s, publicRoom=false, phase='revealed') { user = { uid: 'a' }; roomMeta = { hostId: 'a', round: 2, phase, visibility:publicRoom?'public':'private' }; players = p; ${globe ? 'settings' : 'roomSettings'} = s; ${globe ? 'target' : 'selectedTarget'} = {}; ${globe ? 'shownRound=null;' : "roomCode = 'ABCDEF';preparedRound=null;"} },
-    showResults, nextRound, submitLine${globe ? '' : ', handlePhase, startRound, validateTimer, setupLobby() { roomMeta.round = 0; roomMeta.phase = \"lobby\"; }'}
+    showResults, nextRound, submitLine${globe ? '' : ', handlePhase, startRound, validateTimer, setLobbyTarget(value) { selectedTarget=value; renderLobbyTarget(); }, setupLobby() { roomMeta.round = 0; roomMeta.phase = \"lobby\"; }'}
   };`;
   source = globe ? source.replace('  initialize();', expose) : source + expose;
   vm.runInContext(source, context);
@@ -85,6 +85,11 @@ async function checkController(file, globe) {
   if (!globe) {
     context.test.setup({}, settings);
     context.test.setupLobby();
+    context.test.setLobbyTarget({label:'Papeete, French Polynesia'});
+    assert.equal(elements.get('roomLobbyTarget').textContent,'Target: Papeete, French Polynesia');
+    context.test.setLobbyTarget(null);
+    assert.equal(elements.get('roomLobbyTarget').textContent,'Target not chosen yet');
+    context.test.setLobbyTarget({label:'Tokyo, Japan'});
     context.document.getElementById('roomScoreGoal').value = '5000';
     elements.get('roomTimerEnabled').checked = true;
     context.document.getElementById('roomMode').value = 'medium';
