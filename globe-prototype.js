@@ -636,7 +636,7 @@ function renderMultiplayerResults(entries, roundTarget, mode) {
   window.BussoleMobileLayout?.update();
   const leaders = results.filter(result => result.submission || result.publicResult);
   const bestPoints = Math.max(0, ...leaders.map(result => result.points));
-  const colours = [...new Set(leaders.filter(result => result.points === bestPoints).map(result => result.color))];
+  const colours = [...new Set(leaders.filter(result => result.points === bestPoints).map(result => result.errorColor || '#facf0a'))];
   if (targetMarker && colours.length) targetMarker.getElement().style.background = colours.length === 1
     ? colours[0] : `linear-gradient(90deg, ${colours.map((colour,index) => `${colour} ${index/colours.length*100}% ${(index+1)/colours.length*100}%`).join(', ')})`;
   updateAccessPanel();

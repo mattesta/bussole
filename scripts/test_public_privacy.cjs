@@ -71,9 +71,9 @@ for (const globe of [false,true]) {
   });
   vm.runInContext(extract(source,'renderMultiplayerResults'),c);
   const entries=[
-    {uid:'own',name:'Own',color:'#e41a1c',submission:s,publicResult:shared},
-    {uid:'rival',name:'Rival',color:'#377eb8',publicResult:shared},
-    {uid:'hidden',name:'Hidden',color:'#4daf4a',publicResult:near},
+    {uid:'own',name:'Own',color:'#e41a1c',errorColor:'#ff8587',submission:s,publicResult:shared},
+    {uid:'rival',name:'Rival',color:'#377eb8',errorColor:'#86c5f4',publicResult:shared},
+    {uid:'hidden',name:'Hidden',color:'#4daf4a',errorColor:'#92dc8f',publicResult:near},
     {uid:'dnf',name:'DNF',color:'#984ea3'}
   ];
   const results=c.renderMultiplayerResults(entries,globe ? {...distant,label:'Target'} : [distant.lat,distant.lon],'medium');
@@ -84,6 +84,6 @@ for (const globe of [false,true]) {
   assert.equal(lines.length,15); // two own lines + twelve faded parts + rival error
   assert.ok(results.find(r=>r.uid==='own').errorMeters>0);
   assert.ok(!lines.slice(2).some(line=>line.points.some(p=>p[0]===0 && p[1]===0)));
-  if(globe){assert.equal(blurred,true);assert.equal(distanceHidden,true);assert.equal(targetStyle.background,'#4daf4a')}
+  if(globe){assert.equal(blurred,true);assert.equal(distanceHidden,true);assert.equal(targetStyle.background,'#92dc8f')}
   console.log(`${globe?'3D':'2D'}: reduced payload, low-score/near-origin safety, poles, revolutions, fading, own route and hidden rivals passed.`);
 }
