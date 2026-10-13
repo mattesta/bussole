@@ -252,7 +252,7 @@ function playerTemplate(index, eligibleRound = 1) {
   };
 }
 
-async function createRoom(visibility = byId('roomVisibility').value) {
+async function createRoom(visibility = 'private') {
   try {
     user = await ensureUser();
     visibility = visibility === 'public' ? 'public' : 'private';
@@ -412,8 +412,13 @@ async function enterRoom(code) {
       roomTargetBanner.textContent = '';
       hide(roomTargetBanner);
     }
+    renderLobbyTarget();
     byId('startRoomRound').disabled = !selectedTarget;
   }));
+}
+
+function renderLobbyTarget() {
+  byId('roomLobbyTarget').textContent = selectedTarget ? `Target: ${selectedTarget.label}` : 'Target not chosen yet';
 }
 
 function renderRoom() {
@@ -421,6 +426,7 @@ function renderRoom() {
   countdown.sync(roomMeta);
   if (roomMeta.phase !== 'lobby') window.BussoleExplorers.close();
   const host = isHost();
+  renderLobbyTarget();
   byId('roomVisibilityLabel').textContent = roomMeta.visibility === 'public' ? 'Public room · First round starts at 8 explorers' : 'Private room · Invite by code or link';
   byId('roomSettingsSummary').textContent = window.BussolePublicRooms.summary(roomSettings);
   host ? show(hostControls) : hide(hostControls);
@@ -767,6 +773,7 @@ async function leaveRoom() {
   roomCode = null; roomMeta = null; players = {}; selectedTarget = null;
   preparedRound = null; revealedRound = null;
   byId('roomTargetInput').value = '';
+  renderLobbyTarget();
   byId('startRoomRound').disabled = true;
   hide(panel); hide(roomBadge); hide(roomTargetBanner); hide(lobby); hide(resultsPanel); show(entry);
   roomTargetBanner.textContent = '';
@@ -819,7 +826,8 @@ closeButton.addEventListener('click', () => {
   if (closeResultsPanel()) return;
   roomCode ? leaveRoom() : (hide(panel), show(menu));
 });
-byId('createRoomBtn').addEventListener('click', () => createRoom());
+byId('createRoomBtn').addEventListener('click', () => createRoom('private'));
+byId('createPublicRoomBtn').addEventListener('click', () => createRoom('public'));
 byId('joinPublicRoomBtn').addEventListener('click', joinPublicRoom);
 byId('myExplorerInfo').addEventListener('click', event => {
   const me = players[user?.uid];
@@ -832,7 +840,10 @@ byId('explorerDialog').addEventListener('click', event => {
     if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) window.BussoleExplorers.close();
   }
 });
-byId('showJoinRoomBtn').addEventListener('click', () => show(byId('joinRoomForm')));
+byId('showJoinRoomBtn').addEventListener('click', () => {
+  show(byId('joinRoomForm'));
+  byId('roomCodeInput').focus();
+});
 byId('roomCodeInput').addEventListener('input', event => { event.target.value = displayCode(compactCode(event.target.value)); });
 byId('joinRoomBtn').addEventListener('click', joinRoom);
 byId('roomTargetSearch').addEventListener('click', searchTarget);
