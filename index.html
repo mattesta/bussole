@@ -30,7 +30,7 @@
     #roomResumeLoading a { color: rgba(255,255,255,.7); }
   </style>
 
-  <link rel="stylesheet" href="style.css?v=24"/>
+  <link rel="stylesheet" href="style.css?v=25"/>
   <link rel="stylesheet" href="round-timer.css?v=2">
   <link rel="stylesheet" href="player-blur.css?v=1">
 </head>
@@ -120,14 +120,13 @@
       <p id="roomVisibilityLabel"></p>
       <p id="roomSettingsSummary"></p>
       <p id="roomLobbyTarget" class="lobby-target" role="status">Target not chosen yet</p>
-      <label class="player-name-label"><span>Explorer name <button id="myExplorerInfo" class="explorer-info" type="button" aria-label="About your explorer">i</button></span>
+      <label class="player-name-label"><span>Explorer name</span>
         <input id="playerNameInput" maxlength="24" autocomplete="off">
       </label>
       <h3 id="roomStandingsTitle">Explorers</h3>
-      <p id="roomGoalSummary"></p>
       <ul id="roomPlayers"></ul>
       <div id="hostControls" class="hidden">
-        <fieldset class="choice-field"><legend>Difficulty</legend>
+        <fieldset class="choice-field difficulty-field"><legend>Difficulty</legend>
           <input id="roomMode" type="hidden" value="medium">
           <div class="choice-buttons" data-choice-input="roomMode" role="group" aria-label="Difficulty">
             <button type="button" data-choice-value="easy">Easy</button>
@@ -135,17 +134,18 @@
             <button type="button" data-choice-value="hard">Pro</button>
           </div>
         </fieldset>
-        <label>Points to win
+        <label class="points-goal-label">Points to win
           <input id="roomScoreGoal" type="number" min="1" max="1000000" step="1" value="5000" inputmode="numeric">
         </label>
-        <label><span>Blur around player</span><input id="roomBlurEnabled" type="checkbox"></label>
+        <div class="room-options-row">
         <div class="room-timer-row">
           <label class="room-timer-toggle"><input id="roomTimerEnabled" type="checkbox"><span>Timer</span></label>
           <label id="roomTimerSettings" class="room-timer-settings hidden">
-            <input id="roomTimerDuration" type="number" min="3" max="60" step="1" value="60" inputmode="numeric" aria-label="Timer seconds" aria-describedby="roomTimerError">
+            <input id="roomTimerDuration" type="number" min="3" max="60" step="1" placeholder="3–60" inputmode="numeric" aria-label="Timer seconds, from 3 to 60">
             <span>sec.</span>
-            <span id="roomTimerError" class="hidden" role="status">Enter 3–60 seconds.</span>
           </label>
+        </div>
+        <label class="room-blur-toggle"><span>Blur around player</span><input id="roomBlurEnabled" type="checkbox"></label>
         </div>
         <div class="room-target-row">
           <input id="roomTargetInput" placeholder="Choose the target…" autocomplete="off">
@@ -168,6 +168,10 @@
   <dialog id="explorerDialog" class="explorer-dialog" aria-labelledby="explorerTitle">
     <button id="explorerClose" class="panel-close" type="button" aria-label="Close explorer information">×</button>
     <h2 id="explorerTitle"></h2>
+    <figure id="explorerFigure" class="explorer-figure hidden">
+      <img id="explorerImage" alt="">
+      <figcaption><a id="explorerImageSource" target="_blank" rel="noopener noreferrer">Image source and credits ↗</a> <a id="explorerImageLicense" class="hidden" target="_blank" rel="noopener noreferrer"></a></figcaption>
+    </figure>
     <p id="explorerBiography"></p>
     <a id="explorerWikipedia" target="_blank" rel="noopener noreferrer">Read more on Wikipedia ↗</a>
   </dialog>
@@ -182,8 +186,8 @@
   <script src="scoring.js?v=2"></script>
   <script src="choice-buttons.js?v=1"></script>
   <script src="home.js?v=4"></script>
-  <script src="explorers.js?v=1"></script>
+  <script src="explorers.js?v=2"></script>
   <script src="public-rooms.js?v=3"></script>
-  <script type="module" src="multiplayer.js?v=14"></script>
+  <script type="module" src="multiplayer.js?v=15"></script>
 </body>
 </html>
