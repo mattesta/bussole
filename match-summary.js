@@ -9,15 +9,16 @@
     markers.forEach(marker=>marker.remove());markers=[];popup?.remove();
     byId('summaryStats').replaceChildren();
   }
-  function marker(point,colour,label) {
+  function marker(point,colour,label,roundNumber) {
     const element=document.createElement('button');
     element.type='button';element.className='globe-marker target summary-marker';element.style.background=colour;
-    element.setAttribute('aria-label',label);
+    element.textContent=String(roundNumber);
+    element.setAttribute('aria-label',`Round ${roundNumber} · ${label}`);
     const position=[point[1],point[0]];
     element.addEventListener('click',event=>{
       event.stopPropagation();
       popup?.remove();const text=document.createElement('div');text.textContent=label;
-      popup=new maplibregl.Popup({offset:12}).setLngLat(position).setDOMContent(text).addTo(map);
+      popup=new maplibregl.Popup({offset:12,closeButton:false,closeOnClick:true}).setLngLat(position).setDOMContent(text).addTo(map);
     });
     markers.push(new maplibregl.Marker({element,anchor:'center'}).setLngLat(position).addTo(map));
   }
@@ -54,7 +55,7 @@
       const best=Math.max(0,...results.map(result=>result.points));
       const colours=[...new Set(results.filter(result=>result.points===best).map(result=>result.errorColor||'#ff8587'))];
       const colour=personal?entries[0]?.errorColor||'#ff8587':colours.length>1?`linear-gradient(90deg,${colours.join(',')})`:colours[0]||'#ff8587';
-      marker(target,colour,`Round ${round.round} · ${round.target.label}`);
+      marker(target,colour,round.target.label,round.round);
     });
     byId('summaryStatus').textContent=personal?`${count} guesses · ${total} points. Tap a target to see its name.`:`${chosen[0].target.label} · All explorers’ guesses for this round.`;
     if(report.partial)byId('summaryStatus').textContent+=' Some earlier rounds predate this feature.';

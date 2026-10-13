@@ -753,3 +753,5 @@ select:focus-visible {
   .room-options-row .room-timer-toggle,#hostControls .room-blur-toggle,.room-options-row .room-timer-settings {font-size:12px;}
   .room-options-row .room-timer-settings input {width:54px;}
 }
+.player-host {margin-left:6px;color:var(--ui-muted);font-size:12px;font-weight:400;}
+#roundRanking {list-style:none;padding-left:0;}

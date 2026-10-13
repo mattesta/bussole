@@ -59,3 +59,7 @@ assert.equal(fresh['meta/matchStartRound'], 2);
 assert.equal(Object.hasOwn(fresh, 'meta/round'), false);
 assert.equal(fresh.target, null);
 console.log('Match goal, tie, standings and restart checks passed.');
+
+const mixed=[{name:'A',points:200,totalPoints:3000},{name:'B',points:900,totalPoints:1000}];
+assert.equal(scoring.roundRanking(mixed)[0].name,'B');
+assert.equal(mixed[0].name,'A');

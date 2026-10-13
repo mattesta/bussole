@@ -55,6 +55,8 @@ async function checkController(file, globe) {
     { uid: 'a', name: 'A', points: 400, errorMeters: 10, color: 'red' },
     { uid: 'b', name: 'B', points: 900, errorMeters: 2, color: 'blue' }
   ];
+  context.window.BUSSOLE_TARGETS=[{name:'Old target',country:'A',lat:1,lon:2},{name:'New target',country:'B',lat:3,lon:4}];
+  vm.runInContext(fs.readFileSync('round-target.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('scoring.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('round-timer.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('explorers.js', 'utf8'), context);
@@ -62,7 +64,7 @@ async function checkController(file, globe) {
   vm.runInContext(fs.readFileSync('match-report.js', 'utf8'), context);
   let source = fs.readFileSync(file, 'utf8').replace(/^import[\s\S]*?;\s*/gm, '');
   const expose = `globalThis.test = {
-    setup(p, s, publicRoom=false, phase='revealed') { user = { uid: 'a' }; roomMeta = { hostId: 'a', round: 2, phase, visibility:publicRoom?'public':'private' }; players = p; ${globe ? 'settings' : 'roomSettings'} = s; ${globe ? 'target' : 'selectedTarget'} = {}; ${globe ? 'shownRound=null;' : "roomCode = 'ABCDEF';preparedRound=null;"} },
+    setup(p, s, publicRoom=false, phase='revealed') { user = { uid: 'a' }; roomMeta = { hostId: 'a', round: 2, phase, visibility:publicRoom?'public':'private' }; players = p; ${globe ? 'settings' : 'roomSettings'} = s; ${globe ? 'target' : 'selectedTarget'} = {lat:1,lon:2,label:'Old target, A'}; ${globe ? 'shownRound=null;' : "roomCode = 'ABCDEF';preparedRound=null;"} },
     showResults, nextRound, submitLine${globe ? '' : ', handlePhase, startRound, validateTimer, setLobbyTarget(value) { selectedTarget=value; renderLobbyTarget(); }, setupLobby() { roomMeta.round = 0; roomMeta.phase = \"lobby\"; }'}
   };`;
   source = globe ? source.replace('  initialize();', expose) : source + expose;
@@ -71,17 +73,19 @@ async function checkController(file, globe) {
   await context.test.showResults({});
   assert.equal(elements.get(globe ? 'globeResultsTitle' : 'roundResultsTitle').textContent, 'Match results');
   assert.match(elements.get(globe ? 'globeMatchOutcome' : 'matchOutcome').textContent, /B wins with 5400/);
-  assert.equal(elements.get(globe ? 'globeNextRoundBtn' : 'nextRoundBtn').textContent, 'New match');
+  assert.equal(elements.get(globe ? 'globeNextRoundBtn' : 'nextRoundBtn').textContent, 'Next Match');
   await context.test.nextRound();
   const fresh = updates.at(-1);
   assert.equal(fresh['players/a/roundScores'], null);
   assert.equal(fresh['players/b/roundScores'], null);
   assert.equal(fresh['meta/matchStartRound'], 2);
   assert.equal(fresh['meta/phase'], 'lobby');
+  assert.equal(fresh.target.label,'New target, B');
   // Below the goal, Next round preserves scores.
   context.test.setup({ a: { name: 'A', roundScores: { 1: 100 } } }, settings);
   await context.test.nextRound();
   assert.equal(Object.hasOwn(updates.at(-1), 'players/a/roundScores'), false);
+  assert.equal(updates.at(-1).target.label,'New target, B');
   if (!globe) {
     context.test.setup({}, settings);
     context.test.setupLobby();

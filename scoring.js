@@ -14,6 +14,9 @@ window.BussoleScoring = {
       return { ...result, totalPoints: this.total(roundScores) };
     }).sort((a, b) => b.totalPoints - a.totalPoints || b.points - a.points || a.name.localeCompare(b.name));
   },
+  roundRanking(ranking) {
+    return [...ranking].sort((a, b) => b.points - a.points || b.totalPoints - a.totalPoints || a.name.localeCompare(b.name));
+  },
   goal(value) {
     const goal = Number(value);
     return Number.isSafeInteger(goal) && goal > 0 ? goal : 5000;
