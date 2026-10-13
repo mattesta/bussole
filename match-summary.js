@@ -48,8 +48,8 @@
         item.textContent=text;byId('summaryStats').appendChild(item);
       });
       const best=Math.max(0,...results.map(result=>result.points));
-      const colours=[...new Set(results.filter(result=>result.points===best).map(result=>result.color))];
-      const colour=personal?entries[0]?.color||'#ff8587':colours.length>1?`linear-gradient(90deg,${colours.join(',')})`:colours[0]||'#ff8587';
+      const colours=[...new Set(results.filter(result=>result.points===best).map(result=>result.errorColor||'#ff8587'))];
+      const colour=personal?entries[0]?.errorColor||'#ff8587':colours.length>1?`linear-gradient(90deg,${colours.join(',')})`:colours[0]||'#ff8587';
       marker(target,colour,`Round ${round.round} · ${round.target.label}`);
     });
     byId('summaryStatus').textContent=personal?`${count} guesses · ${total} points. Tap a target to see its name.`:'All explorers’ guesses for this round. Tap the target to see its name.';
