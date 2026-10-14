@@ -33,7 +33,7 @@ button:focus-visible, input:focus-visible, .home-button:focus-visible { outline:
 
 .target-card {
   position: fixed;
-  top: max(12px, env(safe-area-inset-top));
+  top: calc(var(--visible-top, 0px) + max(12px, env(safe-area-inset-top)));
   left: 50%;
   z-index: 3;
   width: min(620px, calc(100% - 24px));

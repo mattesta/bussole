@@ -5,11 +5,11 @@ vm.runInContext(fs.readFileSync('mobile-layout.js','utf8'),c);
 assert.equal(timer.style.top,'');
 c.document.activeElement.tagName='INPUT';viewport.height=330;viewport.offsetTop=90;
 c.window.BussoleMobileLayout.update();
-assert.equal(vars['--keyboard-inset'],'424px');assert.equal(vars['--search-gap'],'12px');
+assert.equal(vars['--visible-top'],'90px');assert.equal(vars['--keyboard-inset'],'424px');assert.equal(vars['--search-gap'],'12px');
 assert.equal(timer.style.top,'');
 // Browsers that resize the layout viewport rather than overlaying it.
 c.window.innerHeight=330;viewport.height=330;viewport.offsetTop=0;c.window.BussoleMobileLayout.update();
-assert.equal(timer.style.top,'');assert.equal(vars['--keyboard-inset'],'0px');
+assert.equal(timer.style.top,'');assert.equal(vars['--visible-top'],'0px');assert.equal(vars['--keyboard-inset'],'0px');
 c.document.activeElement.tagName='DIV';c.window.innerHeight=844;viewport.height=844;c.window.BussoleMobileLayout.update();
 assert.equal(vars['--search-gap'],'174px');assert.equal(timer.style.top,'');
 assert.ok(fs.readFileSync('globe-prototype.css','utf8').includes('place-items: end center'));
