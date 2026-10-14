@@ -153,6 +153,8 @@ function updatePlayerBlur() {
 map.on('move', updatePlayerBlur);
 map.on('zoom', updatePlayerBlur);
 
+map.on('click', () => multiplayerController?.dismissResults?.());
+
 map.getCanvas().addEventListener('pointerdown', () => {
   if (lineRevealed) map.stop();
 }, { passive: true });

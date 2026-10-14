@@ -18,7 +18,6 @@ if (multiplayerMode) {
   const ERROR_COLOURS = ['#ff8587', '#86c5f4', '#92dc8f', '#d29ddd', '#ffc06a', '#70dada', '#ffc0df', '#b99a78'];
   const resultsPanel = document.getElementById('globeMultiplayerResults');
   const rankingList = document.getElementById('globeRoundRanking');
-  const resultsClose = document.getElementById('globeResultsClose');
   const nextRoundButton = document.getElementById('globeNextRoundBtn');
   const roomBadge = document.getElementById('globeRoomBadge');
   const roomProgress = document.getElementById('globeRoomProgress');
@@ -28,6 +27,8 @@ if (multiplayerMode) {
   const summaryStatus = document.getElementById('globeSummaryStatus');
   const summaryFrame = document.getElementById('matchSummaryFrame');
   let matchReport = null;
+  let resultsReady = false;
+  let advancingRound = false;
 
   let serverTimeOffset = 0;
   const countdown = window.BussoleRoundTimer.create(document.getElementById('globeCountdown'), document.querySelector('.target-card'), () => Date.now() + serverTimeOffset, () => {}, element => window.BussoleMobileLayout.positionTimer(element));
@@ -157,8 +158,10 @@ if (multiplayerMode) {
       )
     ));
     const finished = window.BussoleScoring.outcome(ranking, settings.scoreGoal).length > 0;
-    document.getElementById('globeResultsTitle').textContent = finished ? 'Match results' : 'Round results';
-    document.getElementById('globeMatchOutcome').textContent = window.BussoleScoring.matchMessage(ranking, settings.scoreGoal);
+    document.getElementById('globeResultsTitle').textContent = finished ? 'Match results' : '';
+    document.getElementById('globeResultsTitle').classList.toggle('hidden', !finished);
+    document.getElementById('globeMatchOutcome').textContent = finished ? window.BussoleScoring.matchMessage(ranking, settings.scoreGoal) : '';
+    document.getElementById('globeMatchOutcome').classList.toggle('hidden', !finished);
     nextRoundButton.textContent = finished ? 'Next Match' : 'Next round';
     rankingList.replaceChildren();
     (finished ? ranking : window.BussoleScoring.roundRanking(ranking)).forEach(result => {
@@ -173,7 +176,8 @@ if (multiplayerMode) {
       item.textContent = `${result.name} — ${result.points} pts${error} · Total: ${result.totalPoints} pts`;
       rankingList.appendChild(item);
     });
-    nextRoundButton.classList.toggle('hidden', !isHost());
+    resultsReady = true;
+    updateNextRoundState();
     roomBadge.classList.remove('results-available');
     show(resultsPanel);
     summaryActions.classList.toggle('hidden', !finished);
@@ -182,6 +186,16 @@ if (multiplayerMode) {
   }
 
   let reportLoading = null;
+  function updateNextRoundState() {
+    show(nextRoundButton);
+    nextRoundButton.disabled = !isHost() || roomMeta?.phase !== 'revealed' || !resultsReady || Boolean(reportLoading) || advancingRound;
+    nextRoundButton.title = isHost() ? 'Continue to the next round' : 'Waiting for the host to continue';
+  }
+  function dismissResults() {
+    if (roomMeta?.phase !== 'revealed') return;
+    hide(resultsPanel);
+    roomBadge.classList.add('results-available');
+  }
   function prepareReport() {
     if (reportLoading) return reportLoading;
     const publicRoom = roomMeta.visibility === 'public';
@@ -201,7 +215,7 @@ if (multiplayerMode) {
         summaryStatus.textContent = 'Summary unavailable. Tap Summary to retry.';
       } finally {
         personalSummary.disabled = false;
-        nextRoundButton.disabled = false; reportLoading = null;
+        reportLoading = null; updateNextRoundState();
       }
     })();
     return reportLoading;
@@ -225,7 +239,7 @@ if (multiplayerMode) {
   });
 
   async function nextRound() {
-    if (!isHost()) return;
+    if (!isHost() || advancingRound) return;
     if (roomMeta?.phase !== 'revealed') return;
     const newMatch = window.BussoleScoring.outcome(
       window.BussoleScoring.standings(players), settings.scoreGoal
@@ -233,7 +247,12 @@ if (multiplayerMode) {
     const changes = window.BussoleScoring.lobbyUpdates(players, roomMeta.round, newMatch);
     changes.target = window.BussoleRoundTargets.next(target);
     changes['meta/lastActiveAt'] = serverTimestamp();
-    await update(ref(db, roomPath()), changes);
+    advancingRound = true; updateNextRoundState();
+    try { await update(ref(db, roomPath()), changes); }
+    catch (error) {
+      advancingRound = false; updateNextRoundState();
+      window.BussoleGlobe.setStatus('Could not start the next round. Please retry.');
+    }
   }
 
   async function leaveRoom() {
@@ -288,7 +307,8 @@ if (multiplayerMode) {
       if (!roomMeta || roomMeta.phase === 'closed' || !players[user.uid]) return goHome();
       if (!target) return goHome();
 
-      window.BussoleGlobe.registerMultiplayer({ isActive: () => true, submitLine });
+      window.BussoleGlobe.registerMultiplayer({ isActive: () => true, submitLine, dismissResults });
+      updateNextRoundState();
       window.BussoleGlobe.setBlurEnabled(settings.blurEnabled);
       window.BussoleGlobe.setMultiplayerTarget(target);
       await refreshPresence();
@@ -319,7 +339,7 @@ if (multiplayerMode) {
         if (!roomMeta || roomMeta.phase === 'closed') return goHome();
         countdown.sync(roomMeta);
         updateProgress();
-        nextRoundButton.classList.toggle('hidden', !isHost());
+        updateNextRoundState();
         if (roomMeta.phase === 'revealed') showResults();
         if (roomMeta.phase === 'lobby' && previousPhase !== 'lobby') {
           const lobbyUrl = new URL('./', location.href);
@@ -348,10 +368,6 @@ if (multiplayerMode) {
     }
   }
 
-  resultsClose.addEventListener('click', () => {
-    hide(resultsPanel);
-    roomBadge.classList.add('results-available');
-  });
   roomBadge.addEventListener('click', () => {
     if (roomMeta?.phase === 'revealed') {
       roomBadge.classList.remove('results-available');
