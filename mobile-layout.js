@@ -17,6 +17,7 @@
   }
   function update() {
     const m=metrics(), style=document.documentElement.style;
+    style.setProperty('--visible-top',`${m.top}px`);
     style.setProperty('--keyboard-inset',`${m.inset}px`);
     style.setProperty('--search-gap',`${m.keyboard?12:m.controls+24}px`);
     style.setProperty('--visible-height',`${m.height}px`);
