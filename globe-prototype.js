@@ -15,7 +15,7 @@ const soloTimerSeconds = !multiplayerMode && window.BussoleRoundTimer.validDurat
 let soloTimerActive = false;
 const soloCountdown = window.BussoleRoundTimer.create(
   document.getElementById('globeCountdown'), document.querySelector('.target-card'), () => Date.now(),
-  () => { showPrototypeLine(); }
+  () => { showPrototypeLine(); }, element => window.BussoleMobileLayout.positionTimer(element)
 );
 function stopSoloTimer() {
   soloTimerActive = false;
