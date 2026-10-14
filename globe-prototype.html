@@ -5,14 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Bussole!</title>
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="globe-prototype.css?v=21">
+  <link rel="stylesheet" href="globe-prototype.css?v=22">
   <link rel="stylesheet" href="round-timer.css?v=2">
   <link rel="stylesheet" href="player-blur.css?v=1">
 </head>
 <body>
   <main id="globeMap" aria-label="Interactive 3D globe"></main>
 
-  <div id="globeCountdown" class="round-countdown hidden" role="timer"></div>
   <section id="globeAccessPanel" class="access-panel hidden" aria-labelledby="globeAccessTitle">
     <h2 id="globeAccessTitle">Location &amp; compass</h2>
     <p id="globeAccessMessage" role="status">Allow location and motion access to play from your real position.</p>
@@ -49,6 +48,13 @@
       <output id="bearingValue" for="bearingInput">0°</output>
       <input id="bearingInput" type="range" min="0" max="359" value="0">
     </label>
+
+    <div class="round-hud" aria-label="Round status">
+      <div id="globeCountdown" class="round-countdown hidden" role="timer"></div>
+      <button id="globeRoomBadge" class="globe-room-badge hidden" type="button" aria-label="Show round results">
+        <span id="globeRoomProgress">0 explorers</span>
+      </button>
+    </div>
 
     <label id="distanceInputWrap" class="distance-control hidden" for="distanceInput">
       <input id="distanceInput" type="number" min="0" step="1" inputmode="decimal" placeholder="Distance">
@@ -89,9 +95,6 @@
 
   <iframe id="matchSummaryFrame" class="summary-frame hidden" title="Match summary"></iframe>
 
-  <button id="globeRoomBadge" class="globe-room-badge hidden" type="button" aria-label="Show round results">
-    <span id="globeRoomProgress">0 explorers</span>
-  </button>
 
   <div class="prototype-attribution">MapLibre · Tiles © Esri</div>
 
@@ -104,8 +107,8 @@
   <script src="globe-lines.js?v=1"></script>
   <script src="compass.js?v=1"></script>
   <script src="public-privacy.js?v=1"></script>
-  <script src="mobile-layout.js?v=1"></script>
-  <script src="globe-prototype.js?v=32"></script>
+  <script src="mobile-layout.js?v=2"></script>
+  <script src="globe-prototype.js?v=33"></script>
   <script src="public-rooms.js?v=3"></script>
   <script src="match-report.js?v=1"></script>
   <script type="module" src="globe-multiplayer.js?v=11"></script>

@@ -11,8 +11,9 @@
     return {height,top,inset,keyboard:editing && (largestHeight-height>100 || inset>100),controls:controls?.getBoundingClientRect().height || 72};
   }
   function positionTimer(element) {
-    const m=metrics();
-    element.style.top = `${Math.max(m.top+8,m.top+m.height-(m.keyboard?12:m.controls+26)-(element.offsetHeight||43))}px`;
+    // The timer shares a normal-flow row with the room badge above the inputs.
+    // Clear legacy coordinates written by the old fixed-position countdown.
+    element.style.top = '';
   }
   function update() {
     const m=metrics(), style=document.documentElement.style;
@@ -20,7 +21,7 @@
     style.setProperty('--search-gap',`${m.keyboard?12:m.controls+24}px`);
     style.setProperty('--visible-height',`${m.height}px`);
     const timer=document.getElementById('globeCountdown');
-    if(document.body.classList.contains('globe-multiplayer') && timer) positionTimer(timer);
+    if(timer) positionTimer(timer);
   }
   window.addEventListener('resize',update);
   window.visualViewport?.addEventListener('resize',update);

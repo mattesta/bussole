@@ -234,11 +234,15 @@ async function refreshPresence() {
   return presenceRefreshPromise;
 }
 
-async function ensureUser() {
-  await auth.authStateReady();
-  if (auth.currentUser) return auth.currentUser;
-  const credential = await signInAnonymously(auth);
-  return credential.user;
+let authRequest = null;
+function ensureUser() {
+  if (authRequest) return authRequest;
+  authRequest = (async () => {
+    await auth.authStateReady();
+    if (auth.currentUser) return auth.currentUser;
+    return (await signInAnonymously(auth)).user;
+  })().finally(() => { authRequest = null; });
+  return authRequest;
 }
 
 function playerTemplate(index, eligibleRound = 1) {
@@ -323,6 +327,11 @@ async function joinRoom() {
     const joinedMeta = metaSnapshot.val();
     const playerSnapshot = await get(ref(db, `rooms/${code}/players`));
     const currentPlayers = playerSnapshot.val() || {};
+    // A round transition must restore an existing seat, never register a new
+    // anonymous identity as an extra explorer if browser auth was lost.
+    if (resumeRequested && !currentPlayers[user.uid]) {
+      throw new Error('Your player could not be restored. Go Home and rejoin the room.');
+    }
     const hasConnectedPlayer = Object.values(currentPlayers).some(player => player.connected);
     const canResumeOwnSeat = resumeRequested && currentPlayers[user.uid] && isPlayerOnline(currentPlayers[user.uid]);
     if (joinedMeta.phase === 'closed' || (!hasConnectedPlayer && !canResumeOwnSeat)) {
