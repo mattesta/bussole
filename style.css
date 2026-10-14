@@ -755,3 +755,6 @@ select:focus-visible {
 }
 .player-host {margin-left:6px;color:var(--ui-muted);font-size:12px;font-weight:400;}
 #roundRanking {list-style:none;padding-left:0;}
+
+.room-match-settings {display:grid;gap:7px;min-width:0;margin:0;padding:0;border:0;}
+.lobby-mode.match-in-progress #roomPlayers {max-height:none;overflow:visible;}

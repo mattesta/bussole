@@ -35,13 +35,18 @@ const timerEnabledInput = byId('roomTimerEnabled');
 const timerSettings = byId('roomTimerSettings');
 let serverTimeOffset = 0;
 const countdown = window.BussoleRoundTimer.create(byId('roomCountdown'), roomTargetBanner, () => Date.now() + serverTimeOffset);
+function matchStarted() {
+  return (roomMeta?.round || 0) > (roomMeta?.matchStartRound || 0);
+}
+
 function validateTimer() {
   const input = byId('roomTimerDuration');
-  const valid = window.BussoleRoundTimer.validDuration(input.value);
-  const invalid = timerEnabledInput.checked && !valid;
+  const locked = matchStarted();
+  const valid = window.BussoleRoundTimer.validDuration(locked ? window.BussoleRoundTimer.duration(roomSettings) : input.value);
+  const invalid = (locked ? roomSettings.timerEnabled : timerEnabledInput.checked) && !valid;
   input.classList.toggle('invalid', invalid);
-  byId('startRoomRound').disabled = !selectedTarget || invalid;
-  input.setAttribute('aria-invalid', String(timerEnabledInput.checked && !valid));
+  byId('startRoomRound').disabled = !settingsReady || !selectedTarget || invalid;
+  input.setAttribute('aria-invalid', String(Boolean(invalid)));
   return valid;
 }
 const pageParameters = new URLSearchParams(location.search);
@@ -442,7 +447,13 @@ function renderRoom() {
   byId('roomSettingsSummary').textContent = window.BussolePublicRooms.summary(roomSettings);
   host ? show(hostControls) : hide(hostControls);
   byId('nextRoundBtn').classList.toggle('hidden', !host);
-  byId('roomScoreGoal').disabled = roomMeta.round > (roomMeta.matchStartRound || 0);
+  const started = matchStarted();
+  byId('roomMatchSettings').disabled = started;
+  byId('roomMatchSettings').classList.toggle('hidden', started);
+  byId('playerNameSettings').classList.toggle('hidden', started);
+  playerNameInput.disabled = started;
+  byId('roomSettingsSummary').classList.toggle('hidden', started);
+  panel.classList.toggle('match-in-progress', started);
   byId('roomStandingsTitle').textContent = roomMeta.round > (roomMeta.matchStartRound || 0) ? 'Total standings' : 'Explorers';
   if (roomMeta.phase === 'lobby') {
     setResultsCollapsed(false);
@@ -528,24 +539,25 @@ async function tryHostTransfer() {
 }
 
 async function startRound() {
-  if (startingRound || !isHost() || !selectedTarget || roomMeta.phase !== 'lobby') return;
+  if (startingRound || !settingsReady || !isHost() || !selectedTarget || roomMeta.phase !== 'lobby') return;
   if (roomMeta.visibility === 'public' && Object.values(players).filter(player => window.BussolePublicRooms.online(player, serverNow())).length < 2) {
     roomMessage.textContent = 'At least 2 explorers are needed for a public match.'; return;
   }
   if (window.BussoleScoring.outcome(window.BussoleScoring.standings(players), roomSettings.scoreGoal).length) return;
   const goalInput = byId('roomScoreGoal');
-  if (!goalInput.checkValidity()) { goalInput.reportValidity(); return; }
+  const locked = matchStarted();
+  if (!locked && !goalInput.checkValidity()) { goalInput.reportValidity(); return; }
   const round = (roomMeta.round || 0) + 1;
-  const timerEnabled = byId('roomTimerEnabled').checked;
+  const timerEnabled = locked ? Boolean(roomSettings.timerEnabled) : byId('roomTimerEnabled').checked;
   if (timerEnabled && !validateTimer()) { byId('roomTimerDuration').focus(); return; }
-  const timerSeconds = timerEnabled ? Number(byId('roomTimerDuration').value) : 60;
+  const timerSeconds = timerEnabled ? (locked ? window.BussoleRoundTimer.duration(roomSettings) : Number(byId('roomTimerDuration').value)) : 60;
   const settings = {
-    mode: byId('roomMode').value,
+    mode: locked ? roomSettings.mode : byId('roomMode').value,
     mapStyle: '3d',
-    scoreGoal: roomMeta.round > (roomMeta.matchStartRound || 0)
+    scoreGoal: locked
       ? window.BussoleScoring.goal(roomSettings.scoreGoal) : window.BussoleScoring.goal(goalInput.value),
     timerEnabled,
-    blurEnabled: Boolean(byId('roomBlurEnabled').checked),
+    blurEnabled: locked ? Boolean(roomSettings.blurEnabled) : Boolean(byId('roomBlurEnabled').checked),
     timerSeconds,
     // Preserve the legacy field required by already deployed Firebase rules.
     // timerSeconds and the room deadline carry the actual 3–60 second duration.
@@ -729,6 +741,7 @@ async function saveTarget(target) {
 }
 
 async function changeName() {
+  if (matchStarted() || roomMeta?.phase !== 'lobby') return;
   const name = playerNameInput.value.trim().slice(0, 24);
   if (name && roomCode) await set(ref(db, roomPath(`players/${user.uid}/name`)), name);
 }
@@ -868,13 +881,13 @@ byId('copyRoomLinkBtn').addEventListener('click', copyRoomLink);
 timerEnabledInput.addEventListener('change', updateTimerSettingsVisibility);
 byId('roomTimerDuration').addEventListener('input', validateTimer);
 byId('roomScoreGoal').addEventListener('change', async event => {
-  if (!isHost() || roomMeta?.phase !== 'lobby' || roomMeta.round > (roomMeta.matchStartRound || 0)) return;
+  if (!isHost() || roomMeta?.phase !== 'lobby' || matchStarted()) return;
   if (!event.target.checkValidity()) { event.target.reportValidity(); return; }
   await set(ref(db, roomPath('settings/scoreGoal')), window.BussoleScoring.goal(event.target.value));
 });
 for (const id of ['roomMode', 'roomTimerEnabled', 'roomTimerDuration', 'roomBlurEnabled']) {
   byId(id).addEventListener('change', async () => {
-    if (!isHost() || roomMeta?.phase !== 'lobby' || (timerEnabledInput.checked && !validateTimer())) return;
+    if (!isHost() || roomMeta?.phase !== 'lobby' || matchStarted() || (timerEnabledInput.checked && !validateTimer())) return;
     await update(ref(db, roomPath('settings')), {
       mode: byId('roomMode').value, mapStyle: '3d',
       timerEnabled: timerEnabledInput.checked,
