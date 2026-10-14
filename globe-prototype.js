@@ -73,6 +73,7 @@ let locationError = null;
 let locationRequest = null;
 let accessRequest = null;
 let accessBusy = false;
+let automaticAccessCheck = true;
 let orientationPermissionGranted = Boolean(launchData?.orientationGranted);
 
 let playerLatLng = hasLaunchCoordinates
@@ -804,12 +805,29 @@ async function searchTarget() {
 
 function updateAccessPanel() {
   const missing = !locationReady || (!compassUsable && !manualBearing);
-  accessPanel.classList.toggle('hidden', !missing || lineRevealed || compassSubmitted);
+  const motionAvailable = typeof DeviceOrientationEvent !== 'undefined';
+  const needsMotionGesture = motionAvailable && !orientationPermissionGranted &&
+    typeof DeviceOrientationEvent.requestPermission === 'function';
+  // Chrome/Android needs no motion-permission tap. Wait for the automatic GPS
+  // request and first absolute heading instead of flashing a permission dialog.
+  // The GPS timeout and compass tracker's timeout expose real failures normally.
+  const waiting = automaticAccessCheck && motionAvailable && !needsMotionGesture &&
+    !locationError && !compassWarning && (!mapReady ||
+      (!locationReady && Boolean(locationRequest)) || (!compassUsable && orientationStarted));
+  accessPanel.classList.toggle('hidden', !missing || lineRevealed || compassSubmitted || waiting);
+  if (missing && waiting && !lineRevealed && !compassSubmitted) {
+    statusEl.textContent = 'Connecting location and compass…';
+  }
+  if (!missing && !lineRevealed && !compassSubmitted && statusEl.textContent === 'Connecting location and compass…') {
+    statusEl.textContent = 'Location and compass ready. Move phone to set direction.';
+  }
   accessRetry.disabled = accessBusy;
-  accessRetry.textContent = accessBusy ? 'Checking access…' : 'Enable location & compass';
+  accessRetry.textContent = accessBusy ? 'Checking access…'
+    : needsMotionGesture ? 'Enable location & compass' : 'Retry location & compass';
   accessMessage.textContent = locationError || compassWarning || (!locationReady
     ? 'Allow location access to play from your real position.'
-    : 'Allow motion access, then hold the phone fairly flat to aim.');
+    : needsMotionGesture ? 'Allow motion access, then hold the phone fairly flat to aim.'
+    : 'Waiting for a compass reading. Hold the phone fairly flat, then retry if needed.');
 }
 
 function persistAccess() {
@@ -856,6 +874,7 @@ function refreshPlayerLocation(recenter = true) {
 function useMyLocation() {
   if (accessRequest) return accessRequest;
   accessBusy = true;
+  automaticAccessCheck = false;
   compassUsable = false;
   pendingHeading = null;
   smoothHeading = null;
@@ -881,6 +900,7 @@ accessRetry.addEventListener('click', useMyLocation);
 
 function recheckAccess() {
   if (!mapReady || lineRevealed || compassSubmitted || document.visibilityState === 'hidden') return;
+  automaticAccessCheck = true;
   refreshPlayerLocation();
   if (orientationPermissionGranted && !accessBusy) {
     compassTracker?.stop(); orientationStarted = false; compassUsable = false;
