@@ -264,7 +264,8 @@ button:focus-visible, input:focus-visible, .home-button:focus-visible { outline:
 
 .globe-multiplayer #randomTargetBtn,
 .globe-multiplayer #openGlobeSearchBtn,
-.globe-multiplayer #resetPrototypeBtn { display: none; }
+.globe-multiplayer #resetPrototypeBtn,
+.globe-multiplayer #prototypeBackLink { display: none; }
 .globe-multiplayer .action-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 .globe-results {
@@ -286,7 +287,7 @@ button:focus-visible, input:focus-visible, .home-button:focus-visible { outline:
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
-.globe-results h2 { margin: 0 38px 8px 0; font-size: 20px; }
+.globe-results h2 { margin: 0 0 8px; font-size: 20px; }
 .globe-results ol { margin: 0 0 12px; padding-left: 28px; }
 .globe-results li { padding: 6px 2px; font-weight: 650; }
 .globe-results-close {
@@ -300,7 +301,7 @@ button:focus-visible, input:focus-visible, .home-button:focus-visible { outline:
   background: transparent;
   font-size: 24px;
 }
-.globe-results #globeNextRoundBtn { width: 100%; border-color: var(--ui-red); background: var(--ui-red); }
+.globe-multiplayer #globeNextRoundBtn { border-color: var(--ui-red); background: var(--ui-red); }
 .globe-room-badge {
   position: fixed;
   right: 10px;

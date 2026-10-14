@@ -6,7 +6,7 @@ async function checkController(file, globe) {
   const elements = new Map();
   function element() {
     return {
-      classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
+      classList: { values:new Set(),add(...names){names.forEach(n=>this.values.add(n))},remove(...names){names.forEach(n=>this.values.delete(n))},toggle(name,force){const value=force ?? !this.values.has(name);value?this.values.add(name):this.values.delete(name);return value},contains(name){return this.values.has(name)} },
       style: {}, children: [], value: '', textContent: '',
       focus() {}, checkValidity() { return true; }, reportValidity() {},
       addEventListener() {}, setAttribute() {}, removeAttribute() {},
@@ -64,8 +64,8 @@ async function checkController(file, globe) {
   vm.runInContext(fs.readFileSync('match-report.js', 'utf8'), context);
   let source = fs.readFileSync(file, 'utf8').replace(/^import[\s\S]*?;\s*/gm, '');
   const expose = `globalThis.test = {
-    setup(p, s, publicRoom=false, phase='revealed') { user = { uid: 'a' }; roomMeta = { hostId: 'a', round: 2, phase, visibility:publicRoom?'public':'private' }; players = p; ${globe ? 'settings' : 'roomSettings'} = s; ${globe ? 'target' : 'selectedTarget'} = {lat:1,lon:2,label:'Old target, A'}; ${globe ? 'shownRound=null;' : "roomCode = 'ABCDEF';preparedRound=null;"} },
-    showResults, nextRound, submitLine${globe ? '' : ', handlePhase, startRound, validateTimer, setLobbyTarget(value) { selectedTarget=value; renderLobbyTarget(); }, setupLobby() { roomMeta.round = 0; roomMeta.phase = \"lobby\"; }'}
+    setup(p, s, publicRoom=false, phase='revealed') { user = { uid: 'a' }; roomMeta = { hostId: 'a', round: 2, phase, visibility:publicRoom?'public':'private' }; players = p; ${globe ? 'settings' : 'roomSettings'} = s; ${globe ? 'target' : 'selectedTarget'} = {lat:1,lon:2,label:'Old target, A'}; ${globe ? 'shownRound=null;resultsReady=false;advancingRound=false;' : "roomCode = 'ABCDEF';preparedRound=null;"} },
+    showResults, nextRound, submitLine${globe ? ', updateNextRoundState, dismissResults, guest() { roomMeta.hostId="b";updateNextRoundState(); }' : ', handlePhase, startRound, validateTimer, setLobbyTarget(value) { selectedTarget=value; renderLobbyTarget(); }, setupLobby() { roomMeta.round = 0; roomMeta.phase = \"lobby\"; }'}
   };`;
   source = globe ? source.replace('  initialize();', expose) : source + expose;
   vm.runInContext(source, context);
@@ -139,6 +139,21 @@ async function checkController(file, globe) {
     }
     context.test.setup(players,settings,false,'lobby');
     const before=redirects.length;await context.test.handlePhase();assert.equal(redirects.length,before);
+  }
+  if(globe) {
+    context.test.setup({a:{name:'A',roundScores:{}}},settings,false,'aiming');
+    context.test.updateNextRoundState();assert.equal(elements.get('globeNextRoundBtn').disabled,true);
+    context.test.setup({a:{name:'A',roundScores:{}}},settings,false,'revealed');
+    context.test.updateNextRoundState();assert.equal(elements.get('globeNextRoundBtn').disabled,true);
+    await context.test.showResults({});
+    assert.equal(elements.get('globeNextRoundBtn').disabled,false);
+    assert.equal(elements.get('globeResultsTitle').textContent,'');assert.equal(elements.get('globeMatchOutcome').textContent,'');
+    const before=updates.length;context.test.dismissResults();
+    assert.equal(elements.get('globeMultiplayerResults').classList.contains('hidden'),true);
+    assert.equal(elements.get('globeRoomBadge').classList.contains('results-available'),true);
+    assert.equal(updates.length,before);
+    assert.equal(elements.get('globeNextRoundBtn').disabled,false);
+    context.test.guest();assert.equal(elements.get('globeNextRoundBtn').disabled,true);
   }
   console.log(`${file}: final results, whole-round winner and restart passed.`);
 }
