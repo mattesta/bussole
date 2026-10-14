@@ -30,7 +30,7 @@
     #roomResumeLoading a { color: rgba(255,255,255,.7); }
   </style>
 
-  <link rel="stylesheet" href="style.css?v=26"/>
+  <link rel="stylesheet" href="style.css?v=27"/>
   <link rel="stylesheet" href="round-timer.css?v=2">
   <link rel="stylesheet" href="player-blur.css?v=1">
 </head>
@@ -120,12 +120,13 @@
       <p id="roomVisibilityLabel"></p>
       <p id="roomSettingsSummary"></p>
       <p id="roomLobbyTarget" class="lobby-target" role="status">Target not chosen yet</p>
-      <label class="player-name-label"><span>Explorer name</span>
+      <label id="playerNameSettings" class="player-name-label"><span>Explorer name</span>
         <input id="playerNameInput" maxlength="24" autocomplete="off">
       </label>
       <h3 id="roomStandingsTitle">Explorers</h3>
       <ul id="roomPlayers"></ul>
       <div id="hostControls" class="hidden">
+        <fieldset id="roomMatchSettings" class="room-match-settings" aria-label="Match settings">
         <fieldset class="choice-field difficulty-field"><legend>Difficulty</legend>
           <input id="roomMode" type="hidden" value="medium">
           <div class="choice-buttons" data-choice-input="roomMode" role="group" aria-label="Difficulty">
@@ -147,6 +148,7 @@
         </div>
         <label class="room-blur-toggle"><span>Blur around player</span><input id="roomBlurEnabled" type="checkbox"></label>
         </div>
+        </fieldset>
         <div class="room-target-row">
           <input id="roomTargetInput" placeholder="Choose the target…" autocomplete="off">
           <button id="roomTargetSearch" type="button">Search</button>
@@ -189,6 +191,6 @@
   <script src="home.js?v=4"></script>
   <script src="explorers.js?v=2"></script>
   <script src="public-rooms.js?v=3"></script>
-  <script type="module" src="multiplayer.js?v=17"></script>
+  <script type="module" src="multiplayer.js?v=18"></script>
 </body>
 </html>

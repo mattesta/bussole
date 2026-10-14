@@ -31,7 +31,7 @@ async function checkController(file, globe) {
     location: { search: globe ? '?multiplayer=1&room=ABCDEF' : '', replace(url){redirects.push(url)} },
     document: {
       getElementById(id) { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); },
-      querySelector: element, createElement: element, addEventListener() {}, body: element()
+      querySelector: element, createElement: element, addEventListener() {}, documentElement: element(), body: element()
     },
     initializeApp() {}, firebaseConfig: {}, getAuth() { return {}; }, getDatabase() {},
     onAuthStateChanged() {}, ref(db, path) { return path; }, serverTimestamp() { return 123; },
@@ -64,8 +64,8 @@ async function checkController(file, globe) {
   vm.runInContext(fs.readFileSync('match-report.js', 'utf8'), context);
   let source = fs.readFileSync(file, 'utf8').replace(/^import[\s\S]*?;\s*/gm, '');
   const expose = `globalThis.test = {
-    setup(p, s, publicRoom=false, phase='revealed') { user = { uid: 'a' }; roomMeta = { hostId: 'a', round: 2, phase, visibility:publicRoom?'public':'private' }; players = p; ${globe ? 'settings' : 'roomSettings'} = s; ${globe ? 'target' : 'selectedTarget'} = {lat:1,lon:2,label:'Old target, A'}; ${globe ? 'shownRound=null;resultsReady=false;advancingRound=false;' : "roomCode = 'ABCDEF';preparedRound=null;"} },
-    showResults, nextRound, submitLine${globe ? ', updateNextRoundState, dismissResults, guest() { roomMeta.hostId="b";updateNextRoundState(); }' : ', handlePhase, startRound, validateTimer, setLobbyTarget(value) { selectedTarget=value; renderLobbyTarget(); }, setupLobby() { roomMeta.round = 0; roomMeta.phase = \"lobby\"; }'}
+    setup(p, s, publicRoom=false, phase='revealed') { user = { uid: 'a' }; roomMeta = { hostId: 'a', round: 2, phase, visibility:publicRoom?'public':'private' }; players = p; ${globe ? 'settings' : 'roomSettings'} = s; ${globe ? 'target' : 'selectedTarget'} = {lat:1,lon:2,label:'Old target, A'}; ${globe ? 'shownRound=null;resultsReady=false;advancingRound=false;' : "roomCode = 'ABCDEF';preparedRound=null;settingsReady=true;"} },
+    showResults, nextRound, submitLine${globe ? ', updateNextRoundState, dismissResults, guest() { roomMeta.hostId="b";updateNextRoundState(); }' : ', handlePhase, startRound, validateTimer, renderRoom, changeName, newMatch() { roomMeta.matchStartRound=roomMeta.round; }, setLobbyTarget(value) { selectedTarget=value; renderLobbyTarget(); }, setupLobby() { roomMeta.round = 0; roomMeta.phase = \"lobby\"; }'}
   };`;
   source = globe ? source.replace('  initialize();', expose) : source + expose;
   vm.runInContext(source, context);
@@ -116,6 +116,32 @@ async function checkController(file, globe) {
       assert.ok(change.settings.timerDuration >= 10); // Existing rules remain compatible.
       assert.equal(change['meta/deadline'] - change['meta/startedAt'], Number(seconds) * 1000);
     }
+  }
+  if (!globe) {
+    const fixed = {mode:'hard',scoreGoal:9000,timerEnabled:true,timerSeconds:7,blurEnabled:true};
+    context.test.setup({}, fixed, false, 'lobby');
+    context.test.renderRoom();
+    assert.equal(elements.get('roomMatchSettings').disabled,true);
+    assert.equal(elements.get('roomMatchSettings').classList.contains('hidden'),true);
+    assert.equal(elements.get('playerNameSettings').classList.contains('hidden'),true);
+    assert.equal(elements.get('roomSettingsSummary').classList.contains('hidden'),true);
+    elements.get('roomMode').value='easy';
+    elements.get('roomTimerEnabled').checked=false;
+    elements.get('roomTimerDuration').value='61';
+    elements.get('roomBlurEnabled').checked=false;
+    elements.get('roomScoreGoal').value='100';
+    await context.test.startRound();
+    const saved=updates.at(-1).settings;
+    for (const key of Object.keys(fixed)) assert.equal(saved[key],fixed[key]);
+    const beforeName=updates.length;
+    await context.test.changeName();
+    assert.equal(updates.length,beforeName);
+    context.test.newMatch();
+    context.test.renderRoom();
+    assert.equal(elements.get('roomMatchSettings').disabled,false);
+    assert.equal(elements.get('roomMatchSettings').classList.contains('hidden'),false);
+    assert.equal(elements.get('playerNameInput').disabled,false);
+    assert.equal(elements.get('playerNameSettings').classList.contains('hidden'),false);
   }
   context.test.setup(players,settings,true,'aiming');
   await context.test.submitLine(raw);
