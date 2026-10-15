@@ -143,6 +143,8 @@ const map = new maplibregl.Map({
   touchZoomRotate: true
 });
 
+window.BussoleGlobeMarkerSync.attach(map, () => [playerMarker, targetMarker]);
+
 const playerBlur = window.BussolePlayerBlur.create(
   document.getElementById('globeMap'), point => map.project([point[1], point[0]]), destLatLng
 );
@@ -331,7 +333,7 @@ function updatePlayerMarker() {
   if (!mapReady) return;
   const lngLat = [normalizeLongitude(playerLatLng[1]), playerLatLng[0]];
   if (!playerMarker) {
-    playerMarker = new maplibregl.Marker({ element: markerElement('player'), anchor: 'center' })
+    playerMarker = new maplibregl.Marker({ element: markerElement('player'), anchor: 'center', subpixelPositioning: true })
       .setLngLat(lngLat)
       .addTo(map);
   } else {
@@ -343,7 +345,7 @@ function updateTargetMarker() {
   if (!mapReady || !targetLatLng) return;
   const lngLat = [normalizeLongitude(targetLatLng[1]), targetLatLng[0]];
   if (!targetMarker) {
-    targetMarker = new maplibregl.Marker({ element: markerElement('target'), anchor: 'center' })
+    targetMarker = new maplibregl.Marker({ element: markerElement('target'), anchor: 'center', subpixelPositioning: true })
       .setLngLat(lngLat)
       .addTo(map);
   } else {
