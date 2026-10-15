@@ -10,7 +10,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-const EXPLORERS = window.BussoleExplorers.catalogue.map(explorer => explorer.name);
 const COLOURS = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#00a6a6', '#f781bf', '#6b4c2a'];
 const ERROR_COLOURS = ['#ff8587', '#86c5f4', '#92dc8f', '#d29ddd', '#ffc06a', '#70dada', '#ffc0df', '#b99a78'];
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -114,7 +113,7 @@ async function addPublicPlayer(code, meta, currentPlayers) {
   const slot = await reservePublicSeat(code, meta, currentPlayers);
   const previous = currentPlayers[user.uid];
   if (previous?.slotId === String(slot)) return;
-  const newPlayer = { ...playerTemplate(slot, (meta.round || 0) + 1), slotId: String(slot) };
+  const newPlayer = { ...playerTemplate(slot, (meta.round || 0) + 1, meta.explorerOrder), slotId: String(slot) };
   try { await set(ref(db, `rooms/${code}/players/${user.uid}`), newPlayer); }
   catch (error) {
     await runTransaction(ref(db, `rooms/${code}/seats/${slot}`), owner => owner?.uid === user.uid ? null : undefined).catch(() => {});
@@ -250,9 +249,9 @@ function ensureUser() {
   return authRequest;
 }
 
-function playerTemplate(index, eligibleRound = 1) {
+function playerTemplate(index, eligibleRound = 1, explorerOrder) {
   return {
-    name: EXPLORERS[index] || `Explorer ${index + 1}`,
+    ...window.BussoleExplorers.identity(index, explorerOrder),
     colorIndex: index,
     connected: true,
     joinedAt: Date.now(),
@@ -275,11 +274,15 @@ async function createRoom(visibility = 'private') {
       const roomRef = ref(db, `rooms/${code}`);
       const existing = await get(ref(db, `rooms/${code}/meta`));
       if (existing.exists() && (visibility === 'public' || existing.val().visibility === 'public')) { code = null; continue; }
-      const newPlayer = playerTemplate(randomIndex(MAX_PLAYERS), 1);
+      // A room-specific shuffle makes names independent of the eight colours.
+      // Shared slot assignments also prevent duplicate defaults on concurrent
+      // public joins, whose colour slots are already reserved atomically.
+      const explorerOrder = window.BussoleExplorers.createOrder(randomIndex);
+      const newPlayer = playerTemplate(randomIndex(MAX_PLAYERS), 1, explorerOrder);
       if (visibility === 'public') newPlayer.slotId = String(newPlayer.colorIndex);
       if (!existing.exists()) {
         await set(roomRef, {
-          meta: { hostId: user.uid, visibility, phase: 'lobby', round: 0, createdAt: Date.now(), lastActiveAt: Date.now() },
+          meta: { hostId: user.uid, visibility, explorerOrder, phase: 'lobby', round: 0, createdAt: Date.now(), lastActiveAt: Date.now() },
           settings: { mode: 'medium', mapStyle: initialMapStyle, timerEnabled: false, timerDuration: 60, scoreGoal: 5000, blurEnabled: false },
           players: { [user.uid]: newPlayer },
           ...(visibility === 'public' ? { seats: { [newPlayer.colorIndex]: { uid: user.uid, claimedAt: serverTimestamp() } } } : {})
@@ -300,7 +303,8 @@ async function createRoom(visibility = 'private') {
           createdAt: Date.now(),
           lastActiveAt: Date.now(),
           deadline: null,
-          matchStartRound: 0
+          matchStartRound: 0,
+          explorerOrder
         });
         await set(ref(db, `rooms/${code}/settings`), {
           mode: 'medium', mapStyle: initialMapStyle, timerEnabled: false, timerDuration: 60, scoreGoal: 5000, blurEnabled: false
@@ -351,7 +355,7 @@ async function joinRoom() {
       const used = new Set(Object.values(currentPlayers).map(player => player.colorIndex));
       const available = [...Array(MAX_PLAYERS).keys()].filter(candidate => !used.has(candidate));
       const index = available[randomIndex(available.length)] ?? 0;
-      await set(ref(db, `rooms/${code}/players/${user.uid}`), playerTemplate(index, (joinedMeta.round || 0) + 1));
+      await set(ref(db, `rooms/${code}/players/${user.uid}`), playerTemplate(index, (joinedMeta.round || 0) + 1, joinedMeta.explorerOrder));
     }
     await enterRoom(code);
   } catch (error) {
@@ -494,11 +498,12 @@ function renderPlayers() {
         PRESENCE_GRACE_MS - (Date.now() - Number(player.lastSeenAt))
       );
     }
-    if (player.name === EXPLORERS[player.colorIndex]) {
+    const explorerId = window.BussoleExplorers.defaultId(player);
+    if (explorerId !== null) {
       const info = document.createElement('button');
       info.type = 'button'; info.className = 'explorer-info'; info.textContent = 'i';
-      info.setAttribute('aria-label', `About ${EXPLORERS[player.colorIndex]}`);
-      info.addEventListener('click', () => window.BussoleExplorers.open(player.colorIndex, info));
+      info.setAttribute('aria-label', `About ${window.BussoleExplorers.catalogue[explorerId].name}`);
+      info.addEventListener('click', () => window.BussoleExplorers.open(explorerId, info));
       item.appendChild(info);
     }
     roomPlayers.appendChild(item);

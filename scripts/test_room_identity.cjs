@@ -12,6 +12,7 @@ function fixture({resume=false,known=true}={}){
   async set(path,value){writes.push({path,value})},
   window:{addEventListener(){},BussoleGame:{registerMultiplayer(){}},BussoleExplorers:{catalogue:[{name:'Magellan'}]},BussoleRoundTimer:{create(){return{}}}}
  });
+ vm.runInContext(fs.readFileSync('explorers.js','utf8'),context);
  const source=fs.readFileSync('multiplayer.js','utf8').replace(/^import[\s\S]*?;\s*/gm,'').replace('    joinRoom();','    globalThis.autoResumePending=true;');
  vm.runInContext(source+`;enterRoom=async code=>{globalThis.entered=code};globalThis.test={ensureUser,joinRoom};`,context);
  return{context,auth,writes,signins:()=>signins,release:()=>release(),elements};
