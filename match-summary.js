@@ -25,15 +25,20 @@
   function render() {
     if(!ready)return;
     clear();
-    const personal=view==='personal'||report.publicRoom;
+    const personal=view!=='room'||report.publicRoom;
     const chosen=personal?report.rounds:[report.rounds[selectedRound]];
     byId('roundPicker').classList.toggle('hidden',personal);
     for(const button of byId('summaryRound').querySelectorAll('button')) {
       const selected=Number(button.dataset.roundIndex)===selectedRound;
       button.classList.toggle('selected',selected);button.setAttribute('aria-pressed',String(selected));
     }
-    byId('personalView').classList.toggle('selected',personal);
+    const statistics=view==='statistics';
+    byId('statisticsPanel').classList.toggle('hidden',!statistics);
+    byId('summaryStats').classList.toggle('hidden',statistics);
+    byId('statisticsView').classList.toggle('selected',statistics);
+    byId('personalView').classList.toggle('selected',personal&&!statistics);
     byId('roomView').classList.toggle('selected',!personal);
+    for(const id of ['personalView','roomView','statisticsView'])byId(id).setAttribute('aria-pressed',String(byId(id).classList.contains('selected')));
     const bounds=[];let total=0,count=0;
     chosen.forEach(round=>{
       const target=[round.target.lat,round.target.lon];bounds.push(target);
@@ -67,10 +72,32 @@
       map.easeTo({center:[center[1],center[0]],zoom:Math.max(0,Math.min(9,Math.log2(Math.PI/radius)-.9)),bearing:0,pitch:0,duration:650,padding:{top:Math.min(byId('summaryStatus').closest('section').getBoundingClientRect().height+20,window.innerHeight*.45),left:20,right:20,bottom:30},retainPadding:false});
     }
   }
+  function renderStatistics(stats) {
+    byId('statisticsCount').textContent=`${stats.completed} of ${stats.rounds} rounds completed · ${stats.missed} without a guess (excluded).`;
+    const format=(value,unit,signed=false)=>value===null?'—':`${signed&&Math.round(value*10)>0?'+':''}${(Math.round(value*10)/10||0).toFixed(1)}${unit}`;
+    const metrics=[
+      ['Mean relative error',stats.relativeError,'%',false,stats.relativeCount,'Final error divided by target distance. Lower is better.'],
+      ['Mean absolute angle error',stats.absoluteAngle,'°',false,stats.angleCount,'Direction error, regardless of side. Lower is better.'],
+      ['Directional bias',stats.angleBias,'°',true,stats.angleCount,'Positive: right. Negative: left.'],
+    ];
+    if(stats.proRounds)metrics.push(
+      ['Mean absolute distance error · Pro',stats.absoluteDistance,'%',false,stats.distanceCount,'Chosen distance versus target distance, regardless of short or long.'],
+      ['Distance bias · Pro',stats.distanceBias,'%',true,stats.distanceCount,'Positive: too long. Negative: too short.']
+    );
+    byId('statisticsMetrics').replaceChildren();
+    for(const [label,value,unit,signed,count,explanation] of metrics) {
+      const term=document.createElement('dt');term.textContent=label;
+      const detail=document.createElement('dd');
+      const number=document.createElement('strong');number.textContent=format(value,unit,signed);
+      const note=document.createElement('span');note.textContent=`${explanation} ${count} ${count===1?'guess':'guesses'}.`;
+      detail.append(number,note);byId('statisticsMetrics').append(term,detail);
+    }
+  }
   function initialize(data) {
     if(report||!data?.rounds?.length)return;
     report=data;
     if(report.publicRoom)report.rounds.forEach(round=>{round.entries=round.entries.filter(entry=>entry.uid===report.uid)});
+    renderStatistics(window.BussoleSummaryStatistics.calculate(report));
     view=!report.publicRoom&&parameters.get('view')==='room'?'room':'personal';
     byId('roomView').classList.toggle('hidden',report.publicRoom);
     report.rounds.forEach((round,index)=>{
@@ -83,6 +110,7 @@
       style:{version:8,sources:{satellite:{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,maxzoom:19}},layers:[{id:'space',type:'background',paint:{'background-color':'#020712'}},{id:'satellite',type:'raster',source:'satellite'}]}});
     map.on('load',()=>{map.setProjection({type:'globe'});lines=window.BussoleGlobeLines.createLayer('summary-lines');map.addLayer(lines);ready=true;render()});
   }
+  byId('statisticsView').addEventListener('click',()=>{view='statistics';render()});
   byId('personalView').addEventListener('click',()=>{view='personal';render()});
   byId('roomView').addEventListener('click',()=>{if(!report.publicRoom){view='room';render()}});
   if(embedded) {
