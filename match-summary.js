@@ -20,7 +20,7 @@
       popup?.remove();const text=document.createElement('div');text.textContent=label;
       popup=new maplibregl.Popup({offset:12,closeButton:false,closeOnClick:true}).setLngLat(position).setDOMContent(text).addTo(map);
     });
-    markers.push(new maplibregl.Marker({element,anchor:'center'}).setLngLat(position).addTo(map));
+    markers.push(new maplibregl.Marker({element,anchor:'center',subpixelPositioning:true}).setLngLat(position).addTo(map));
   }
   function render() {
     if(!ready)return;
@@ -109,6 +109,7 @@
     byId('summaryBack').href=`./?room=${encodeURIComponent(report.roomCode||'')}&resume=1`;
     map=new maplibregl.Map({container:'summaryMap',attributionControl:false,renderWorldCopies:false,center:[0,20],zoom:0,maxPitch:0,pitch:0,dragRotate:false,
       style:{version:8,sources:{satellite:{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,maxzoom:19}},layers:[{id:'space',type:'background',paint:{'background-color':'#020712'}},{id:'satellite',type:'raster',source:'satellite'}]}});
+    window.BussoleGlobeMarkerSync.attach(map,()=>markers);
     map.on('load',()=>{map.setProjection({type:'globe'});lines=window.BussoleGlobeLines.createLayer('summary-lines');map.addLayer(lines);ready=true;render()});
   }
   byId('statisticsView').addEventListener('click',()=>{view='statistics';render()});
