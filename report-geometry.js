@@ -130,7 +130,18 @@ function measure(submission,target,mode){
  const contact=mode==='hard'?route.at(-1):nearestPointOnLine(destination,route).point;
  const errorMeters=angleBetween(toUnitVector(contact),toUnitVector(destination))*EARTH_RADIUS;
  const initialDistance=angleBetween(toUnitVector([submission.lat,submission.lon]),toUnitVector(destination))*EARTH_RADIUS;
- return {route,errorArc:greatCircleArcBetween(contact,destination),contact,errorMeters,points:root.BussoleScoring.points(errorMeters,initialDistance)};
+ const origin=toUnitVector([submission.lat,submission.lon]);
+ const destinationVector=toUnitVector(destination);
+ const crossLength=Math.hypot(...cross(origin,destinationVector));
+ const phi1=submission.lat*Math.PI/180,phi2=target.lat*Math.PI/180;
+ const deltaLon=(target.lon-submission.lon)*Math.PI/180;
+ // Coincident and antipodal points have no unique initial bearing.
+ const bearing=crossLength<1e-10?null:Math.atan2(
+   Math.sin(deltaLon)*Math.cos(phi2),
+   Math.cos(phi1)*Math.sin(phi2)-Math.sin(phi1)*Math.cos(phi2)*Math.cos(deltaLon)
+ )*180/Math.PI;
+ const angleError=bearing===null?null:((submission.heading-bearing+180)%360+360)%360-180;
+ return {initialDistance,angleError,route,errorArc:greatCircleArcBetween(contact,destination),contact,errorMeters,points:root.BussoleScoring.points(errorMeters,initialDistance)};
 }
 root.BussoleReportGeometry={measure,toUnitVector,vectorToLatLng,normalizeVector,angleBetween};
 })(window);
