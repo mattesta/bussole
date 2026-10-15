@@ -781,6 +781,8 @@ function showSuggestions(results) {
 }
 
 async function fetchSearchResults(query, limit = 5) {
+  const surprise = window.BussoleRoundTargets.searchEasterEgg(query);
+  if (surprise) return [{lat: surprise.lat, lon: surprise.lon, display_name: surprise.label}];
   const response = await fetch(
     `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=${limit}`,
     { headers: { 'Accept-Language': 'en' } }

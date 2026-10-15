@@ -21,8 +21,11 @@
 .maplibregl-popup-content {padding-right:12px;}
 #statisticsPanel h2 {font-size:17px;margin:16px 0 8px;}
 #statisticsMetrics {margin:12px 0;}
-#statisticsMetrics dt {font-size:13px;color:var(--ui-muted);margin-top:14px;}
+#statisticsMetrics dt {font-size:13px;font-weight:700;color:white;margin-top:14px;}
 #statisticsMetrics dd {margin:4px 0 0;}
 #statisticsMetrics strong {font-size:23px;font-variant-numeric:tabular-nums;}
 #statisticsMetrics dd span {display:block;font-size:12px;line-height:1.4;color:var(--ui-muted);margin-top:4px;}
 .summary-panel .statistics-note {font-size:12px;}
+
+.summary-panel nav {display:flex;flex-wrap:nowrap;gap:6px;}
+.summary-panel nav button {flex:1;min-width:0;white-space:nowrap;font-size:13px;padding:8px 6px;}
