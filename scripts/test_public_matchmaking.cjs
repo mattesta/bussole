@@ -31,6 +31,16 @@ function controller(uid, state) {
   a.test.setup('a',race.rooms.BBBBBB.meta,race.rooms.BBBBBB.players);b.test.setup('b',race.rooms.BBBBBB.meta,race.rooms.BBBBBB.players);
   const results=await Promise.allSettled([a.test.reservePublicSeat('BBBBBB',race.rooms.BBBBBB.meta,race.rooms.BBBBBB.players),b.test.reservePublicSeat('BBBBBB',race.rooms.BBBBBB.meta,race.rooms.BBBBBB.players)]);
   assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+  const pair=fixture();
+  delete pair.rooms.BBBBBB.players.p6;delete pair.rooms.BBBBBB.seats[6];
+  pair.rooms.BBBBBB.meta.explorerOrder=[...Array(30).keys()].reverse();
+  const first=controller('first',pair),second=controller('second',pair);
+  await Promise.all([first.test.joinPublicRoom(),second.test.joinPublicRoom()]);
+  const newcomers=['first','second'].map(uid=>pair.rooms.BBBBBB.players[uid]);
+  assert.equal(new Set(newcomers.map(p=>p.colorIndex)).size,2);
+  assert.equal(new Set(newcomers.map(p=>p.explorerId)).size,2);
+  for(const p of newcomers){assert.equal(p.explorerId,29-p.colorIndex);assert.equal(p.name,first.window.BussoleExplorers.catalogue[p.explorerId].name);}
+  assert.equal(Object.keys(pair.rooms.BBBBBB.players).length,8);
   const empty=controller('solo',{publicRooms:{},rooms:{}});await empty.test.joinPublicRoom();assert.equal(empty.created,'public');
   const denied=controller('solo',{denied:true,rooms:{}});await denied.test.joinPublicRoom();assert.equal(denied.created,undefined);
   const full=Object.fromEntries([...Array(8)].map((_,i)=>[i,{connected:true}]));
