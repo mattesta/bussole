@@ -34,6 +34,7 @@
     }
     const statistics=view==='statistics';
     byId('statisticsPanel').classList.toggle('hidden',!statistics);
+    byId('summaryStatus').classList.toggle('hidden',statistics);
     byId('summaryStats').classList.toggle('hidden',statistics);
     byId('statisticsView').classList.toggle('selected',statistics);
     byId('personalView').classList.toggle('selected',personal&&!statistics);
@@ -73,23 +74,23 @@
     }
   }
   function renderStatistics(stats) {
-    byId('statisticsCount').textContent=`${stats.completed} of ${stats.rounds} rounds completed · ${stats.missed} without a guess (excluded).`;
+    byId('statisticsCount').textContent=`${stats.completed} of ${stats.rounds} rounds completed · ${stats.missed} without a guess (excluded).${report.partial?' Earlier rounds are missing from this report.':''}`;
     const format=(value,unit,signed=false)=>value===null?'—':`${signed&&Math.round(value*10)>0?'+':''}${(Math.round(value*10)/10||0).toFixed(1)}${unit}`;
     const metrics=[
-      ['Mean relative error',stats.relativeError,'%',false,stats.relativeCount,'Final error divided by target distance. Lower is better.'],
-      ['Mean absolute angle error',stats.absoluteAngle,'°',false,stats.angleCount,'Direction error, regardless of side. Lower is better.'],
-      ['Directional bias',stats.angleBias,'°',true,stats.angleCount,'Positive: right. Negative: left.'],
+      ['Mean relative error',stats.relativeError,'%',false,'Final error divided by target distance. Lower is better.'],
+      ['Mean absolute angle error',stats.absoluteAngle,'°',false,'Direction error, regardless of side. Lower is better.'],
+      ['Directional bias',stats.angleBias,'°',true,'Positive: right. Negative: left.'],
     ];
     if(stats.proRounds)metrics.push(
-      ['Mean absolute distance error · Pro',stats.absoluteDistance,'%',false,stats.distanceCount,'Chosen distance versus target distance, regardless of short or long.'],
-      ['Distance bias · Pro',stats.distanceBias,'%',true,stats.distanceCount,'Positive: too long. Negative: too short.']
+      ['Mean absolute distance error · Pro',stats.absoluteDistance,'%',false,'Chosen distance versus target distance, regardless of short or long.'],
+      ['Distance bias · Pro',stats.distanceBias,'%',true,'Positive: too long. Negative: too short.']
     );
     byId('statisticsMetrics').replaceChildren();
-    for(const [label,value,unit,signed,count,explanation] of metrics) {
+    for(const [label,value,unit,signed,explanation] of metrics) {
       const term=document.createElement('dt');term.textContent=label;
       const detail=document.createElement('dd');
       const number=document.createElement('strong');number.textContent=format(value,unit,signed);
-      const note=document.createElement('span');note.textContent=`${explanation} ${count} ${count===1?'guess':'guesses'}.`;
+      const note=document.createElement('span');note.textContent=explanation;
       detail.append(number,note);byId('statisticsMetrics').append(term,detail);
     }
   }

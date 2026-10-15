@@ -726,6 +726,12 @@ async function selectRandomTarget() {
 async function searchTarget() {
   const query = byId('roomTargetInput').value.trim();
   if (!query) return;
+  const surprise = window.BussoleRoundTargets.searchEasterEgg(query);
+  if (surprise) {
+    await saveTarget(surprise);
+    roomMessage.textContent = 'Target selected. Ready to start.';
+    return;
+  }
   roomMessage.textContent = 'Searching…';
   const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`, { headers: { 'Accept-Language': 'en' } });
   const matches = await response.json();
