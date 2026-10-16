@@ -167,9 +167,6 @@ map.on('load', () => {
 
   mapReady = true;
   setMapInteraction(false);
-  if (typeof map.touchZoomRotate.disableRotation === 'function') {
-    map.touchZoomRotate.disableRotation();
-  }
   updatePlayerMarker();
   frameAimingView(false);
   // Geolocation may prompt without a tap. iOS motion permission may not:
@@ -374,9 +371,9 @@ function setMapInteraction(enabled) {
     if (enabled) handler.enable(handler === map.dragPan ? GLOBE_DRAG_INERTIA : undefined);
     else handler.disable();
   }
-  if (enabled && typeof map.touchZoomRotate.disableRotation === 'function') {
-    map.touchZoomRotate.disableRotation();
-  }
+  // Aim follows the phone compass. After reveal, allow pinch/twist inspection.
+  if (enabled) map.touchZoomRotate.enableRotation();
+  else map.touchZoomRotate.disableRotation();
 }
 
 function weightedRandom(items) {
@@ -583,7 +580,7 @@ function showPrototypeLine() {
   globeLines.setLine('prototype-error', errorArc, '#facf0a');
   const initialDistance = angleBetween(toUnitVector(playerLatLng), toUnitVector(targetLatLng)) * EARTH_RADIUS;
   errorEl.textContent = `${window.BussoleScoring.points(errorMeters, initialDistance)} / 1000 points · Error: ${(errorMeters / 1000).toFixed(1)} km`;
-  statusEl.textContent = `Line locked at ${Math.round(heading)}°. Drag the globe to inspect it.`;
+  statusEl.textContent = `Line locked at ${Math.round(heading)}°. Drag or rotate with two fingers to inspect.`;
   lineRevealed = true;
   updatePlayerBlur();
   if (!multiplayerMode) stopSoloTimer();
@@ -647,7 +644,7 @@ function renderMultiplayerResults(entries, roundTarget, mode) {
   updateAccessPanel();
   setMapInteraction(true);
   frameResult(boundsPoints);
-  statusEl.textContent = 'All routes revealed. Drag the globe to inspect them.';
+  statusEl.textContent = 'All routes revealed. Drag or rotate with two fingers to inspect.';
   return results.sort((first, second) =>
     (first.errorMeters ?? Infinity) - (second.errorMeters ?? Infinity)
   );
