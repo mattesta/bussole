@@ -65,6 +65,8 @@ let revealSubscription = null;
 let timerHandle = null;
 let leaving = false;
 let presenceRefreshPromise = null;
+let presenceRefreshQueued = false;
+let databaseConnected = false;
 let presenceUiTimer = null;
 let hostTransferTimer = null;
 let directoryTimer = null;
@@ -191,7 +193,7 @@ function roomPath(suffix = '') { return `rooms/${roomCode}${suffix ? `/${suffix}
 function isPlayerOnline(player) {
   if (player?.connected !== false) return true;
   const lastSeenAt = Number(player?.lastSeenAt) || 0;
-  return lastSeenAt > 0 && Date.now() - lastSeenAt < PRESENCE_GRACE_MS;
+  return lastSeenAt > 0 && serverNow() - lastSeenAt < PRESENCE_GRACE_MS;
 }
 function compactCode(value) { return value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6); }
 function displayCode(value) { return value.match(/.{1,2}/g)?.join('-') || value; }
@@ -220,21 +222,28 @@ function updateTimerSettingsVisibility() {
 }
 
 async function refreshPresence() {
-  if (!roomCode || !user || leaving) return;
-  if (presenceRefreshPromise) return presenceRefreshPromise;
+  if (!roomCode || !user || leaving || roomMeta?.phase === 'closed') return;
+  if (presenceRefreshPromise) { presenceRefreshQueued = true; return presenceRefreshPromise; }
   const activeCode = roomCode;
   const activeUserId = user.uid;
+  let saved = false;
   presenceRefreshPromise = (async () => {
-    if (disconnectHandle) await disconnectHandle.cancel().catch(() => {});
     if (roomCode !== activeCode || leaving) return;
     const playerRef = ref(db, `rooms/${activeCode}/players/${activeUserId}`);
     disconnectHandle = onDisconnect(playerRef);
     await disconnectHandle.update({ connected: false, lastSeenAt: serverTimestamp() });
-    if (roomCode === activeCode && !leaving) {
+    if (roomCode === activeCode && !leaving && roomMeta?.phase !== 'closed') {
       await update(playerRef, { connected: true, lastSeenAt: serverTimestamp() });
+      saved = true;
     }
   })().catch(error => console.warn('Could not refresh multiplayer presence.', error))
-    .finally(() => { presenceRefreshPromise = null; });
+    .finally(() => {
+      presenceRefreshPromise = null;
+      const retry = presenceRefreshQueued;
+      presenceRefreshQueued = false;
+      if (saved && retry && roomCode === activeCode && !leaving && databaseConnected && document.visibilityState === 'visible' &&
+          players[activeUserId]?.connected === false && Number(players[activeUserId].lastSeenAt) > 0) refreshPresence();
+    });
   return presenceRefreshPromise;
 }
 
@@ -341,8 +350,13 @@ async function joinRoom() {
     if (resumeRequested && !currentPlayers[user.uid]) {
       throw new Error('Your player could not be restored. Go Home and rejoin the room.');
     }
-    const hasConnectedPlayer = Object.values(currentPlayers).some(player => player.connected);
-    const canResumeOwnSeat = resumeRequested && currentPlayers[user.uid] && isPlayerOnline(currentPlayers[user.uid]);
+    // Sending an invite often backgrounds Safari. A recent disconnect is not
+    // the same as explicitly leaving; use the same grace as the lobby display.
+    const hasConnectedPlayer = Object.values(currentPlayers).some(isPlayerOnline);
+    const ownSeat = currentPlayers[user.uid];
+    const canResumeOwnSeat = ownSeat && (isPlayerOnline(ownSeat) || (
+      Number(ownSeat.lastSeenAt) > 0 && serverNow() - Number(ownSeat.lastSeenAt) < 120000
+    ));
     if (joinedMeta.phase === 'closed' || (!hasConnectedPlayer && !canResumeOwnSeat)) {
       throw new Error('This room is no longer active. Ask the host to create a new room.');
     }
@@ -383,7 +397,8 @@ async function enterRoom(code) {
   history.replaceState(null, '', `${location.pathname}?room=${displayCode(code)}`);
 
   subscriptions.push(onValue(ref(db, '.info/connected'), snapshot => {
-    if (snapshot.val() === true) refreshPresence();
+    databaseConnected = snapshot.val() === true;
+    if (databaseConnected) refreshPresence();
   }));
   await refreshPresence();
   subscriptions.push(onValue(ref(db, '.info/serverTimeOffset'), snapshot => { serverTimeOffset = Number(snapshot.val()) || 0; }));
@@ -398,6 +413,10 @@ async function enterRoom(code) {
   }));
   subscriptions.push(onValue(ref(db, roomPath('players')), snapshot => {
     players = snapshot.val() || {};
+    // An older page's delayed onDisconnect can arrive after navigation. The
+    // currently visible, connected page must restore its own existing seat.
+    if (databaseConnected && document.visibilityState === 'visible' &&
+        players[user?.uid]?.connected === false && Number(players[user.uid].lastSeenAt) > 0) refreshPresence();
     renderPlayers();
     publishPublicLobby();
     maybeAutoStart();
@@ -495,7 +514,7 @@ function renderPlayers() {
     if (player.connected === false && online) {
       nextPresenceExpiry = Math.min(
         nextPresenceExpiry,
-        PRESENCE_GRACE_MS - (Date.now() - Number(player.lastSeenAt))
+        PRESENCE_GRACE_MS - (serverNow() - Number(player.lastSeenAt))
       );
     }
     const explorerId = window.BussoleExplorers.defaultId(player);
@@ -792,7 +811,7 @@ async function leaveRoom() {
   const previousUserId = user?.uid;
   const previousDisconnectHandle = disconnectHandle;
   const shouldCloseRoom = !Object.entries(players).some(([uid, player]) =>
-    uid !== previousUserId && player.connected
+    uid !== previousUserId && isPlayerOnline(player)
   );
   clearTimeout(timerHandle);
   clearInterval(directoryTimer);
@@ -813,6 +832,7 @@ async function leaveRoom() {
   if (revealSubscription) revealSubscription();
   revealSubscription = null;
   disconnectHandle = null;
+  databaseConnected = false;
   roomCode = null; roomMeta = null; players = {}; selectedTarget = null;
   preparedRound = null; revealedRound = null;
   byId('roomTargetInput').value = '';

@@ -54,6 +54,7 @@ const showLineBtn = document.getElementById('showPrototypeLineBtn');
 const resetBtn = document.getElementById('resetPrototypeBtn');
 const distanceInputWrap = document.getElementById('distanceInputWrap');
 const distanceInput = document.getElementById('distanceInput');
+window.BussoleDistanceInput?.attach(distanceInput);
 const compassEl = document.getElementById('prototypeCompass');
 const compassNeedle = document.getElementById('prototypeCompassNeedle');
 const bearingControl = document.querySelector('.bearing-control');
@@ -544,7 +545,9 @@ function showPrototypeLine() {
   if (!mapReady || !targetLatLng) return;
   let distanceMeters = ROUTE_DISTANCE_METERS;
   if (gameMode === 'hard') {
-    const distanceKm = Number.parseFloat(distanceInput.value);
+    const distanceKm = window.BussoleDistanceInput
+      ? window.BussoleDistanceInput.parse(distanceInput.value)
+      : Number(distanceInput.value.replace(/['’‘\s]/g, '').replace(',', '.'));
     if (!Number.isFinite(distanceKm) || distanceKm <= 0) {
       statusEl.textContent = 'Enter a valid distance for Pro mode.';
       distanceInput.focus();

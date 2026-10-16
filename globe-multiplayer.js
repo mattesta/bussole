@@ -38,6 +38,10 @@ if (multiplayerMode) {
   let target;
   let players = {};
   let disconnectHandle;
+  let presenceRefreshPromise = null;
+  let presenceRefreshQueued = false;
+  let presenceReady = false;
+  let databaseConnected = false;
   let timerHandle;
   let shownRound = null;
   let leaving = false;
@@ -61,12 +65,31 @@ if (multiplayerMode) {
   }
 
   async function refreshPresence() {
-    if (!user || leaving) return;
-    if (disconnectHandle) await disconnectHandle.cancel().catch(() => {});
-    const playerRef = ref(db, roomPath(`players/${user.uid}`));
-    disconnectHandle = onDisconnect(playerRef);
-    await disconnectHandle.update({ connected: false, lastSeenAt: serverTimestamp() });
-    await update(playerRef, { connected: true, lastSeenAt: serverTimestamp(), ready: true });
+    if (!user || leaving || !presenceReady || roomMeta?.phase === 'closed') return;
+    if (presenceRefreshPromise) { presenceRefreshQueued = true; return presenceRefreshPromise; }
+    const activeUserId = user.uid;
+    let saved = false;
+    presenceRefreshPromise = (async () => {
+      const playerRef = ref(db, roomPath(`players/${activeUserId}`));
+      // Re-arming the same path replaces its disconnect update. Cancelling
+      // first can stall recovery while the previous connection is suspended.
+      disconnectHandle = onDisconnect(playerRef);
+      await disconnectHandle.update({ connected: false, lastSeenAt: serverTimestamp() });
+      if (!leaving && user?.uid === activeUserId && roomMeta?.phase !== 'closed') {
+        await update(playerRef, { connected: true, lastSeenAt: serverTimestamp(), ready: true });
+        saved = true;
+      }
+    })().catch(error => {
+      console.warn('Could not refresh multiplayer presence.', error);
+      window.BussoleGlobe.setStatus('Could not reconnect to the room. Check your connection, then retry.');
+    }).finally(() => {
+      presenceRefreshPromise = null;
+      const retry = presenceRefreshQueued;
+      presenceRefreshQueued = false;
+      if (saved && retry && !leaving && databaseConnected && document.visibilityState === 'visible' &&
+          players[user?.uid]?.connected === false && Number(players[user.uid].lastSeenAt) > 0) refreshPresence();
+    });
+    return presenceRefreshPromise;
   }
 
   function updateProgress() {
@@ -263,7 +286,7 @@ if (multiplayerMode) {
     clearTimeout(hostTransferTimer);
     unsubscribers.forEach(unsubscribe => unsubscribe());
     const otherOnlinePlayers = Object.entries(players).some(([uid, player]) =>
-      uid !== user?.uid && player.connected
+      uid !== user?.uid && window.BussolePublicRooms.online(player, Date.now() + serverTimeOffset)
     );
     window.BussoleGlobe.setStatus('Leaving room…');
     const presenceSaved = await Promise.race([
@@ -311,12 +334,19 @@ if (multiplayerMode) {
       updateNextRoundState();
       window.BussoleGlobe.setBlurEnabled(settings.blurEnabled);
       window.BussoleGlobe.setMultiplayerTarget(target);
+      presenceReady = true;
+      unsubscribers.push(onValue(ref(db, '.info/connected'), snapshot => {
+        databaseConnected = snapshot.val() === true;
+        if (databaseConnected) refreshPresence();
+      }));
       await refreshPresence();
       updateProgress();
       window.BussoleGlobe.setStatus(`Room ${displayCode(roomCode)} · Aim, then press Go!`);
 
       unsubscribers.push(onValue(ref(db, roomPath('players')), playerSnapshot => {
         players = playerSnapshot.val() || {};
+        if (databaseConnected && document.visibilityState === 'visible' &&
+            players[user?.uid]?.connected === false && Number(players[user.uid].lastSeenAt) > 0) refreshPresence();
         countdown.sync(roomMeta);
         updateProgress();
         tryHostTransfer();
