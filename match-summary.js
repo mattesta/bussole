@@ -107,8 +107,9 @@
       button.addEventListener('click',()=>{selectedRound=index;render()});byId('summaryRound').appendChild(button);
     });
     byId('summaryBack').href=`./?room=${encodeURIComponent(report.roomCode||'')}&resume=1`;
-    map=new maplibregl.Map({container:'summaryMap',attributionControl:false,renderWorldCopies:false,center:[0,20],zoom:0,maxPitch:0,pitch:0,dragRotate:false,
+    map=new maplibregl.Map({container:'summaryMap',attributionControl:false,renderWorldCopies:false,center:[0,20],zoom:0,maxPitch:0,pitch:0,dragRotate:false,touchZoomRotate:true,
       style:{version:8,sources:{satellite:{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,maxzoom:19}},layers:[{id:'space',type:'background',paint:{'background-color':'#020712'}},{id:'satellite',type:'raster',source:'satellite'}]}});
+    map.touchZoomRotate.enableRotation();
     window.BussoleGlobeMarkerSync.attach(map,()=>markers);
     map.on('load',()=>{map.setProjection({type:'globe'});lines=window.BussoleGlobeLines.createLayer('summary-lines');map.addLayer(lines);ready=true;render()});
   }
