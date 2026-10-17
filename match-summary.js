@@ -33,6 +33,7 @@
       button.classList.toggle('selected',selected);button.setAttribute('aria-pressed',String(selected));
     }
     const statistics=view==='statistics';
+    document.querySelector('.summary-panel').classList.toggle('statistics-mode',statistics);
     byId('statisticsPanel').classList.toggle('hidden',!statistics);
     byId('summaryStatus').classList.toggle('hidden',statistics);
     byId('summaryStats').classList.toggle('hidden',statistics);
@@ -79,19 +80,22 @@
     const metrics=[
       ['Mean relative error',stats.relativeError,'%',false,'Final error divided by target distance. Lower is better.'],
       ['Mean absolute angle error',stats.absoluteAngle,'°',false,'Direction error, regardless of side. Lower is better.'],
-      ['Directional bias',stats.angleBias,'°',true,'Positive: right. Negative: left.'],
+      ['Directional bias',stats.angleBias,'°',true,stats.angleCount&&stats.angleBias===null?'No clear mean direction: errors balance around the circle.':'Circular mean. Positive: right. Negative: left.','angle'],
     ];
     if(stats.proRounds)metrics.push(
       ['Mean absolute distance error · Pro',stats.absoluteDistance,'%',false,'Chosen distance versus target distance, regardless of short or long.'],
-      ['Distance bias · Pro',stats.distanceBias,'%',true,'Positive: too long. Negative: too short.']
+      ['Distance bias · Pro',stats.distanceBias,'%',true,'Positive: too long. Negative: too short.','distance']
     );
     byId('statisticsMetrics').replaceChildren();
-    for(const [label,value,unit,signed,explanation] of metrics) {
+    for(const [label,value,unit,signed,explanation,chart] of metrics) {
       const term=document.createElement('dt');term.textContent=label;
       const detail=document.createElement('dd');
       const number=document.createElement('strong');number.textContent=format(value,unit,signed);
       const note=document.createElement('span');note.textContent=explanation;
-      detail.append(number,note);byId('statisticsMetrics').append(term,detail);
+      detail.append(number,note);
+      if(chart==='angle'&&window.BussoleSummaryCharts)detail.appendChild(window.BussoleSummaryCharts.angle(stats.angleSamples,stats.angleBias));
+      if(chart==='distance'&&window.BussoleSummaryCharts)detail.appendChild(window.BussoleSummaryCharts.distance(stats.distanceSamples,stats.distanceBias));
+      byId('statisticsMetrics').append(term,detail);
     }
   }
   function initialize(data) {
