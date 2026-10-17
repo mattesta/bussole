@@ -8,7 +8,7 @@
   <title>Bussole! — Match summary</title>
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
   <link rel="stylesheet" href="globe-prototype.css?v=24">
-  <link rel="stylesheet" href="match-summary.css?v=5">
+  <link rel="stylesheet" href="match-summary.css?v=6">
 </head>
 <body>
   <main id="summaryMap" aria-label="Match summary globe"></main>
@@ -20,7 +20,7 @@
       <h2>Your statistics</h2>
       <p id="statisticsCount"></p>
       <dl id="statisticsMetrics"></dl>
-      <p class="statistics-note">Each guess has equal weight. Percentages use the shortest distance from your starting point to the target. Positive angles mean clockwise (right); negative angles mean counterclockwise (left). Biases can cancel out, so compare them with absolute errors.</p>
+      <p class="statistics-note">Each guess has equal weight. Percentages use the shortest distance from your starting point to the target. Positive angles mean clockwise (right); negative angles mean counterclockwise (left). Distance bias can cancel out; the charts show the individual errors. The mean angle uses a circular mean.</p>
     </section>
     <ol id="summaryStats"></ol>
     <div class="summary-links"><a id="summaryBack" href="./">Back to room</a><a href="./">Home</a></div>
@@ -28,6 +28,6 @@
   <div class="summary-attribution">MapLibre · Tiles © Esri</div>
   <script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
   <script src="scoring.js?v=3"></script><script src="globe-lines.js?v=1"></script><script src="globe-marker-sync.js?v=1"></script>
-  <script src="report-geometry.js?v=2"></script><script src="summary-statistics.js?v=1"></script><script src="match-summary.js?v=8"></script>
+  <script src="report-geometry.js?v=2"></script><script src="summary-statistics.js?v=2"></script><script src="summary-charts.js?v=1"></script><script src="match-summary.js?v=9"></script>
 </body>
 </html>
