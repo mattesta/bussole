@@ -374,6 +374,7 @@ async function joinRoom() {
     await enterRoom(code);
   } catch (error) {
     if (resumeRequested) {
+      byId('roomResumeLoading').classList.add('room-resume-error');
       byId('roomResumeLoading').querySelector('span').textContent =
         'Could not return to the room. Go Home and rejoin.';
     }
