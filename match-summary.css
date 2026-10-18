@@ -36,7 +36,6 @@
 .chart-axis {stroke:#ffffff40;stroke-width:1;}
 .chart-guide {fill:none;stroke:#ffffff20;stroke-width:1;}
 .chart-target {stroke:white;stroke-width:2;stroke-dasharray:4 3;}
-.chart-guess-dot {fill:#cbd5e1;stroke:#0b1422;stroke-width:1.5;}
 .chart-guess-ray {stroke:#cbd5e1;stroke-width:1.7;opacity:.55;}
 .chart-mean-stem {stroke:#ff8587;stroke-width:1.5;}
 .chart-mean-ray {stroke:#ff8587;stroke-width:3;stroke-linecap:round;}
@@ -45,3 +44,8 @@
 
 .summary-panel.statistics-mode {max-height:calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));}
 .summary-panel.statistics-mode nav {position:sticky;top:0;z-index:1;padding:6px 0;background:#050b17;}
+.summary-chart svg {touch-action:pan-y;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
+.chart-guess-tick {stroke:#cbd5e1;stroke-width:2;stroke-linecap:round;}
+.chart-selected-stroke {stroke:white;stroke-width:4.5;stroke-linecap:round;}
+.chart-inspection-box {fill:#111c2c;stroke:#ffffff70;stroke-width:1;}
+.chart-inspection-text {fill:white;font:12px system-ui,sans-serif;}
