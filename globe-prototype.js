@@ -409,6 +409,7 @@ function updateGoButtonState() {
 }
 
 function setTarget(lat, lon, label, isRandomTarget = false) {
+  if (!multiplayerMode) window.dispatchEvent(new CustomEvent('bussole-solo-start'));
   if (!multiplayerMode) stopSoloTimer();
   targetLatLng = [lat, lon];
   targetLabel = label;
@@ -583,6 +584,10 @@ function showPrototypeLine() {
   globeLines.setLine('prototype-error', errorArc, '#facf0a');
   const initialDistance = angleBetween(toUnitVector(playerLatLng), toUnitVector(targetLatLng)) * EARTH_RADIUS;
   errorEl.textContent = `${window.BussoleScoring.points(errorMeters, initialDistance)} / 1000 points · Error: ${(errorMeters / 1000).toFixed(1)} km`;
+  window.dispatchEvent(new CustomEvent('bussole-solo-result', {detail:{
+    submission:{lat:playerLatLng[0],lon:playerLatLng[1],heading,distanceMeters},
+    target:{lat:targetLatLng[0],lon:targetLatLng[1]},mode:gameMode
+  }}));
   statusEl.textContent = `Line locked at ${Math.round(heading)}°. Drag or rotate with two fingers to inspect.`;
   lineRevealed = true;
   updatePlayerBlur();
@@ -654,6 +659,7 @@ function renderMultiplayerResults(entries, roundTarget, mode) {
 }
 
 function resetPrototype() {
+  if (!multiplayerMode) window.dispatchEvent(new CustomEvent('bussole-solo-start'));
   if (!multiplayerMode) stopSoloTimer();
   compassSubmitted = false;
   clearLines();

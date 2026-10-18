@@ -5,6 +5,7 @@ import {
   serverTimestamp, set, update
 } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js';
 import { firebaseConfig } from './firebase-config.js';
+import { beginRound, saveSample } from './account-service.js?v=1';
 
 const parameters = new URLSearchParams(location.search);
 const multiplayerMode = parameters.get('multiplayer') === '1';
@@ -29,6 +30,7 @@ if (multiplayerMode) {
   let matchReport = null;
   let resultsReady = false;
   let advancingRound = false;
+  let accountRound = Promise.resolve(null);
 
   let serverTimeOffset = 0;
   const countdown = window.BussoleRoundTimer.create(document.getElementById('globeCountdown'), document.querySelector('.target-card'), () => Date.now() + serverTimeOffset, () => {}, element => window.BussoleMobileLayout.positionTimer(element));
@@ -175,6 +177,20 @@ if (multiplayerMode) {
     const round = roomMeta.round;
     const results = window.BussoleGlobe.revealMultiplayer(entries, target, settings.mode || 'medium');
     const ranking = window.BussoleScoring.rank(results, players, round);
+    const personal = entries.find(entry => entry.uid === user.uid)?.submission;
+    if (personal) {
+      // Only the current account's scalar errors enter durable statistics.
+      const personalTarget = {...target}, personalMode = settings.mode || 'medium';
+      const recordKey = `${roomCode}:${roomMeta.createdAt}:${round}`;
+      accountRound.then(context => {
+        if (!context) return false;
+        const measured = window.BussoleReportGeometry.measure(personal, personalTarget, personalMode);
+        const sample = window.BussoleAccountStatistics.sample(measured, personal, personalMode, 'multiplayer');
+        return saveSample(context, sample, recordKey);
+      })
+        .then(saved => { if(saved)document.getElementById('accountSaveStatus').textContent = 'Statistics saved.'; })
+        .catch(() => { document.getElementById('accountSaveStatus').textContent = 'Statistics could not be saved. Check your connection.'; });
+    }
     await Promise.all(ranking.filter(result => isHost() || result.uid === user.uid).map(result =>
       runTransaction(ref(db, roomPath(`players/${result.uid}`)), player =>
         window.BussoleScoring.record(player, round, result.points)
@@ -329,6 +345,7 @@ if (multiplayerMode) {
       players = playersSnapshot.val() || {};
       if (!roomMeta || roomMeta.phase === 'closed' || !players[user.uid]) return goHome();
       if (!target) return goHome();
+      if (roomMeta.phase === 'aiming') accountRound = beginRound();
 
       window.BussoleGlobe.registerMultiplayer({ isActive: () => true, submitLine, dismissResults });
       updateNextRoundState();

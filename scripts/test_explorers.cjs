@@ -23,7 +23,10 @@ for(let id=0;id<30;id++){
  e.close();assert.equal(elements.get('explorerDialog').open,false);
 }
 const source=fs.readFileSync('multiplayer.js','utf8');
+c.preferredAccountName=null;
 vm.runInContext(source.slice(source.indexOf('function playerTemplate('),source.indexOf('async function createRoom(')),c);
 const order=e.createOrder(pick);const player=c.playerTemplate(3,2,order);
 assert.equal(player.colorIndex,3);assert.equal(player.explorerId,order[3]);assert.equal(player.name,e.catalogue[order[3]].name);assert.equal(player.eligibleRound,2);
+c.preferredAccountName='My_username';const named=c.playerTemplate(3,2,order);
+assert.equal(named.name,'My_username');assert.equal(named.colorIndex,3);assert.equal(named.explorerId,order[3]);assert.equal(e.defaultId(named),null);
 console.log('30 explorers: biographies/images, independent name/colour shuffles, 8 unique assignments, legacy identities, renamed players and all info cards passed.');

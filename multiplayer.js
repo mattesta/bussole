@@ -5,6 +5,7 @@ import {
   runTransaction, serverTimestamp, set, update
 } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js';
 import { firebaseConfig } from './firebase-config.js';
+import { roomName } from './account-service.js?v=1';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -52,6 +53,7 @@ const pageParameters = new URLSearchParams(location.search);
 const resumeRequested = pageParameters.get('resume') === '1';
 
 let user = null;
+let preferredAccountName = null;
 let roomCode = null;
 let roomMeta = null;
 let players = {};
@@ -252,6 +254,7 @@ function ensureUser() {
   if (authRequest) return authRequest;
   authRequest = (async () => {
     await auth.authStateReady();
+    preferredAccountName = await roomName();
     if (auth.currentUser) return auth.currentUser;
     return (await signInAnonymously(auth)).user;
   })().finally(() => { authRequest = null; });
@@ -261,6 +264,7 @@ function ensureUser() {
 function playerTemplate(index, eligibleRound = 1, explorerOrder) {
   return {
     ...window.BussoleExplorers.identity(index, explorerOrder),
+    ...(preferredAccountName ? {name:preferredAccountName} : {}),
     colorIndex: index,
     connected: true,
     joinedAt: Date.now(),

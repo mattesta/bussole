@@ -13,7 +13,7 @@ function controller(uid, state) {
   const write = (path,value) => { const parts=path.split('/'), key=parts.pop(); let parent=state; for(const part of parts) parent=parent[part] ||= {}; if(value===null) delete parent[key]; else parent[key]=structuredClone(value); };
   const context = vm.createContext({console:{...console,error(){}},Date,URLSearchParams,setTimeout,clearTimeout,setInterval,clearInterval,crypto:webcrypto,
     location:{search:''},document:{getElementById(id){if(!elements.has(id))elements.set(id,el());return elements.get(id)},createElement:el,addEventListener(){}},
-    firebaseConfig:{},initializeApp(){},getDatabase(){},getAuth(){return{currentUser:{uid},async authStateReady(){}}},onAuthStateChanged(){},ref(db,path){return path},serverTimestamp(){return Date.now()},
+    firebaseConfig:{},async roomName(){return null},initializeApp(){},getDatabase(){},getAuth(){return{currentUser:{uid},async authStateReady(){}}},onAuthStateChanged(){},ref(db,path){return path},serverTimestamp(){return Date.now()},
     onValue(path,callback,error,options){assert.equal(path,'.info/serverTimeOffset');assert.equal(options.onlyOnce,true);callback({val(){return 0}});return()=>{}},
     async get(path){if(path.startsWith('.info/'))throw Error('invalid token in path');if(path==='publicRooms'&&state.denied)throw Object.assign(Error('Denied'),{code:'PERMISSION_DENIED'});const value=structuredClone(read(path));return{val(){return value},exists(){return value!=null}}},
     async set(path,value){write(path,value)},async runTransaction(path,fn){const value=fn(structuredClone(read(path)));if(value===undefined)return{committed:false};write(path,value);return{committed:true}},
