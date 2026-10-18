@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Bussole — My account</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1"><link rel="icon" type="image/svg+xml" href="icon.svg?v=1">
+  <link rel="stylesheet" href="style.css?v=28"><link rel="stylesheet" href="match-summary.css?v=6"><link rel="stylesheet" href="account.css?v=1">
+</head>
+<body class="account-page">
+  <main class="account-card">
+    <header><h1>My account</h1><a href="./">Home</a></header>
+    <p id="accountStatus" role="status" aria-live="polite">Loading your account…</p>
+    <section id="accountAuth" class="hidden">
+      <div class="account-choices" role="group" aria-label="Account access"><button id="showLogin" class="selected" type="button">Sign in</button><button id="showRegister" type="button">Create account</button></div>
+      <form id="authForm">
+        <label>Email<input id="accountEmail" type="email" autocomplete="email" required maxlength="254"></label>
+        <label>Password<input id="accountPassword" type="password" autocomplete="current-password" required></label>
+        <p id="registerPrivacy" class="muted hidden">Your email stays private. Account statistics contain errors, difficulty, score and date, without your location, targets or routes. <a href="account-privacy.html">How your data is used</a></p>
+        <button id="authSubmit" class="primary" type="submit">Sign in</button>
+      </form>
+      <button id="resetPassword" class="text-button" type="button">Forgot password?</button>
+      <p><a href="./">Continue as guest</a></p>
+    </section>
+    <section id="accountDetails" class="hidden">
+      <p id="signedInEmail" class="muted"></p>
+      <section id="verificationPanel" class="hidden">
+        <h2>Verify your email</h2><p>You can play now. Statistics start saving after you verify your email; guest and earlier games are not imported.</p>
+        <div class="account-choices"><button id="resendVerification" type="button">Send email again</button><button id="checkVerification" type="button">I have verified</button></div>
+      </section>
+      <form id="profileForm">
+        <h2>Your profile</h2>
+        <label>Username<input id="accountUsername" maxlength="20" pattern="[a-zA-Z0-9_]{3,20}" autocomplete="nickname" placeholder="Optional"></label>
+        <p class="muted">3–20 letters, numbers or underscores. This is a display name, not a login, and can be changed.</p>
+        <label class="check-row"><input id="useUsernameInRooms" type="checkbox">Use my username in multiplayer rooms</label>
+        <label class="check-row"><input id="communityConsent" type="checkbox">Contribute my results to community statistics</label>
+        <p class="muted">Optional, off by default. Only pooled statistics are shown to others. No email, username, location or target is included in the comparison. Turning this off also removes your past contributions from the pool after it refreshes. <a href="account-privacy.html">Privacy details</a></p>
+        <button class="primary" type="submit">Save preferences</button>
+      </form>
+      <section id="personalStatistics">
+        <h2>Your statistics</h2>
+        <div id="modeFilters" class="account-choices" role="group" aria-label="Statistics difficulty"><button data-mode="all" class="selected" type="button">All</button><button data-mode="easy" type="button">Easy</button><button data-mode="medium" type="button">Normal</button><button data-mode="hard" type="button">Pro</button></div>
+        <div id="dateFilters" class="account-choices" role="group" aria-label="Statistics period"><button data-days="0" class="selected" type="button">All time</button><button data-days="30" type="button">30 days</button><button data-days="90" type="button">90 days</button></div>
+        <p id="personalStatsCount" class="muted"></p><dl id="personalMetrics" class="account-metrics"></dl>
+        <p class="muted">Each completed guess has equal weight. Distance percentages use the shortest start-to-target distance. Positive angles mean right; positive Pro distance errors mean too long. The mean direction is circular. DNF guesses are excluded.</p>
+        <h3>Community comparison</h3><p id="communityStatus" class="muted"></p><dl id="communityMetrics" class="account-metrics"></dl>
+      </section>
+      <section>
+        <h2>Security</h2>
+        <form id="securityForm">
+          <label>Current password<input id="currentPassword" type="password" autocomplete="current-password"></label>
+          <label>New password<input id="newPassword" type="password" autocomplete="new-password" minlength="8"></label>
+          <button id="changePassword" type="button">Change password</button>
+          <label>New email<input id="newEmail" type="email" autocomplete="email" maxlength="254"></label>
+          <button id="changeEmail" type="button">Change email</button>
+        </form>
+        <p class="muted">Changing your password, email or deleting your account requires your current password. An email change must be verified at the new address.</p>
+      </section>
+      <section>
+        <h2>Your data</h2>
+        <div class="account-data-actions"><button id="exportAccount" type="button">Export my data</button><button id="deleteStatistics" class="danger" type="button">Delete my statistics</button><button id="deleteAccount" class="danger" type="button">Delete account and all data</button><button id="signOut" type="button">Sign out</button></div>
+        <p class="muted">Deleting statistics also turns off community contributions. Published pooled statistics refresh after removal. Existing room results already shared with other players are separate from your personal account history.</p>
+      </section>
+    </section>
+    <footer><a href="account-privacy.html">Account privacy</a></footer>
+  </main>
+  <script src="account-statistics.js?v=1"></script><script src="summary-charts.js?v=2"></script><script type="module" src="account.js?v=1"></script>
+</body>
+</html>

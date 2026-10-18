@@ -23,12 +23,12 @@
   const number=value=>new Intl.NumberFormat('en',{maximumFractionDigits:1,notation:Math.abs(value)>=10000?'compact':'standard'}).format(value);
   const signed=value=>{const rounded=Math.round(value*10)/10||0;return `${rounded>0?'+':''}${number(rounded)}`;};
   function describe(element,sample,unit) {
-    element.appendChild(node('title',{},`Round ${sample.round}${sample.target?` · ${sample.target}`:''}: ${signed(sample.error)}${unit}`));
+    element.appendChild(node('title',{},`${sample.round===undefined?'Guess':`Round ${sample.round}`}${sample.target?` · ${sample.target}`:''}: ${signed(sample.error)}${unit}`));
   }
   function distance(samples,mean) {
     samples=valid(samples);
     const {figure:chart,svg}=figure('distance',132,'Relative distance errors: short to the left, long to the right, target at zero',
-      'Dots: rounds · White: target · Red diamond: mean bias. Repeated dots are stacked.');
+      'Dots: guesses · White: target · Red diamond: mean bias. Repeated dots are stacked.');
     const maximum=Math.max(1,...samples.map(sample=>Math.abs(sample.error)),Number.isFinite(mean)?Math.abs(mean):0);
     const magnitude=10**Math.floor(Math.log10(maximum));
     const extent=([1,2,5,10].find(step=>step*magnitude>=maximum)||10)*magnitude;
@@ -57,7 +57,7 @@
   function angle(samples,mean) {
     samples=valid(samples);
     const {figure:chart,svg}=figure('angle',252,'Angular errors relative to the target: negative left, positive right',
-      samples.length&&mean===null?'Each ray is a round. No clear mean direction.':'Rays: rounds · White: target · Red: circular mean.');
+      samples.length&&mean===null?'Each ray is a guess. No clear mean direction.':'Rays: guesses · White: target · Red: circular mean.');
     const cx=160,cy=128,radius=86;
     const end=degrees=>[cx+Math.sin(degrees*Math.PI/180)*radius,cy-Math.cos(degrees*Math.PI/180)*radius];
     svg.appendChild(node('circle',{cx,cy,r:radius,class:'chart-guide'}));

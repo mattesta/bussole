@@ -758,3 +758,5 @@ select:focus-visible {
 
 .room-match-settings {display:grid;gap:7px;min-width:0;margin:0;padding:0;border:0;}
 .lobby-mode.match-in-progress #roomPlayers {max-height:none;overflow:visible;}
+
+.account-home-link {display:block;margin:16px auto 0;text-align:center;color:#ffffffb3;font-size:14px;}

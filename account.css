@@ -1,0 +1,19 @@
+.account-page {min-height:100dvh;height:auto;padding:max(14px,env(safe-area-inset-top)) 12px max(24px,env(safe-area-inset-bottom));}
+.account-card {width:100%;max-width:520px;margin:0 auto;padding:18px;border:1px solid var(--ui-border);border-radius:18px;background:var(--ui-panel);}
+.account-card header {display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.account-card h1 {font-size:23px;margin:0;}.account-card h2 {font-size:18px;margin:20px 0 12px;}.account-card h3 {font-size:16px;}
+.account-card a {color:white;}.account-card p {font-size:14px;line-height:1.5;}.account-card .muted {color:var(--ui-muted);font-size:12px;}
+.account-card section section,.account-card #profileForm {padding-top:10px;border-top:1px solid var(--ui-border);margin-top:18px;}
+.account-card label {display:grid;gap:6px;margin:12px 0;font-size:14px;}
+.account-card input:not([type=checkbox]) {min-width:0;width:100%;padding:12px;border:1px solid var(--ui-border);border-radius:10px;background:var(--ui-field);color:white;font:inherit;font-size:16px;}
+.account-card button {min-height:44px;padding:9px 12px;background:var(--ui-field);color:white;border:1px solid var(--ui-border);border-radius:10px;font:inherit;font-size:14px;cursor:pointer;}
+.account-card button.selected,.account-card button.primary {background:#71181d;border-color:var(--ui-red);}
+.account-card button:disabled {opacity:.45;}.account-card .check-row {display:flex;align-items:center;gap:10px;line-height:1.5;}
+.account-card input[type=checkbox] {width:20px;height:20px;flex-shrink:0;accent-color:var(--ui-red);}
+.account-choices {display:flex;gap:6px;margin:10px 0;}.account-choices button {flex:1;min-width:0;padding:8px 5px;}
+.account-data-actions {display:grid;gap:10px;}.account-card .danger {border-color:#ff8587;color:#ffb0b1;}
+.account-card .text-button {background:transparent;border:0;text-decoration:underline;margin-top:8px;}
+#accountStatus {padding:10px 0;overflow-wrap:anywhere;}#accountStatus.error {color:#ff8587;}
+.account-metrics {margin:12px 0;}.account-metrics dt {font-size:13px;font-weight:700;margin-top:16px;}.account-metrics dd {margin:4px 0 12px;}.account-metrics dd>strong {font-size:24px;}.account-metrics dd>span {display:block;color:var(--ui-muted);font-size:12px;line-height:1.5;margin-top:4px;}
+.account-card footer {margin-top:24px;font-size:12px;color:var(--ui-muted);}.account-card footer a {color:inherit;}
+.account-home-link {display:block;margin:16px auto 0;text-align:center;color:#ffffffb3;font-size:14px;}

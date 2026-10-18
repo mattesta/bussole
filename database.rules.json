@@ -96,6 +96,61 @@
           ".validate": "$other === 'count' || $other === 'phase' || $other === 'createdAt' || $other === 'updatedAt'"
         }
       }
+    },
+    "accountData": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider === 'password'",
+        ".write": "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider === 'password'",
+        "profile": {
+          ".validate": "newData.hasChildren(['username','useInRooms','communityConsent','consentVersion','generation']) && newData.child('username').isString() && (newData.child('username').val() === '' || newData.child('username').val().matches(/^[a-zA-Z0-9_]{3,20}$/)) && newData.child('useInRooms').isBoolean() && newData.child('communityConsent').isBoolean() && (newData.child('communityConsent').val() !== true || auth.token.email_verified === true) && newData.child('consentVersion').val() === 1 && newData.child('generation').isString() && newData.child('generation').val().matches(/^[a-zA-Z0-9-]{36}$/)",
+          "$other": {
+            ".validate": "$other === 'username' || $other === 'useInRooms' || $other === 'communityConsent' || $other === 'consentVersion' || $other === 'generation'"
+          }
+        },
+        "samples": {
+          "$sample": {
+            ".validate": "auth.token.email_verified === true && $sample.matches(/^[a-zA-Z0-9-]{20,64}$/) && newData.hasChildren(['day','mode','kind','points','generation']) && root.child('accountData').child($uid).child('profile/generation').exists() && newData.child('generation').val() === root.child('accountData').child($uid).child('profile/generation').val()",
+            "generation": {
+              ".validate": "newData.isString()"
+            },
+            "day": {
+              ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= now / 86400000 + 1"
+            },
+            "mode": {
+              ".validate": "newData.isString() && newData.val().matches(/^(easy|medium|hard)$/)"
+            },
+            "kind": {
+              ".validate": "newData.isString() && newData.val().matches(/^(solo|multiplayer)$/)"
+            },
+            "points": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000 && newData.val() % 1 === 0"
+            },
+            "relativeError": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000000000"
+            },
+            "angleError": {
+              ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() < 180"
+            },
+            "distanceError": {
+              ".validate": "newData.parent().child('mode').val() === 'hard' && newData.isNumber() && newData.val() >= -100 && newData.val() <= 1000000000000"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "communityStatistics": {
+      ".read": "auth != null && auth.token.email_verified === true && auth.token.firebase.sign_in_provider === 'password'",
+      ".write": false
+    },
+    "accountInternal": {
+      ".read": false,
+      ".write": false
     }
   }
 }
