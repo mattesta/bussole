@@ -17,3 +17,5 @@
 .account-metrics {margin:12px 0;}.account-metrics dt {font-size:13px;font-weight:700;margin-top:16px;}.account-metrics dd {margin:4px 0 12px;}.account-metrics dd>strong {font-size:24px;}.account-metrics dd>span {display:block;color:var(--ui-muted);font-size:12px;line-height:1.5;margin-top:4px;}
 .account-card footer {margin-top:24px;font-size:12px;color:var(--ui-muted);}.account-card footer a {color:inherit;}
 .account-home-link {display:block;margin:16px auto 0;text-align:center;color:#ffffffb3;font-size:14px;}
+#soloBestList {padding-left:18px;font-size:13px;line-height:1.6;}
+#soloBestList li {margin:8px 0;}

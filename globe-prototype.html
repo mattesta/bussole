@@ -8,7 +8,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Bussole!</title>
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="globe-prototype.css?v=24">
+  <link rel="stylesheet" href="globe-prototype.css?v=25">
   <link rel="stylesheet" href="round-timer.css?v=2">
   <link rel="stylesheet" href="player-blur.css?v=1">
 </head>
@@ -23,6 +23,7 @@
   </section>
   <aside class="target-card" aria-live="polite">
     <span class="target-label">TARGET</span>
+    <span id="soloRoundLabel" class="solo-round-label hidden"></span>
     <strong id="prototypeTarget">Choose a target</strong>
     <span id="prototypeStatus" class="status">Preparing location and compass…</span>
     <span id="prototypeError"></span>
@@ -71,6 +72,7 @@
       <button id="showPrototypeLineBtn" class="primary" type="button" disabled>Go!</button>
       <button id="resetPrototypeBtn" type="button">Reset</button>
       <a id="prototypeBackLink" class="home-button" href="./">Home</a>
+      <button id="soloNextRoundBtn" class="hidden" type="button" disabled>Next round</button>
       <button id="globeNextRoundBtn" class="hidden" type="button" disabled>Next round</button>
     </nav>
   </section>
@@ -96,6 +98,16 @@
     </div>
   </section>
 
+  <section id="soloGameResults" class="globe-results hidden" aria-live="polite">
+    <h2 id="soloResultsTitle"></h2>
+    <p id="soloRoundScore"></p>
+    <p id="soloRecordStatus" role="status"></p>
+    <div class="globe-results-actions">
+      <button id="soloSummaryBtn" class="hidden" type="button">Summary</button>
+      <button id="soloSaveRetry" class="hidden" type="button">Retry saving record</button>
+    </div>
+  </section>
+
   <iframe id="matchSummaryFrame" class="summary-frame hidden" title="Match summary"></iframe>
 
 
@@ -113,12 +125,14 @@
   <script src="public-privacy.js?v=1"></script>
   <script src="mobile-layout.js?v=3"></script>
   <script src="distance-input.js?v=1"></script>
+  <script src="solo-game.js?v=1"></script>
   <script src="account-statistics.js?v=1"></script>
   <script src="report-geometry.js?v=2"></script>
-  <script src="globe-prototype.js?v=39"></script>
+  <script src="globe-prototype.js?v=40"></script>
   <script src="public-rooms.js?v=3"></script>
   <script src="match-report.js?v=1"></script>
-  <script type="module" src="account-game.js?v=1"></script>
-  <script type="module" src="globe-multiplayer.js?v=14"></script>
+  <script type="module" src="account-game.js?v=2"></script>
+  <script type="module" src="globe-solo.js?v=1"></script>
+  <script type="module" src="globe-multiplayer.js?v=15"></script>
 </body>
 </html>

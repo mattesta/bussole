@@ -21,7 +21,7 @@ function fixture({motion='granted',geo='granted',android=false,missingMotion=fal
     compassUsable:false,compassWarning:null,compassSubmitted:false,compassTracker:null,
     pendingHeading:null,smoothHeading:null,manualBearing:false,
     playerLatLng:[40.2506,18.2794],mapReady:true,targetLatLng:[0,0],lineRevealed:false,
-    soloTimerSeconds:3,soloTimerActive:false,soloCountdown:{sync(){clockStarts++}},
+    soloGameMode:false,soloTimerSeconds:3,soloTimerActive:false,soloCountdown:{sync(){clockStarts++}},
     updatePlayerMarker(){},updatePlayerBlur(){},frameAimingView(){frames++},stopSoloTimer(){},cancelAnimationFrame(){},
     handleCompassHeading(){c.compassUsable=true;c.updateGoButtonState()},handleCompassStatus(){c.compassUsable=false;c.updateGoButtonState()}
   });

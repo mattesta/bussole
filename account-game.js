@@ -1,6 +1,8 @@
-import { beginRound, saveSample } from './account-service.js?v=1';
+import { beginRound, saveSample, saveSoloBest } from './account-service.js?v=2';
 const multiplayer=new URLSearchParams(location.search).get('multiplayer')==='1';
 let context=multiplayer?Promise.resolve(null):beginRound();
+const matchOwner=context;
+export async function completeGame(settings,score){return saveSoloBest(await matchOwner,settings,score);}
 let saved=false,pending=null,roundVersion=0;
 function start(){if(multiplayer)return;roundVersion++;context=beginRound();saved=false;pending=null;status('');}
 function status(text){const element=document.getElementById('accountSaveStatus');if(element)element.textContent=text;}

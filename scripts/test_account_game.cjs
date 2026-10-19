@@ -6,7 +6,7 @@ function fixture({guest=false}={}){
   async saveSample(context,sample){writes.push({id:context.id,sample});if(writes.length===1)await new Promise(resolve=>release=resolve);return true;},
   window:{addEventListener(name,fn){handlers[name]=fn},BussoleReportGeometry:{measure(){return{points:100}}},BussoleAccountStatistics:{sample(){return{points:100}}}}
  });
- vm.runInContext(fs.readFileSync('account-game.js','utf8').replace(/^import[^;]+;\s*/gm,''),c);
+ vm.runInContext(fs.readFileSync('account-game.js','utf8').replace(/^import[^;]+;\s*/gm,'').replace(/export /g,''),c);
  return{c,writes,status,release:()=>release(),start:()=>handlers['bussole-solo-start'](),record:()=>handlers['bussole-solo-result']({detail:{}})};
 }
 (async()=>{

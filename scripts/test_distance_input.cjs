@@ -13,8 +13,8 @@ console.log('Pro distance: live thousands grouping, decimal parsing, pasted sepa
 const globe=fs.readFileSync('globe-prototype.js','utf8');
 const handler=globe.slice(globe.indexOf('function showPrototypeLine('),globe.indexOf('function renderMultiplayerResults('));
 let submitted;
-Object.assign(c,{locationReady:true,compassUsable:true,manualBearing:false,mapReady:true,targetLatLng:[1,2],gameMode:'hard',ROUTE_DISTANCE_METERS:20000000,distanceInput:{value:'12’345,6',focus(){}},playerLatLng:[0,0],heading:15,showLineBtn:{},statusEl:{},multiplayerController:{isActive:()=>true,submitLine(value){submitted=value}}});
+Object.assign(c,{lineRevealed:false,compassSubmitted:false,soloGameMode:false,locationReady:true,compassUsable:true,manualBearing:false,mapReady:true,targetLatLng:[1,2],gameMode:'hard',ROUTE_DISTANCE_METERS:20000000,distanceInput:{value:'12’345,6',focus(){}},playerLatLng:[0,0],heading:15,showLineBtn:{},statusEl:{},multiplayerController:{isActive:()=>true,submitLine(value){submitted=value}}});
 vm.runInContext(handler,c);c.showPrototypeLine();assert.equal(submitted.distanceMeters,12345600);
-submitted=null;c.distanceInput.value='-5';c.showPrototypeLine();assert.equal(submitted,null);
+submitted=null;c.compassSubmitted=false;c.distanceInput.value='-5';c.showPrototypeLine();assert.equal(submitted,null);
 
 c.window.BussoleDistanceInput=null;c.distanceInput.value='1’234';c.showPrototypeLine();assert.equal(submitted.distanceMeters,1234000);

@@ -110,6 +110,7 @@
       button.dataset.roundIndex=String(index);button.setAttribute('aria-label',`Round ${round.round}: ${round.target.label}`);
       button.addEventListener('click',()=>{selectedRound=index;render()});byId('summaryRound').appendChild(button);
     });
+    byId('summaryBack').textContent=report.solo?'Back to game':'Back to room';
     byId('summaryBack').href=`./?room=${encodeURIComponent(report.roomCode||'')}&resume=1`;
     map=new maplibregl.Map({container:'summaryMap',attributionControl:false,renderWorldCopies:false,center:[0,20],zoom:0,maxPitch:0,pitch:0,dragRotate:false,touchZoomRotate:true,
       style:{version:8,sources:{satellite:{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,maxzoom:19}},layers:[{id:'space',type:'background',paint:{'background-color':'#020712'}},{id:'satellite',type:'raster',source:'satellite'}]}});

@@ -141,6 +141,35 @@
         },
         "$other": {
           ".validate": false
+        },
+        "soloBests": {
+          "$setting": {
+            ".validate": "auth.token.email_verified === true && newData.hasChildren(['mode','timerSeconds','blurEnabled','score','rounds','day','generation']) && newData.child('generation').val() === root.child('accountData').child($uid).child('profile/generation').val() && root.child('accountData').child($uid).child('profile/generation').exists() && $setting === newData.child('mode').val() + '-t' + newData.child('timerSeconds').val() + '-b' + (newData.child('blurEnabled').val() === true ? '1' : '0') && (!data.exists() || newData.child('generation').val() !== data.child('generation').val() || newData.child('score').val() >= data.child('score').val())",
+            "mode": {
+              ".validate": "newData.isString() && newData.val().matches(/^(easy|medium|hard)$/)"
+            },
+            "timerSeconds": {
+              ".validate": "newData.isNumber() && newData.val() % 1 === 0 && (newData.val() === 0 || (newData.val() >= 3 && newData.val() <= 60))"
+            },
+            "blurEnabled": {
+              ".validate": "newData.isBoolean()"
+            },
+            "score": {
+              ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 5000"
+            },
+            "rounds": {
+              ".validate": "newData.val() === 5"
+            },
+            "day": {
+              ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= now / 86400000 + 1"
+            },
+            "generation": {
+              ".validate": "newData.isString()"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
         }
       }
     },

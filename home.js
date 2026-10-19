@@ -8,15 +8,28 @@
     byId('homePlayChoice').classList.add('hidden');
     byId('singlePlayerPanel').classList.remove('hidden');
   });
+  let soloType=null;
+  function chooseSolo(type) {
+    soloType=type;
+    byId('soloPlayChoice').classList.add('hidden');byId('soloSettings').classList.remove('hidden');
+    const game=type==='game';
+    byId('soloSettingsTitle').textContent=game?'Game · 5 rounds':'Practice';
+    byId('soloDescription').textContent=game?'5 random targets. No skips. Up to 5,000 points.':'Choose any target, search for a place or try a random one. Play as many rounds as you like.';
+    byId('soloRecordNote').classList.toggle('hidden',!game);
+    byId('startSoloBtn').textContent=game?'Start game':'Start practice';
+  }
+  byId('soloGameBtn').addEventListener('click',()=>chooseSolo('game'));
+  byId('soloPracticeBtn').addEventListener('click',()=>chooseSolo('practice'));
   byId('singlePlayerBack').addEventListener('click', () => {
-    byId('singlePlayerPanel').classList.add('hidden');
-    byId('homePlayChoice').classList.remove('hidden');
+    if(soloType){soloType=null;byId('soloSettings').classList.add('hidden');byId('soloPlayChoice').classList.remove('hidden');return;}
+    byId('singlePlayerPanel').classList.add('hidden');byId('homePlayChoice').classList.remove('hidden');
   });
 
   function validateTimer() {
     const valid = window.BussoleRoundTimer.validDuration(duration.value);
-    byId('soloTimerError').classList.toggle('hidden', !timer.checked || valid);
+    duration.classList.toggle('invalid',timer.checked&&!valid);
     duration.setAttribute('aria-invalid', String(timer.checked && !valid));
+    byId('startSoloBtn').disabled=launching||(timer.checked&&!valid);
     return valid;
   }
   function prepareAccess() {
@@ -50,23 +63,23 @@
     return accessPromise;
   }
 
-  document.querySelectorAll('.modeBtn').forEach(button => button.addEventListener('click', async () => {
-    if (launching) return;
+  byId('startSoloBtn').addEventListener('click', async () => {
+    if (launching||!soloType) return;
     if (timer.checked && !validateTimer()) { duration.focus(); return; }
-    const parameters = new URLSearchParams({ mode: button.dataset.mode, integrated: '1' });
+    const parameters = new URLSearchParams({ mode: byId('soloMode').value, integrated: '1', solo:soloType });
     if (timer.checked) parameters.set('timer', duration.value);
     if (byId('blurCheckbox').checked) parameters.set('blur', '1');
     launching = true;
-    button.disabled = true;
+    byId('startSoloBtn').disabled = true;
     byId('launchStatus').textContent = 'Requesting location and compass access…';
     await prepareAccess();
     window.location.href = `globe-prototype.html?${parameters}`;
-  }));
+  });
   for (const id of ['multiplayerBtn','createRoomBtn','createPublicRoomBtn','joinRoomBtn','joinPublicRoomBtn']) {
     byId(id).addEventListener('click', prepareAccess);
   }
   timer.addEventListener('change', () => {
-    byId('timerSettings').style.display = timer.checked ? 'flex' : 'none';
+    byId('timerSettings').classList.toggle('hidden',!timer.checked);
     validateTimer();
   });
   duration.addEventListener('input', validateTimer);
