@@ -760,3 +760,20 @@ select:focus-visible {
 .lobby-mode.match-in-progress #roomPlayers {max-height:none;overflow:visible;}
 
 .account-home-link {display:block;margin:16px auto 0;text-align:center;color:#ffffffb3;font-size:14px;}
+.solo-settings {width:100%;text-align:left;}
+.solo-settings h3 {text-align:center;}
+.solo-settings p {font-size:13px;line-height:1.5;color:var(--ui-muted);}
+.solo-settings button {min-height:44px;}
+.solo-settings .solo-difficulty {display:flex;align-items:center;position:relative;padding-left:78px;min-height:44px;}
+.solo-settings .solo-difficulty legend {position:absolute;top:50%;left:0;transform:translateY(-50%);font-size:14px;}
+.solo-options {display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center;}
+.solo-options label,.solo-timer-row {display:flex;align-items:center;gap:6px;font-size:13px;}
+.solo-options input[type=checkbox] {margin:0;width:18px;height:18px;}
+.solo-timer-row {min-height:44px;}
+.solo-settings #timerDuration {width:62px;min-height:38px;padding:5px;}
+.solo-settings #timerDuration.invalid {border-color:#ff8587;color:#ff8587;}
+#startSoloBtn {width:100%;margin-top:14px;background:#e41a1c;color:white;border:1px solid #e41a1c;border-radius:10px;font:inherit;font-weight:700;}
+#startSoloBtn:disabled {opacity:.45;}
+.solo-difficulty .choice-buttons {flex:1;min-width:0;gap:5px;}
+.solo-difficulty .choice-buttons button {flex:1;min-width:0;padding:8px 5px;color:white;background:var(--ui-field);border:1px solid var(--ui-border);border-radius:9px;font:inherit;font-size:14px;}
+.solo-difficulty .choice-buttons button.selected {border-color:var(--ui-red);background:#71181d;}

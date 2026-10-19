@@ -22,6 +22,16 @@ Only the account owner can read/write their account branch. Samples and consent 
 
 Deleting statistics removes samples, opts out of community contributions and rotates the generation key atomically. Old games open in other tabs then fail rule validation instead of resurrecting deleted data. Deleting the account first reauthenticates with the current password, removes personal database data, then deletes the Authentication user. Already shared room results and the current match summary are separate from account history.
 
+## Five-round single-player Games
+
+Single-player offers Game and Practice. Game draws five distinct targets from the existing catalogue, keeps the chosen difficulty/timer/blur for all five rounds, and allows no target skips or searches. A timer expiry without Go is a zero-point DNF. Practice remains open-ended and does not set personal bests.
+
+Completed Games save only the highest total (0–5000) for each difficulty/timer/blur combination under `accountData/{auth.uid}/soloBests/{setting}`. The account must have been verified when the Game started and still be the same account at completion. Records contain score, UTC day, settings, five-round count and the generation key; no coordinates, targets or routes. Scores are client-reported personal records, not cheat-proof competition results. Incomplete Games have no record, and there is no resume after leaving/reloading. Existing per-attempt statistics are still recorded as the player completes valid guesses.
+
+**Required for existing installations:** publish the complete updated `database.rules.json` in Realtime Database → Rules. The new `soloBests` validation is needed even if account rules were published previously. No Authentication provider change, Cloud Functions deployment or billing upgrade is needed. Until rules are updated, gameplay works and a completed Game offers Retry if its record cannot be saved.
+
+The account page lists records and includes them in JSON export. Delete statistics removes both samples and personal bests, opts out of community contributions and rotates the generation key. Games already open before deletion cannot recreate their records.
+
 ## Optional server-side community comparison
 
 Cloud Functions deployment requires Firebase's **Blaze** plan (billing account). Do not enable billing just to test personal accounts. No functions or billing have been enabled by this repository change.
@@ -40,6 +50,9 @@ Only aggregate means and counts are published under `communityStatistics`; clien
 **Prototype scaling limit:** each change rebuilds the small pool by reading account statistics. A distributed lease serializes refreshes, handles duplicate/out-of-order events by re-reading the current source, and avoids retaining per-player aggregation state after deletion. Before substantial traffic or large histories, replace full-pool reads with batched/sharded aggregation and bounded events. Protect the deployment with appropriate quotas and monitor costs; the prototype does not claim an unlimited free service or cheat-proof self-reported scores.
 
 ## Validation
+
+- `node scripts/test_solo_game.cjs` and `node scripts/test_solo_camera.cjs`: five-round lifecycle, no skips/repeats, totals/DNF and camera reset under live compass updates.
+- `scripts/test_solo_ui.cjs`: mobile Game/Practice flow, five distinct targets, verified best, Summary, Practice reset and timed Pro DNF/guest behavior against real Auth/Database emulators. Uses a map/camera facade; it does not validate GPU globe rendering.
 
 - `node scripts/test_account_statistics.cjs`: scalar projection, filters, signed/circular means, undefined geometry, opt-in, deletion and per-measure thresholds.
 - Start the Database emulator and run `scripts/test_account_rules.cjs` with `@firebase/rules-unit-testing@5` and `firebase@12.2.1`: owner isolation, verification, field rejection, bounds, generation reset and aggregate privacy.

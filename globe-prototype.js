@@ -8,6 +8,9 @@ const GLOBE_DRAG_INERTIA = { linearity: 0.4, maxSpeed: 1400, deceleration: 1200 
 const pageParameters = new URLSearchParams(window.location.search);
 const integratedMode = pageParameters.get('integrated') === '1';
 const multiplayerMode = pageParameters.get('multiplayer') === '1';
+const soloGameMode = !multiplayerMode && pageParameters.get('solo') === 'game';
+if (soloGameMode) document.body.classList.add('solo-game');
+let soloController = null;
 const debugMode = pageParameters.get('debug') === '1';
 let blurEnabled = !multiplayerMode && pageParameters.get('blur') === '1';
 const soloTimerSeconds = !multiplayerMode && window.BussoleRoundTimer.validDuration(pageParameters.get('timer'))
@@ -15,7 +18,7 @@ const soloTimerSeconds = !multiplayerMode && window.BussoleRoundTimer.validDurat
 let soloTimerActive = false;
 const soloCountdown = window.BussoleRoundTimer.create(
   document.getElementById('globeCountdown'), document.querySelector('.target-card'), () => Date.now(),
-  () => { showPrototypeLine(); }, element => window.BussoleMobileLayout.positionTimer(element)
+  () => { if (soloGameMode) soloController?.expire(); else showPrototypeLine(); }, element => window.BussoleMobileLayout.positionTimer(element)
 );
 function stopSoloTimer() {
   soloTimerActive = false;
@@ -156,7 +159,7 @@ function updatePlayerBlur() {
 map.on('move', updatePlayerBlur);
 map.on('zoom', updatePlayerBlur);
 
-map.on('click', () => multiplayerController?.dismissResults?.());
+map.on('click', () => { multiplayerController?.dismissResults?.(); soloController?.dismissResults?.(); });
 
 map.getCanvas().addEventListener('pointerdown', () => {
   if (lineRevealed) map.stop();
@@ -401,7 +404,7 @@ function setRandomButtonState(isRandomTarget) {
 
 function updateGoButtonState() {
   updateAccessPanel();
-  showLineBtn.disabled = Boolean(!locationReady || !mapReady || !targetLatLng || lineRevealed || compassSubmitted || (!compassUsable && !manualBearing));
+  showLineBtn.disabled = Boolean(!locationReady || !mapReady || !targetLatLng || lineRevealed || compassSubmitted || (!compassUsable && !manualBearing) || (soloGameMode && !soloController?.canAim()));
   if (soloTimerSeconds && !soloTimerActive && !showLineBtn.disabled) {
     soloTimerActive = true;
     soloCountdown.sync({ phase: 'aiming', deadline: Date.now() + soloTimerSeconds * 1000 });
@@ -421,7 +424,7 @@ function setTarget(lat, lon, label, isRandomTarget = false) {
   lineRevealed = false;
   setRandomButtonState(isRandomTarget);
   setMapInteraction(false);
-  frameAimingView();
+  frameAimingView(false);
   statusEl.textContent = 'Target ready. Aim with your phone or use the bearing slider.';
   updateGoButtonState();
 }
@@ -510,6 +513,7 @@ function frameResult(points) {
 }
 
 function chooseRandomTarget() {
+  if (soloGameMode) return;
   const catalogue = Array.isArray(window.BUSSOLE_TARGETS) ? window.BUSSOLE_TARGETS : [];
   if (!catalogue.length) {
     statusEl.textContent = 'The random target catalogue could not be loaded.';
@@ -541,6 +545,7 @@ function chooseRandomTarget() {
 }
 
 function showPrototypeLine() {
+  if (lineRevealed || compassSubmitted || (soloGameMode && !soloController?.canAim())) return;
   if (!locationReady) return;
   if (!compassUsable && !manualBearing) return;
   if (!mapReady || !targetLatLng) return;
@@ -586,7 +591,8 @@ function showPrototypeLine() {
   errorEl.textContent = `${window.BussoleScoring.points(errorMeters, initialDistance)} / 1000 points · Error: ${(errorMeters / 1000).toFixed(1)} km`;
   window.dispatchEvent(new CustomEvent('bussole-solo-result', {detail:{
     submission:{lat:playerLatLng[0],lon:playerLatLng[1],heading,distanceMeters},
-    target:{lat:targetLatLng[0],lon:targetLatLng[1]},mode:gameMode
+    target:{lat:targetLatLng[0],lon:targetLatLng[1],label:targetLabel},mode:gameMode,
+    points:window.BussoleScoring.points(errorMeters, initialDistance),errorMeters
   }}));
   statusEl.textContent = `Line locked at ${Math.round(heading)}°. Drag or rotate with two fingers to inspect.`;
   lineRevealed = true;
@@ -659,6 +665,7 @@ function renderMultiplayerResults(entries, roundTarget, mode) {
 }
 
 function resetPrototype() {
+  if (soloGameMode) return;
   if (!multiplayerMode) window.dispatchEvent(new CustomEvent('bussole-solo-start'));
   if (!multiplayerMode) stopSoloTimer();
   compassSubmitted = false;
@@ -669,7 +676,7 @@ function resetPrototype() {
   updatePlayerBlur();
   updateGoButtonState();
   setMapInteraction(false);
-  frameAimingView();
+  frameAimingView(false);
   statusEl.textContent = 'Aiming view restored. The target is unchanged.';
 }
 
@@ -752,6 +759,7 @@ function updateClearSearchButton() {
 }
 
 function openSearchPanel() {
+  if (soloGameMode) return;
   searchPanel.classList.remove('hidden');
   requestAnimationFrame(() => searchBox.focus({ preventScroll: true }));
 }
@@ -800,6 +808,7 @@ async function fetchSearchResults(query, limit = 5) {
 }
 
 async function searchTarget() {
+  if (soloGameMode) return;
   const query = searchBox.value.trim();
   if (!query) return;
   statusEl.textContent = 'Searching…';
@@ -987,6 +996,30 @@ updateBearing(0);
 window.BussoleGlobe = {
   isReady() {
     return mapReady;
+  },
+  registerSolo(controller) {
+    soloController = controller;
+    updateGoButtonState();
+  },
+  setSoloTarget(target) {
+    compassSubmitted = false;
+    distanceInput.blur();
+    distanceInput.value = '';
+    document.body.classList.remove('round-revealed');
+    setTarget(target.lat, target.lon, target.label, true);
+    updatePlayerBlur();
+  },
+  revealSoloMiss() {
+    if (lineRevealed) return;
+    stopSoloTimer();
+    lineRevealed = true;
+    updatePlayerBlur();
+    updateTargetMarker();
+    updateGoButtonState();
+    setMapInteraction(true);
+    statusEl.textContent = "Time’s up. No guess submitted. Drag the globe to inspect the target.";
+    errorEl.textContent = '0 / 1000 points · DNF';
+    frameResult([playerLatLng, targetLatLng]);
   },
   registerMultiplayer(controller) {
     multiplayerController = controller;

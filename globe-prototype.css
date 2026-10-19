@@ -344,3 +344,11 @@ button:focus-visible, input:focus-visible, .home-button:focus-visible { outline:
 .round-hud {display:flex;align-items:flex-end;justify-content:space-between;gap:12px;width:min(760px,100%);margin:0 auto;}
 .round-hud .round-countdown,.round-hud .globe-room-badge {position:static;inset:auto;z-index:auto;margin-bottom:8px;}
 .round-hud .globe-room-badge {margin-left:auto;pointer-events:auto;}
+.solo-game #randomTargetBtn,.solo-game #openGlobeSearchBtn,.solo-game #resetPrototypeBtn {display:none;}
+.solo-game .action-bar {grid-template-columns:repeat(3,minmax(0,1fr));}
+.solo-game #soloNextRoundBtn {order:1;background:var(--ui-red);border-color:var(--ui-red);}
+.solo-game #prototypeBackLink {order:2;}
+.solo-game.round-revealed #distanceInputWrap {display:none;}
+.solo-round-label {float:right;color:var(--ui-muted);font-size:13px;font-weight:650;}
+#soloRoundScore {font-size:18px;font-weight:700;}
+#soloRecordStatus {font-size:13px;color:var(--ui-muted);line-height:1.5;}

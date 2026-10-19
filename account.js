@@ -1,4 +1,4 @@
-import * as accounts from './account-service.js?v=1';
+import * as accounts from './account-service.js?v=2';
 const byId=id=>document.getElementById(id),show=(id,visible)=>byId(id).classList.toggle('hidden',!visible);
 let registration=false,data={},mode='all',days=0,busy=false,requestId=0;
 function message(text,error=false){byId('accountStatus').textContent=text;byId('accountStatus').classList.toggle('error',error);}
@@ -14,7 +14,19 @@ async function refresh(){
   data=await accounts.loadData();const profile={...accounts.defaultProfile,...data.profile};
   byId('accountUsername').value=profile.username;byId('useUsernameInRooms').checked=profile.useInRooms;
   byId('communityConsent').checked=profile.communityConsent;byId('communityConsent').disabled=!user.emailVerified;
-  renderStatistics();message(user.emailVerified?'Your account is ready.':'Verify your email to start saving statistics.');
+  renderBests();renderStatistics();message(user.emailVerified?'Your account is ready.':'Verify your email to start saving statistics.');
+}
+function renderBests(){
+  const list=byId('soloBestList');list.replaceChildren();
+  const records=Object.values(data.soloBests||{}).filter(record=>record.generation===data.profile?.generation);
+  if(!records.length){const item=document.createElement('li');item.textContent='No completed games yet.';list.append(item);return;}
+  records.sort((a,b)=>['easy','medium','hard'].indexOf(a.mode)-['easy','medium','hard'].indexOf(b.mode)||a.timerSeconds-b.timerSeconds||Number(a.blurEnabled)-Number(b.blurEnabled));
+  for(const record of records){
+    const item=document.createElement('li');
+    const difficulty={easy:'Easy',medium:'Normal',hard:'Pro'}[record.mode];
+    item.textContent=`${difficulty} · ${record.timerSeconds?`${record.timerSeconds} s`:'No timer'} · Blur ${record.blurEnabled?'on':'off'} — ${record.score} / 5000`;
+    list.append(item);
+  }
 }
 const format=(value,unit,signed=false)=>Number.isFinite(value)?`${signed&&value>0?'+':''}${(Math.round(value*10)/10||0).toFixed(1)}${unit}`:'—';
 function metric(list,label,value,unit,signed=false,explanation='',chart){
@@ -81,7 +93,7 @@ byId('changePassword').onclick=()=>action(async()=>{const next=byId('newPassword
 byId('changeEmail').onclick=()=>action(async()=>{const input=byId('newEmail');if(!input.value||!input.reportValidity())throw new Error('Enter your new email address.');await accounts.changeEmail(password(),input.value);byId('securityForm').reset();message('Open the verification link sent to your new email to finish changing it.');});
 byId('exportAccount').onclick=()=>action(async()=>{
   const values=await accounts.loadData();
-  const exported={version:1,email:accounts.auth.currentUser.email,profile:values.profile||{},samples:window.BussoleAccountStatistics.select(values.samples)};
+  const exported={version:1,email:accounts.auth.currentUser.email,profile:values.profile||{},samples:window.BussoleAccountStatistics.select(values.samples),soloBests:Object.values(values.soloBests||{}).map(({generation,...record})=>record)};
   delete exported.profile.generation;
   const url=URL.createObjectURL(new Blob([JSON.stringify(exported,null,2)],{type:'application/json'})),link=document.createElement('a');
   link.href=url;link.download='bussole-my-data.json';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);message('Your data export is ready.');

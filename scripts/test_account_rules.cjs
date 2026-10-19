@@ -20,8 +20,16 @@ const {get,set,update,ref}=require('firebase/database');
   for(const extra of [{lat:42},{target:'private target'},{heading:100},{roomCode:'ABCDEF'},{round:2},{angleError:181},{distanceError:-101},{relativeError:-1},{points:1001},{kind:'bad'}])await no(set(ref(owner,`${p}/samples/${key}`),{...sample,...extra}));
   await no(set(ref(owner,`${p}/samples/${key}`),{...sample,mode:'easy',distanceError:10}));
   await ok(update(ref(owner,`${p}/profile`),{communityConsent:true}));
+  const best={mode:'medium',timerSeconds:0,blurEnabled:false,score:3100,rounds:5,day:sample.day,generation:profile.generation};
+  const bestPath=`${p}/soloBests/medium-t0-b0`;
+  await ok(set(ref(owner,bestPath),best));await no(get(ref(other,bestPath)));
+  await no(set(ref(unverified,'accountData/pending/soloBests/medium-t0-b0'),best));
+  for(const invalid of [{score:5001},{rounds:4},{score:2999},{timerSeconds:2},{target:'Private place'},{lat:42}])await no(set(ref(owner,bestPath),{...best,...invalid}));
+  await no(set(ref(owner,`${p}/soloBests/medium-t3-b0`),best));
+  await ok(set(ref(owner,bestPath),{...best,score:3200}));
   const nextGeneration='aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
-  await ok(update(ref(owner,p),{samples:null,'profile/generation':nextGeneration,'profile/communityConsent':false}));
+  await ok(update(ref(owner,p),{samples:null,soloBests:null,'profile/generation':nextGeneration,'profile/communityConsent':false}));
+  await no(set(ref(owner,bestPath),best));
   await no(set(ref(owner,`${p}/samples/${key}`),sample)); // An old open game cannot restore deleted data.
   await ok(set(ref(owner,`${p}/samples/${key}`),{...sample,generation:nextGeneration}));
   await no(set(ref(owner,'communityStatistics/all'),{available:true,count:1}));await no(get(ref(guest,'communityStatistics')));

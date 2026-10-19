@@ -74,10 +74,21 @@ export async function saveSample(context,sample,key){
   await set(ref(db,`${path(user.uid)}/samples/${id}`),{...clean,generation:context.generation});
   return true;
 }
+export async function saveSoloBest(context,settings,score){
+  if(!context||!verified(auth.currentUser)||auth.currentUser.uid!==context.uid)return {saved:false};
+  const config=window.BussoleSoloGame.settings(settings);
+  if(!Number.isInteger(score)||score<0||score>5000)throw new Error('Invalid game score.');
+  const value={...config,score,rounds:5,day:Math.floor(Date.now()/86400000),generation:context.generation};
+  const result=await runTransaction(ref(db,`${path(context.uid)}/soloBests/${window.BussoleSoloGame.key(config)}`),previous=>{
+    if(previous?.generation===context.generation&&previous.score>=score)return;
+    return value;
+  });
+  return {saved:true,isNew:result.committed,best:result.snapshot.val()?.score??score};
+}
 export async function deleteStatistics(){
   const user=current();
   await loadProfile();
-  await update(ref(db,path(user.uid)),{samples:null,'profile/communityConsent':false,'profile/consentVersion':1,'profile/generation':crypto.randomUUID()});
+  await update(ref(db,path(user.uid)),{samples:null,soloBests:null,'profile/communityConsent':false,'profile/consentVersion':1,'profile/generation':crypto.randomUUID()});
 }
 async function reauthenticate(password){
   const user=current();await reauthenticateWithCredential(user,EmailAuthProvider.credential(user.email,password));return user;

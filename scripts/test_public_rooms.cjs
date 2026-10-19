@@ -21,7 +21,7 @@ assert.equal(rooms.shouldAutoStart({ visibility: 'public', phase: 'lobby', round
 assert.equal(rooms.shouldAutoStart({ visibility: 'public', phase: 'lobby', round: 2, matchStartRound: 2 }, full, now), true);
 assert.match(rooms.summary({ mode: 'medium', mapStyle: '3d', timerEnabled: true, timerSeconds: 3, scoreGoal: 5000 }), /Normal · 3 s timer · 5000 points/);
 const catalogue = context.window.BussoleExplorers.catalogue;
-assert.equal(catalogue.length, 8);
+assert.equal(catalogue.length, 30);
 for (const explorer of catalogue) { assert.ok(explorer.text.length > 150); assert.ok(explorer.article); }
 const elements = Object.fromEntries(['explorerDialog','explorerTitle','explorerBiography','explorerWikipedia'].map(id => [id, {}]));
 elements.explorerDialog.showModal = function() { this.open = true; };

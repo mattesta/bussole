@@ -46,7 +46,7 @@ assert.equal(context.timerDuration, 3);
 Object.assign(context, { showLineBtn: {}, mapReady: true, targetLatLng: [0,0], lineRevealed: false,
   locationReady: true, updateAccessPanel(){},
   compassSubmitted: false, compassUsable: false, manualBearing: false,
-  soloTimerSeconds: 3, soloTimerActive: false });
+  soloGameMode:false,soloTimerSeconds: 3, soloTimerActive: false });
 vm.runInContext(actualFunction(globe, 'updateGoButtonState'), context);
 const before = clocks.length;
 context.updateGoButtonState(); assert.equal(clocks.length, before);

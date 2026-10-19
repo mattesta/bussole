@@ -4,7 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>Bussole — My account</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1"><link rel="icon" type="image/svg+xml" href="icon.svg?v=1">
-  <link rel="stylesheet" href="style.css?v=28"><link rel="stylesheet" href="match-summary.css?v=7"><link rel="stylesheet" href="account.css?v=1">
+  <link rel="stylesheet" href="style.css?v=29"><link rel="stylesheet" href="match-summary.css?v=7"><link rel="stylesheet" href="account.css?v=2">
 </head>
 <body class="account-page">
   <main class="account-card">
@@ -36,6 +36,11 @@
         <p class="muted">Optional, off by default. Only pooled statistics are shown to others. No email, username, location or target is included in the comparison. Turning this off also removes your past contributions from the pool after it refreshes. <a href="account-privacy.html">Privacy details</a></p>
         <button class="primary" type="submit">Save preferences</button>
       </form>
+      <section id="soloPersonalBests">
+        <h2>Single-player personal bests</h2>
+        <p class="muted">Completed 5-round games only · up to 5,000 points. Each difficulty, timer and blur combination has its own record. Practice does not set records.</p>
+        <ul id="soloBestList"></ul>
+      </section>
       <section id="personalStatistics">
         <h2>Your statistics</h2>
         <div id="modeFilters" class="account-choices" role="group" aria-label="Statistics difficulty"><button data-mode="all" class="selected" type="button">All</button><button data-mode="easy" type="button">Easy</button><button data-mode="medium" type="button">Normal</button><button data-mode="hard" type="button">Pro</button></div>
@@ -63,6 +68,6 @@
     </section>
     <footer><a href="account-privacy.html">Account privacy</a></footer>
   </main>
-  <script src="account-statistics.js?v=1"></script><script src="summary-charts.js?v=3"></script><script type="module" src="account.js?v=1"></script>
+  <script src="solo-game.js?v=1"></script><script src="account-statistics.js?v=1"></script><script src="summary-charts.js?v=3"></script><script type="module" src="account.js?v=2"></script>
 </body>
 </html>
