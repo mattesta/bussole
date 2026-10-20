@@ -6,9 +6,10 @@ const AIMING_ZOOM = 16;
 // MapLibre. A lower deceleration gives a short, soft coast after a flick.
 const GLOBE_DRAG_INERTIA = { linearity: 0.4, maxSpeed: 1400, deceleration: 1200 };
 const pageParameters = new URLSearchParams(window.location.search);
+if(pageParameters.get('solo')==='daily'){pageParameters.set('mode','medium');pageParameters.set('timer','30');pageParameters.set('blur','1');}
 const integratedMode = pageParameters.get('integrated') === '1';
 const multiplayerMode = pageParameters.get('multiplayer') === '1';
-const soloGameMode = !multiplayerMode && pageParameters.get('solo') === 'game';
+const soloGameMode = !multiplayerMode && ['game','daily'].includes(pageParameters.get('solo'));
 if (soloGameMode) document.body.classList.add('solo-game');
 let soloController = null;
 const debugMode = pageParameters.get('debug') === '1';

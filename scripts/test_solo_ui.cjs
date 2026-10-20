@@ -32,11 +32,11 @@ const fakeMap=`(()=>{
    else if(file==='/multiplayer.js'||file==='/globe-multiplayer.js')body=''; // These controllers do not participate in single-player.
    else if(file==='/compass.js')body="window.BussoleCompass={createTracker({onHeading}){window.__aim=onHeading;let tick;return{start(){onHeading(30);tick=setInterval(()=>onHeading(window.__bearing||30),20)},stop(){clearInterval(tick)}}}};";
    else try{body=fs.readFileSync(path.join(root,file==='/'?'index.html':file));}catch{return route.fulfill({status:404,body:'missing'})}
-   return route.fulfill({contentType:file.endsWith('.css')?'text/css':file.endsWith('.js')?'text/javascript':'text/html',body});
+   return route.fulfill({contentType:file.endsWith('.json')?'application/json':file.endsWith('.css')?'text/css':file.endsWith('.js')?'text/javascript':'text/html',body});
   });
   await page.goto('http://localhost/account.html');await page.locator('#showRegister').click();await page.locator('#accountEmail').fill('solo@example.test');await page.locator('#accountPassword').fill('Explorer123!');await page.locator('#authSubmit').click();
   await page.waitForFunction(()=>document.getElementById('accountStatus').textContent.includes('Account created'));
-  const uid=await page.evaluate(async()=>(await import('./account-service.js?v=2')).auth.currentUser.uid);await admin.updateUser(uid,{emailVerified:true});await page.locator('#checkVerification').click();await page.waitForFunction(()=>document.getElementById('accountStatus').textContent==='Your account is ready.');
+  const uid=await page.evaluate(async()=>(await import('./account-service.js?v=3')).auth.currentUser.uid);await admin.updateUser(uid,{emailVerified:true});await page.locator('#checkVerification').click();await page.waitForFunction(()=>document.getElementById('accountStatus').textContent==='Your account is ready.');
   await page.goto('http://localhost/');await page.locator('#singlePlayerBtn').click();assert.equal(await page.locator('#soloGameBtn').isVisible(),true);assert.equal(await page.locator('#soloPracticeBtn').isVisible(),true);
   await page.locator('#soloGameBtn').click();assert.equal(await page.locator('#soloMode').inputValue(),'medium');
   await page.locator('#timerCheckbox').check();await page.locator('#timerDuration').fill('2');assert.equal(await page.locator('#startSoloBtn').isDisabled(),true);await page.locator('#timerCheckbox').uncheck();

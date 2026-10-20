@@ -4,12 +4,13 @@ import {
   sendEmailVerification, sendPasswordResetEmail, reload, EmailAuthProvider,
   reauthenticateWithCredential, updatePassword, verifyBeforeUpdateEmail, deleteUser
 } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js';
-import { getDatabase, ref, get, set, update, runTransaction } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js';
+import { getDatabase, ref, get, set, update, runTransaction, onValue, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js';
 import { firebaseConfig } from './firebase-config.js';
 
 const app=initializeApp(firebaseConfig);
 export const auth=getAuth(app);
-const db=getDatabase(app);
+export const db=getDatabase(app);
+export { ref, get, runTransaction, set, onValue, serverTimestamp };
 export const defaultProfile={username:'',useInRooms:false,communityConsent:false,consentVersion:1};
 const account=user=>Boolean(user&&!user.isAnonymous&&user.email);
 const verified=user=>account(user)&&user.emailVerified;
@@ -85,10 +86,15 @@ export async function saveSoloBest(context,settings,score){
   });
   return {saved:true,isNew:result.committed,best:result.snapshot.val()?.score??score};
 }
+function dailyRemovals(attempts={}){
+  return Object.fromEntries(Object.entries(attempts||{}).filter(([,attempt])=>attempt.entryKey).map(([day,attempt])=>[`dailyScores/${day}/${attempt.entryKey}`,null]));
+}
 export async function deleteStatistics(){
   const user=current();
   await loadProfile();
-  await update(ref(db,path(user.uid)),{samples:null,soloBests:null,'profile/communityConsent':false,'profile/consentVersion':1,'profile/generation':crypto.randomUUID()});
+  const data=await loadData(), changes=dailyRemovals(data.dailyAttempts);
+  Object.assign(changes,{[`${path(user.uid)}/samples`]:null,[`${path(user.uid)}/soloBests`]:null,[`${path(user.uid)}/dailyAttempts`]:null,[`${path(user.uid)}/profile/communityConsent`]:false,[`${path(user.uid)}/profile/consentVersion`]:1,[`${path(user.uid)}/profile/generation`]:crypto.randomUUID()});
+  await update(ref(db),changes);
 }
 async function reauthenticate(password){
   const user=current();await reauthenticateWithCredential(user,EmailAuthProvider.credential(user.email,password));return user;
@@ -98,7 +104,8 @@ export async function changeEmail(password,email){await verifyBeforeUpdateEmail(
 export async function deleteAccount(password){
   const user=await reauthenticate(password);
   // Remove database data while cleanup is still authorized, before deleting Authentication.
-  await set(ref(db,path(user.uid)),null);
+  const data=await loadData();
+  await update(ref(db),{...dailyRemovals(data.dailyAttempts),[path(user.uid)]:null});
   await deleteUser(user);
 }
 export async function community(mode='all'){

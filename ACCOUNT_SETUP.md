@@ -32,6 +32,16 @@ Completed Games save only the highest total (0–5000) for each difficulty/timer
 
 The account page lists records and includes them in JSON export. Delete statistics removes both samples and personal bests, opts out of community contributions and rotates the generation key. Games already open before deletion cannot recreate their records.
 
+## Daily Challenge (Spark-compatible)
+
+Daily Challenge v1 uses Normal, 30 seconds and blur on, with five deterministic targets per UTC day (00:00 reset). `daily-targets-v1.json` is an immutable snapshot of the existing catalogue; do not edit it or the v1 PRNG in place, including during a day. A new catalogue/config needs a versioned daily release and matching rules. Practice and ordinary Games still use `targets.js`.
+
+Verified accounts reserve an official attempt on Start, using a transaction at `accountData/{uid}/dailyAttempts/{UTCday}`. The server enforces today's UTC day, timestamp, generation, allowed fields and immutable completion score. Repeat starts, reloads and guests play unranked, without replacing the original attempt. Abandoned attempts do not enter the comparison. Deleting statistics intentionally removes participation, as do account deletion; recreating accounts or deliberate erasure is not prevented as an anti-abuse guarantee.
+
+After five rounds, completion stores a scalar score and publishes it under a random per-day key at `dailyScores/{UTCday}/{entryKey}`. The public branch contains only scores; no names, account IDs, locations, targets or routes. Private generation/key mapping authorizes publish/deletion. A retry can publish an already completed attempt but cannot change its score. Day is pinned at start so games crossing midnight finish against their original day. The client reads only that day's scores, excludes its own entry and counts strictly lower scores; ties and participant counts are shown. First finishers see a waiting message. This is exact for the downloaded current snapshot, not a privacy-preserving aggregation of secret values or a cheat-proof score service. No Cloud Functions, billing or new provider needed. Downloads grow with daily participation; public scores remain until the owner deletes them, with no promised automatic retention cleanup.
+
+Publish the full updated `database.rules.json` before official attempts can work. Guests can play unranked without these new writes. The account export includes day/status/score; deletion removes private attempts and public scores atomically together with the usual statistics/generation reset. User-facing participation and sharing details appear before the official Start and on `account-privacy.html`.
+
 ## Optional server-side community comparison
 
 Cloud Functions deployment requires Firebase's **Blaze** plan (billing account). Do not enable billing just to test personal accounts. No functions or billing have been enabled by this repository change.
@@ -50,6 +60,10 @@ Only aggregate means and counts are published under `communityStatistics`; clien
 **Prototype scaling limit:** each change rebuilds the small pool by reading account statistics. A distributed lease serializes refreshes, handles duplicate/out-of-order events by re-reading the current source, and avoids retaining per-player aggregation state after deletion. Before substantial traffic or large histories, replace full-pool reads with batched/sharded aggregation and bounded events. Protect the deployment with appropriate quotas and monitor costs; the prototype does not claim an unlimited free service or cheat-proof self-reported scores.
 
 ## Validation
+
+- `node scripts/test_daily_challenge.cjs`: pinned deterministic catalogue, UTC changeover, fixed settings and percentile/self/tie behavior.
+- `scripts/test_daily_rules.cjs`: real Database rules, cross-device reservation, verified ownership, immutable scalar scores, cross-midnight completion, deletion and stale-generation barriers.
+- `scripts/test_daily_ui.cjs`: native mobile browser with real SDK/Auth/Database emulators; official completion, live percentile, partial-publication recovery, replay/guest exclusion, reload, Summary, export and private/shared erasure. Uses the same map/camera facade as solo-flow QA, not WebGL tiles.
 
 - `node scripts/test_solo_game.cjs` and `node scripts/test_solo_camera.cjs`: five-round lifecycle, no skips/repeats, totals/DNF and camera reset under live compass updates.
 - `scripts/test_solo_ui.cjs`: mobile Game/Practice flow, five distinct targets, verified best, Summary, Practice reset and timed Pro DNF/guest behavior against real Auth/Database emulators. Uses a map/camera facade; it does not validate GPU globe rendering.

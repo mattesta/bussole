@@ -170,6 +170,29 @@
               ".validate": false
             }
           }
+        },
+        "dailyAttempts": {
+          "$day": {
+            ".validate": "auth.token.email_verified === true && $day.matches(/^[0-9]{1,8}$/) && newData.hasChildren(['version','entryKey','generation','startedAt']) && newData.child('version').val() === 1 && newData.child('generation').val() === root.child('accountData').child($uid).child('profile/generation').val() && root.child('accountData').child($uid).child('profile/generation').exists() && ((!data.exists() && $day === ((now - now % 86400000) / 86400000) + '' && newData.child('startedAt').val() === now && !newData.child('score').exists()) || (data.exists() && newData.child('entryKey').val() === data.child('entryKey').val() && newData.child('startedAt').val() === data.child('startedAt').val() && newData.child('generation').val() === data.child('generation').val() && newData.child('score').exists() && (!data.child('score').exists() || newData.child('score').val() === data.child('score').val())))",
+            "version": {
+              ".validate": "newData.val() === 1"
+            },
+            "entryKey": {
+              ".validate": "newData.isString() && newData.val().matches(/^[a-zA-Z0-9-]{36}$/)"
+            },
+            "generation": {
+              ".validate": "newData.isString()"
+            },
+            "startedAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "score": {
+              ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 5000"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
         }
       }
     },
@@ -180,6 +203,15 @@
     "accountInternal": {
       ".read": false,
       ".write": false
+    },
+    "dailyScores": {
+      "$day": {
+        ".read": "$day.matches(/^[0-9]{1,8}$/)",
+        "$entry": {
+          ".write": "auth != null && auth.token.firebase.sign_in_provider === 'password' && root.child('accountData').child(auth.uid).child('dailyAttempts').child($day).child('entryKey').val() === $entry && (!newData.exists() || (auth.token.email_verified === true && root.child('accountData').child(auth.uid).child('dailyAttempts').child($day).child('generation').val() === root.child('accountData').child(auth.uid).child('profile/generation').val() && root.child('accountData').child(auth.uid).child('dailyAttempts').child($day).child('score').val() === newData.val() && (!data.exists() || data.val() === newData.val())))",
+          ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 5000"
+        }
+      }
     }
   }
 }
