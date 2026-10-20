@@ -1,4 +1,4 @@
-import * as accounts from './account-service.js?v=2';
+import * as accounts from './account-service.js?v=3';
 const byId=id=>document.getElementById(id),show=(id,visible)=>byId(id).classList.toggle('hidden',!visible);
 let registration=false,data={},mode='all',days=0,busy=false,requestId=0;
 function message(text,error=false){byId('accountStatus').textContent=text;byId('accountStatus').classList.toggle('error',error);}
@@ -93,13 +93,13 @@ byId('changePassword').onclick=()=>action(async()=>{const next=byId('newPassword
 byId('changeEmail').onclick=()=>action(async()=>{const input=byId('newEmail');if(!input.value||!input.reportValidity())throw new Error('Enter your new email address.');await accounts.changeEmail(password(),input.value);byId('securityForm').reset();message('Open the verification link sent to your new email to finish changing it.');});
 byId('exportAccount').onclick=()=>action(async()=>{
   const values=await accounts.loadData();
-  const exported={version:1,email:accounts.auth.currentUser.email,profile:values.profile||{},samples:window.BussoleAccountStatistics.select(values.samples),soloBests:Object.values(values.soloBests||{}).map(({generation,...record})=>record)};
+  const exported={version:1,email:accounts.auth.currentUser.email,profile:values.profile||{},samples:window.BussoleAccountStatistics.select(values.samples),soloBests:Object.values(values.soloBests||{}).map(({generation,...record})=>record),dailyAttempts:Object.entries(values.dailyAttempts||{}).map(([day,record])=>({day:Number(day),status:record.score===undefined?'started':'completed',...(record.score===undefined?{}:{score:record.score})}))};
   delete exported.profile.generation;
   const url=URL.createObjectURL(new Blob([JSON.stringify(exported,null,2)],{type:'application/json'})),link=document.createElement('a');
   link.href=url;link.download='bussole-my-data.json';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);message('Your data export is ready.');
 });
 byId('deleteStatistics').onclick=()=>action(async()=>{
-  if(!confirm('Delete all your saved statistics and remove your community contributions? This cannot be undone.'))return;
+  if(!confirm('Delete all your saved statistics, personal bests and daily scores, and remove your community contributions? This cannot be undone.'))return;
   await accounts.deleteStatistics();await refresh();message('Your statistics have been deleted. Community contributions are being removed.');
 });
 byId('deleteAccount').onclick=()=>action(async()=>{

@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const html=fs.readFileSync('index.html','utf8');
 assert.ok(!/leaflet|data-map-style|roomMapStyle|src="app.js/.test(html));
-assert.ok(html.includes('src="home.js?v=5"'));
+assert.ok(html.includes('src="home.js?v=6"'));
 function fixture({noLocation=false,blockedStorage=false}={}) {
   const ids=[...html.matchAll(/id="([^"]+)"/g)].map(match=>match[1]);
   const elements=new Map(ids.map(id=>[id,{value:'60',checked:false,disabled:false,style:{},classList:{hidden:false,toggle(){},add(){this.hidden=true},remove(){this.hidden=false}},events:{},setAttribute(){},focus(){this.focused=true},addEventListener(type,fn){(this.events[type]||=[]).push(fn)}}]));

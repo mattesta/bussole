@@ -777,3 +777,5 @@ select:focus-visible {
 .solo-difficulty .choice-buttons {flex:1;min-width:0;gap:5px;}
 .solo-difficulty .choice-buttons button {flex:1;min-width:0;padding:8px 5px;color:white;background:var(--ui-field);border:1px solid var(--ui-border);border-radius:9px;font:inherit;font-size:14px;}
 .solo-difficulty .choice-buttons button.selected {border-color:var(--ui-red);background:#71181d;}
+#soloDailyBtn {border-color:var(--ui-red);}
+#dailyInfo,#dailyComparison {font-size:13px;line-height:1.5;color:var(--ui-text-muted,#b6bdc9);}
