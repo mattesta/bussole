@@ -4,7 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>Bussole — My account</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1"><link rel="icon" type="image/svg+xml" href="icon.svg?v=1">
-  <link rel="stylesheet" href="style.css?v=29"><link rel="stylesheet" href="match-summary.css?v=7"><link rel="stylesheet" href="account.css?v=3">
+  <link rel="stylesheet" href="style.css?v=31"><link rel="stylesheet" href="match-summary.css?v=9"><link rel="stylesheet" href="account.css?v=5">
   <link rel="stylesheet" href="daily-progress.css?v=1">
 </head>
 <body class="account-page">
@@ -32,8 +32,9 @@
       </section>
       <form id="profileForm">
         <h2>Your profile</h2>
-        <label>Username<input id="accountUsername" maxlength="20" pattern="[a-zA-Z0-9_]{3,20}" autocomplete="nickname" placeholder="Optional"></label>
-        <p class="muted">3–20 letters, numbers or underscores. This is a display name, not a login, and can be changed. It is shared when you create a friend link, send/accept a request or opt into the global ranking.</p>
+        <label>Username<input id="accountUsername" maxlength="20" pattern="[a-zA-Z0-9_]{3,20}" autocomplete="nickname" placeholder="Choose a unique username"></label>
+        <p class="muted">3–20 letters, numbers or underscores. Unique regardless of capitalisation, editable, and searchable by other verified players for friend requests. Saving a username makes your display profile discoverable; statistics are shared only after you both accept. Email remains your login.</p>
+        <p id="usernameStatus" class="muted"></p>
         <label class="check-row"><input id="useUsernameInRooms" type="checkbox">Use my username in multiplayer rooms</label>
         <label class="check-row"><input id="communityConsent" type="checkbox">Contribute my results to community statistics</label>
         <p class="muted">Optional, off by default. Only pooled statistics are shown to others. No email, username, location or target is included in the comparison. Turning this off also removes your past contributions from the pool after it refreshes. <a href="account-privacy.html">Privacy details</a></p>
@@ -44,13 +45,14 @@
         <h2>Explorers</h2><p id="socialStatus" role="status" class="muted"></p>
         <div class="account-choices" role="group" aria-label="Social view"><button id="friendsTab" class="selected" type="button">Friends</button><button id="friendsBoardTab" type="button">Friends ranking</button><button id="globalBoardTab" type="button">Global ranking</button></div>
         <div id="friendsView"><button id="copyFriendLink" type="button">🔗 Copy my friend link</button><input id="myFriendLink" class="hidden" readonly aria-label="My friend link">
-          <form id="friendRequestForm"><label>Friend link or player ID<input id="friendInvite" type="text" autocomplete="off" placeholder="Paste a friend link"></label><button type="submit">Send friend request</button></form>
-          <p class="muted">Accepting a request shares your error statistics, personal bests and Daily journey with each other. No locations, targets, routes or email addresses are shared. Either player can remove the friendship to stop future access.</p><ul id="friendList" class="social-list"></ul>
+          <form id="friendRequestForm"><label>Friend username or link<input id="friendInvite" type="text" autocomplete="off" placeholder="Enter a username"></label><button type="submit">Send friend request</button></form>
+          <p class="muted">Accepting a request shares your error statistics, personal bests and Daily journey with each other. Friends also see only the points and destination names of your top Pro shots. Starting locations, directions, chosen distances and routes remain private. Email addresses are never shared. Either player can remove the friendship to stop future access.</p><ul id="friendList" class="social-list"></ul>
         </div>
         <div id="leaderboardView" class="hidden"><p class="muted">Balances sync when players use Bussole. Missed-day penalties apply even while offline. Global participation is optional.</p><button id="refreshLeaderboard" type="button">Refresh ranking</button><ol id="journeyRanking" class="social-list"></ol></div>
-        <section id="friendStatistics" class="hidden"><button id="closeFriendStatistics" type="button">Close statistics</button><h3 id="friendStatisticsName"></h3><p id="friendStatisticsCount" class="muted"></p><div id="friendJourney" class="daily-travel hidden"></div><dl id="friendMetrics" class="account-metrics"></dl><ul id="friendBests"></ul></section>
+        <section id="friendStatistics" class="hidden"><button id="closeFriendStatistics" type="button">Close statistics</button><h3 id="friendStatisticsName"></h3><p id="friendStatisticsCount" class="muted"></p><div id="friendJourney" class="daily-travel hidden"></div><dl id="friendMetrics" class="account-metrics"></dl><ul id="friendBests"></ul><h4>Top 3 Pro shots</h4><ol id="friendProShots"></ol></section>
       </section>
-      <section id="dailyJourney" aria-label="Daily journey"><div id="dailyTravel" class="daily-travel hidden"></div><p id="dailyTravelStatus" class="muted"></p></section>
+      <section id="dailyJourney" aria-label="Daily journey"><div id="dailyTravel" class="daily-travel hidden"></div><p id="dailyTravelStatus" class="muted"></p><p id="dailyAverage" class="muted"></p></section>
+      <section id="proBestShots"><h2>Top 3 Pro shots</h2><p class="muted">Your highest-scoring saved Pro guesses, with relative error breaking ties. Globe replays are private. Friends see only points and destination names. Earlier shots without saved geometry cannot be replayed.</p><ol id="proBestShotList"></ol></section>
       <section id="soloPersonalBests">
         <h2>Single-player personal bests</h2>
         <p class="muted">Completed 5-round games only · up to 5,000 points. Each difficulty, timer and blur combination has its own record. Practice does not set records.</p>
@@ -83,6 +85,7 @@
     </section>
     <footer><a href="account-privacy.html">Account privacy</a></footer>
   </main>
-  <script src="daily-challenge.js?v=2"></script><script src="daily-progress.js?v=1"></script><script src="social-model.js?v=1"></script><script src="solo-game.js?v=1"></script><script src="account-statistics.js?v=1"></script><script src="summary-charts.js?v=3"></script><script type="module" src="account.js?v=5"></script>
+  <dialog id="privateShotDialog" aria-label="Private Pro shot globe"><button id="closePrivateShot" type="button">Close globe</button><iframe id="privateShotFrame" title="Your private Pro shot" src="about:blank"></iframe></dialog>
+  <script src="daily-challenge.js?v=2"></script><script src="daily-progress.js?v=2"></script><script src="social-model.js?v=3"></script><script src="solo-game.js?v=1"></script><script src="account-statistics.js?v=3"></script><script src="summary-charts.js?v=4"></script><script type="module" src="account.js?v=7"></script>
 </body>
 </html>

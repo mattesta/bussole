@@ -102,7 +102,7 @@
         ".read": "auth != null && auth.uid === $uid && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com')",
         ".write": "auth != null && auth.uid === $uid && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com')",
         "profile": {
-          ".validate": "newData.hasChildren(['username','useInRooms','communityConsent','consentVersion','generation']) && newData.child('username').isString() && (newData.child('username').val() === '' || newData.child('username').val().matches(/^[a-zA-Z0-9_]{3,20}$/)) && newData.child('useInRooms').isBoolean() && newData.child('communityConsent').isBoolean() && (newData.child('communityConsent').val() !== true || auth.token.email_verified === true) && newData.child('consentVersion').val() === 1 && newData.child('generation').isString() && newData.child('generation').val().matches(/^[a-zA-Z0-9-]{36}$/) && (!newData.child('leaderboardOptIn').exists() || (newData.child('leaderboardOptIn').isBoolean() && (newData.child('leaderboardOptIn').val() !== true || auth.token.email_verified === true))) && (!newData.child('socialEnabled').exists() || (newData.child('socialEnabled').isBoolean() && (newData.child('socialEnabled').val() !== true || auth.token.email_verified === true)))",
+          ".validate": "newData.hasChildren(['username','useInRooms','communityConsent','consentVersion','generation']) && newData.child('username').isString() && (newData.child('username').val() === '' || newData.child('username').val().matches(/^[a-zA-Z0-9_]{3,20}$/)) && newData.child('useInRooms').isBoolean() && newData.child('communityConsent').isBoolean() && (newData.child('communityConsent').val() !== true || auth.token.email_verified === true) && newData.child('consentVersion').val() === 1 && newData.child('generation').isString() && newData.child('generation').val().matches(/^[a-zA-Z0-9-]{36}$/) && (!newData.child('leaderboardOptIn').exists() || (newData.child('leaderboardOptIn').isBoolean() && (newData.child('leaderboardOptIn').val() !== true || auth.token.email_verified === true))) && (!newData.child('socialEnabled').exists() || (newData.child('socialEnabled').isBoolean() && (newData.child('socialEnabled').val() !== true || auth.token.email_verified === true))) && (newData.child('username').val() === '' || newData.child('username').val() === data.child('username').val() || (auth.token.email_verified === true && newData.parent().parent().parent().child('usernames').child(newData.child('username').val().toLowerCase()).val() === $uid)) && (!data.child('username').isString() || data.child('username').val() === '' || data.child('username').val().toLowerCase() === newData.child('username').val().toLowerCase() || newData.parent().parent().parent().child('usernames').child(data.child('username').val().toLowerCase()).val() !== $uid)",
           "$other": {
             ".validate": "$other === 'username' || $other === 'useInRooms' || $other === 'communityConsent' || $other === 'consentVersion' || $other === 'generation' || $other === 'leaderboardOptIn' || $other === 'socialEnabled'"
           }
@@ -191,6 +191,74 @@
             },
             "$other": {
               ".validate": false
+            }
+          }
+        },
+        "proShots": {
+          "$slot": {
+            ".validate": "auth.token.email_verified === true && $slot.matches(/^[0-2]$/) && newData.child('sampleId').isString() && newData.child('sampleId').val().matches(/^[a-zA-Z0-9-]{20,64}$/) && newData.hasChildren(['day','mode','kind','points','generation','target','submission']) && newData.child('mode').val() === 'hard' && newData.child('generation').val() === root.child('accountData').child($uid).child('profile/generation').val() && root.child('accountData').child($uid).child('samples').child(newData.child('sampleId').val()).child('generation').val() === newData.child('generation').val() && root.child('accountData').child($uid).child('samples').child(newData.child('sampleId').val()).child('points').val() === newData.child('points').val()",
+            "generation": {
+              ".validate": "newData.isString()"
+            },
+            "day": {
+              ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= now / 86400000 + 1"
+            },
+            "mode": {
+              ".validate": "newData.isString() && newData.val().matches(/^(easy|medium|hard)$/)"
+            },
+            "kind": {
+              ".validate": "newData.isString() && newData.val().matches(/^(solo|multiplayer)$/)"
+            },
+            "points": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000 && newData.val() % 1 === 0"
+            },
+            "relativeError": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000000000"
+            },
+            "angleError": {
+              ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() < 180"
+            },
+            "distanceError": {
+              ".validate": "newData.parent().child('mode').val() === 'hard' && newData.isNumber() && newData.val() >= -100 && newData.val() <= 1000000000000"
+            },
+            "$other": {
+              ".validate": false
+            },
+            "target": {
+              ".validate": "newData.hasChildren(['lat','lon','label'])",
+              "lat": {
+                ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90"
+              },
+              "lon": {
+                ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180"
+              },
+              "label": {
+                ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 300"
+              },
+              "$other": {
+                ".validate": false
+              }
+            },
+            "submission": {
+              ".validate": "newData.hasChildren(['lat','lon','heading','distanceMeters'])",
+              "lat": {
+                ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90"
+              },
+              "lon": {
+                ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180"
+              },
+              "heading": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() < 360"
+              },
+              "distanceMeters": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000000"
+              },
+              "$other": {
+                ".validate": false
+              }
+            },
+            "sampleId": {
+              ".validate": "newData.isString() && newData.val().matches(/^[a-zA-Z0-9-]{20,64}$/)"
             }
           }
         }
@@ -325,6 +393,20 @@
         },
         "$other": {
           ".validate": false
+        },
+        "proShots": {
+          "$index": {
+            ".validate": "$index.matches(/^[0-2]$/) && newData.hasChildren(['points','destination'])",
+            "points": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000 && newData.val() % 1 === 0"
+            },
+            "destination": {
+              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 300"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
         }
       }
     },
@@ -351,6 +433,13 @@
           ".validate": "newData.isString()"
         },
         ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && auth.uid === $uid && (!newData.exists() || auth.token.email_verified === true)"
+      }
+    },
+    "usernames": {
+      "$name": {
+        ".read": "auth != null && auth.token.email_verified === true && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com')",
+        ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && ((newData.exists() && auth.token.email_verified === true && (!data.exists() || data.val() === auth.uid) && newData.val() === auth.uid) || (!newData.exists() && data.val() === auth.uid && (!newData.parent().parent().child('accountData').child(auth.uid).child('profile/username').isString() || newData.parent().parent().child('accountData').child(auth.uid).child('profile/username').val().toLowerCase() !== $name)))",
+        ".validate": "$name.matches(/^[a-z0-9_]{3,20}$/) && newData.isString() && newData.val() === auth.uid && newData.parent().parent().child('accountData').child(auth.uid).child('profile/username').isString() && newData.parent().parent().child('accountData').child(auth.uid).child('profile/username').val().toLowerCase() === $name"
       }
     }
   }

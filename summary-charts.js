@@ -31,6 +31,8 @@
     const highlight=node('g',{class:'chart-inspection-highlight','pointer-events':'none'});
     const annotation=node('g',{class:'chart-inspection-label','pointer-events':'none',visibility:'hidden'});
     svg.appendChild(highlight);
+    const listeners=[];
+    function listen(type,handler,options){svg.addEventListener(type,handler,options);listeners.push([type,handler,options]);}
     let selected=-1,holding=false,touchOwned=false,pointerId=null;
     const originalLabel=svg.getAttribute('aria-label');
     function clear() {
@@ -85,83 +87,125 @@
     // Prevent scrolling only when an inspection actually starts on a stroke.
     // Empty chart areas retain native page scrolling; captured gestures may
     // cross empty areas without highlighting them, then find another stroke.
-    svg.addEventListener('touchstart',event=>{
+    listen('touchstart',event=>{
       if(event.touches.length!==1){stop();return;}
       holding=true;const touch=event.touches[0];
       const index=hit(position(touch.clientX,touch.clientY));
       touchOwned=index>=0;if(touchOwned)event.preventDefault();select(index);
     },{passive:false});
-    svg.addEventListener('touchmove',event=>{
+    listen('touchmove',event=>{
       if(!holding||event.touches.length!==1||event.cancelable===false){stop();return;}
       const touch=event.touches[0],index=hit(position(touch.clientX,touch.clientY));
       if(touchOwned||index>=0){event.preventDefault();touchOwned=true;}
       select(index);
     },{passive:false});
-    svg.addEventListener('touchend',stop);svg.addEventListener('touchcancel',stop);
-    svg.addEventListener('pointerdown',event=>{
+    listen('touchend',stop);listen('touchcancel',stop);
+    listen('pointerdown',event=>{
       if(event.pointerType==='touch'||event.button!==0)return;
       holding=true;pointerId=event.pointerId;
       svg.setPointerCapture?.(pointerId);select(hit(position(event.clientX,event.clientY)));
     });
-    svg.addEventListener('pointermove',event=>{
+    listen('pointermove',event=>{
       if(event.pointerType==='touch'||!holding||event.pointerId!==pointerId)return;
       select(hit(position(event.clientX,event.clientY)));
     });
-    for(const type of ['pointerup','pointercancel','lostpointercapture'])svg.addEventListener(type,event=>{if(event.pointerType!=='touch')stop();});
-    svg.addEventListener('contextmenu',event=>{if(holding)event.preventDefault();});
-    return ()=>svg.appendChild(annotation);
+    for(const type of ['pointerup','pointercancel','lostpointercapture'])listen(type,event=>{if(event.pointerType!=='touch')stop();});
+    listen('contextmenu',event=>{if(holding)event.preventDefault();});
+    const finish=()=>svg.appendChild(annotation);finish.destroy=()=>{stop();for(const args of listeners)svg.removeEventListener?.(...args);};return finish;
   }
-  function distance(samples,mean) {
+  function tickStep(range){
+    const raw=range/5,power=10**Math.floor(Math.log10(raw));
+    return ([1,2,2.5,5,10].find(value=>value*power>=raw)||10)*power;
+  }
+  function ticks(min,max){
+    const step=tickStep(max-min),values=[];
+    for(let value=Math.ceil(min/step)*step;value<=max+step*1e-8;value+=step)values.push(Math.abs(value)<step*1e-8?0:value);
+    return values;
+  }
+  function interactive(kind,samples,mean){
     samples=valid(samples);
-    const {figure:chart,svg}=figure('distance',132,'Relative distance errors: short to the left, long to the right, target at zero',
-      'Ticks: guesses · White: target · Red diamond: mean bias. Hold a tick and slide to inspect.');
+    const isAngle=kind==='angle',height=isAngle?252:132;
+    const title=isAngle?'Angular errors relative to the target: negative left, positive right':'Relative distance errors: short to the left, long to the right, target at zero';
+    const {figure:chart,svg}=figure(kind,height,title,
+      `${isAngle?'Rays':'Ticks'}: guesses · White: target · Red: mean. Hold a stroke to inspect. Pinch to zoom; move two fingers to explore.`);
     const maximum=Math.max(1,...samples.map(sample=>Math.abs(sample.error)),Number.isFinite(mean)?Math.abs(mean):0);
     const magnitude=10**Math.floor(Math.log10(maximum));
-    const extent=([1,2,5,10].find(step=>step*magnitude>=maximum)||10)*magnitude;
-    const x=value=>160+value/extent*136;
-    line(svg,24,70,296,70,'chart-axis');
-    for(const tick of [-extent,extent])line(svg,x(tick),65,x(tick),75,'chart-axis');
-    line(svg,160,45,160,86,'chart-target');label(svg,160,23,'Target · 0%');
-    label(svg,24,122,`${signed(-extent)}%`,'start');label(svg,296,122,`${signed(extent)}%`,'end');
-    const segments=samples.map(sample=>[x(sample.error),64,x(sample.error),76]);
-    samples.forEach((sample,index)=>describe(line(svg,...segments[index],'chart-guess-tick'),sample,'%'));
-    const finish=inspect(svg,samples,segments,index=>[x(samples[index].error),76,x(samples[index].error),34],'%');
-    if(Number.isFinite(mean)) {
-      const center=x(mean);
-      line(svg,center,71,center,93,'chart-mean-stem');
-      const mark=node('path',{d:`M${center} 91l6 7-6 7-6-7z`,class:'chart-mean-dot'});
-      mark.appendChild(node('title',{},`Mean distance bias: ${signed(mean)}%`));svg.appendChild(mark);
+    const extent=isAngle?180:([1,2,5,10].find(step=>step*magnitude>=maximum)||10)*magnitude;
+    const maxZoom=isAngle?36:128;
+    let zoom=1,center=0,inspection=null,pinch=null;
+    const controls=document.createElement('div');controls.className='chart-zoom-controls';
+    function button(text,description,handler){const b=document.createElement('button');b.type='button';b.textContent=text;b.setAttribute('aria-label',description);b.onclick=handler;controls.append(b);return b;}
+    const less=button('−','Zoom out chart',()=>change(zoom/2,center));
+    button('Reset zoom','Reset chart zoom',()=>change(1,0));
+    const more=button('+','Zoom in chart',()=>change(zoom*2,center));
+    chart.insertBefore(controls,chart.lastChild);
+    function change(value,nextCenter){zoom=Math.max(1,Math.min(maxZoom,value));const half=extent/zoom;center=Math.max(-extent+half,Math.min(extent-half,nextCenter));draw();}
+    function draw(){
+      inspection?.destroy();svg.replaceChildren(node('title',{},title));
+      svg.dataset.zoom=String(zoom);less.disabled=zoom===1;more.disabled=zoom===maxZoom;
+      const half=extent/zoom,min=center-half,max=center+half,visible=samples.filter(sample=>sample.error>=min&&sample.error<=max);
+      let segments;
+      if(!isAngle){
+        const x=value=>160+(value-center)/half*136;
+        line(svg,24,70,296,70,'chart-axis');
+        for(const value of ticks(min,max)){const at=x(value);line(svg,at,65,at,75,'chart-axis');label(svg,at,118,`${signed(value)}%`);}
+        if(min<=0&&max>=0){line(svg,x(0),45,x(0),86,'chart-target');label(svg,x(0),23,'Target · 0%');}
+        else label(svg,160,23,'Relative distance error');
+        segments=visible.map(sample=>[x(sample.error),64,x(sample.error),76]);
+        visible.forEach((sample,i)=>describe(line(svg,...segments[i],'chart-guess-tick'),sample,'%'));
+        inspection=inspect(svg,visible,segments,i=>[x(visible[i].error),76,x(visible[i].error),34],'%');
+        if(Number.isFinite(mean)&&mean>=min&&mean<=max){const at=x(mean);line(svg,at,71,at,93,'chart-mean-stem');const mark=node('path',{d:`M${at} 91l6 7-6 7-6-7z`,class:'chart-mean-dot'});mark.append(node('title',{},`Mean distance bias: ${signed(mean)}%`));svg.append(mark);}
+      }else{
+        const full=zoom===1,cx=160,cy=full?128:216,radius=full?86:130;
+        // At overview the true circle is retained. Zoom opens an angular window
+        // into the upper fan; labels always state the original error in degrees.
+        const radians=degrees=>(full?degrees:(degrees-center)/half*90)*Math.PI/180;
+        const end=(degrees,length=radius)=>[cx+Math.sin(radians(degrees))*length,cy-Math.cos(radians(degrees))*length];
+        if(full){
+          svg.appendChild(node('circle',{cx,cy,r:radius,class:'chart-guide'}));line(svg,cx-radius,cy,cx+radius,cy,'chart-axis');
+          label(svg,cx,24,'Target · 0°');label(svg,24,132,'−90°','start');label(svg,296,132,'+90°','end');label(svg,cx,237,'±180°');
+        }else{
+          svg.append(node('path',{d:`M${cx-radius} ${cy} A${radius} ${radius} 0 0 1 ${cx+radius} ${cy}`,class:'chart-guide'}));
+          label(svg,cx,22,`Angular window · ${signed(min)}° to ${signed(max)}°`);
+          for(const value of ticks(min,max)){
+            const [x1,y1]=end(value,radius-4),[x2,y2]=end(value,radius+4),[x,y]=end(value,radius+18);
+            line(svg,x1,y1,x2,y2,'chart-axis');label(svg,x,y+4,`${signed(value)}°`);
+          }
+        }
+        if(min<=0&&max>=0)line(svg,cx,cy,...end(0),'chart-target');
+        segments=visible.map(sample=>[cx,cy,...end(sample.error)]);
+        visible.forEach((sample,i)=>describe(line(svg,...segments[i],'chart-guess-ray'),sample,'°'));
+        inspection=inspect(svg,visible,segments,i=>[cx,cy,...end(visible[i].error,full?108:151)],'°');
+        if(Number.isFinite(mean)&&mean>=min&&mean<=max){const [x,y]=end(mean);const ray=line(svg,cx,cy,x,y,'chart-mean-ray');ray.append(node('title',{},`Circular mean angle: ${signed(mean)}°`));svg.append(node('circle',{cx:x,cy:y,r:3.5,class:'chart-mean-dot'}));}
+        svg.append(node('circle',{cx,cy,r:3,class:'chart-origin'}));
+      }
+      inspection();
+      if(!samples.length)label(svg,160,isAngle?166:103,isAngle?'No valid angle guesses.':'No valid Pro distance guesses.');
     }
-    finish();
-    if(!samples.length)label(svg,160,103,'No valid Pro distance guesses.');
-    return chart;
+    const midpoint=touches=>(touches[0].clientX+touches[1].clientX)/2;
+    const gap=touches=>Math.hypot(touches[0].clientX-touches[1].clientX,touches[0].clientY-touches[1].clientY);
+    // Capture pinch before one-finger inspection. Two-finger events stay on the
+    // same SVG while its contents redraw, preserving the gesture on iOS.
+    svg.addEventListener('touchstart',event=>{
+      if(event.touches.length!==2)return;
+      event.preventDefault();event.stopImmediatePropagation();inspection?.destroy();
+      pinch={gap:Math.max(1,gap(event.touches)),mid:midpoint(event.touches),zoom,center};
+    },{passive:false,capture:true});
+    svg.addEventListener('touchmove',event=>{
+      if(!pinch)return;event.preventDefault();event.stopImmediatePropagation();if(event.touches.length!==2)return;
+      const value=Math.max(1,Math.min(maxZoom,pinch.zoom*gap(event.touches)/pinch.gap));
+      const width=svg.getBoundingClientRect().width||320,half=extent/value;
+      const anchor=(pinch.mid-svg.getBoundingClientRect().left)/width*320;
+      const offset=(anchor-160)/136;
+      const nextCenter=isAngle?pinch.center-(midpoint(event.touches)-pinch.mid)/width*2*extent/pinch.zoom:pinch.center+offset*(extent/pinch.zoom-half)-(midpoint(event.touches)-pinch.mid)/width*320/136*half;
+      change(value,nextCenter);
+    },{passive:false,capture:true});
+    for(const type of ['touchend','touchcancel'])svg.addEventListener(type,event=>{
+      if(!pinch)return;event.stopImmediatePropagation();if(event.touches.length===0){pinch=null;draw();}
+    },{capture:true});
+    draw();return chart;
   }
-  function angle(samples,mean) {
-    samples=valid(samples);
-    const {figure:chart,svg}=figure('angle',252,'Angular errors relative to the target: negative left, positive right',
-      samples.length&&mean===null?'Each ray is a guess. No clear mean direction.':'Rays: guesses · White: target · Red: circular mean. Hold a ray and slide to inspect.');
-    const cx=160,cy=128,radius=86;
-    const end=degrees=>[cx+Math.sin(degrees*Math.PI/180)*radius,cy-Math.cos(degrees*Math.PI/180)*radius];
-    svg.appendChild(node('circle',{cx,cy,r:radius,class:'chart-guide'}));
-    line(svg,cx-radius,cy,cx+radius,cy,'chart-axis');
-    line(svg,cx,cy,cx,cy-radius,'chart-target');
-    label(svg,cx,24,'Target · 0°');label(svg,24,132,'−90°','start');label(svg,296,132,'+90°','end');label(svg,cx,237,'±180°');
-    const segments=samples.map(sample=>[cx,cy,...end(sample.error)]);
-    samples.forEach((sample,index)=>describe(line(svg,...segments[index],'chart-guess-ray'),sample,'°'));
-    const finish=inspect(svg,samples,segments,index=>{
-      const radians=samples[index].error*Math.PI/180;
-      return [cx,cy,cx+Math.sin(radians)*108,cy-Math.cos(radians)*108];
-    },'°');
-    if(Number.isFinite(mean)) {
-      const [x,y]=end(mean);
-      const ray=line(svg,cx,cy,x,y,'chart-mean-ray');
-      ray.appendChild(node('title',{},`Circular mean angle: ${signed(mean)}°`));
-      svg.appendChild(node('circle',{cx:x,cy:y,r:3.5,class:'chart-mean-dot'}));
-    }
-    svg.appendChild(node('circle',{cx,cy,r:3,class:'chart-origin'}));
-    finish();
-    if(!samples.length)label(svg,cx,166,'No valid angle guesses.');
-    return chart;
-  }
+  const distance=(samples,mean)=>interactive('distance',samples,mean);
+  const angle=(samples,mean)=>interactive('angle',samples,mean);
   root.BussoleSummaryCharts={distance,angle};
 })(window);

@@ -36,7 +36,7 @@ const fakeMap=`(()=>{
   });
   await page.goto('http://localhost/account.html');await page.locator('#showRegister').click();await page.locator('#accountEmail').fill('daily@example.test');await page.locator('#accountPassword').fill('Explorer123!');await page.locator('#authSubmit').click();
   await page.waitForFunction(()=>document.getElementById('accountStatus').textContent.includes('Account created'));
-  const uid=await page.evaluate(async()=>(await import('./account-service.js?v=4')).auth.currentUser.uid);await admin.updateUser(uid,{emailVerified:true});await page.locator('#checkVerification').click();await page.waitForFunction(()=>document.getElementById('accountStatus').textContent==='Your account is ready.');
+  const uid=await page.evaluate(async()=>(await import('./account-service.js?v=6')).auth.currentUser.uid);await admin.updateUser(uid,{emailVerified:true});await page.locator('#checkVerification').click();await page.waitForFunction(()=>document.getElementById('accountStatus').textContent==='Your account is ready.');
   const day=Math.floor(Date.now()/86400000);
   async function openDaily(){await page.goto('http://localhost/');await page.locator('#singlePlayerBtn').click();await page.locator('#soloDailyBtn').click();await page.waitForFunction(()=>!document.getElementById('startSoloBtn').disabled);}
   await openDaily();assert.equal(await page.locator('#soloConfigControls').isVisible(),false);assert.equal(await page.locator('#startSoloBtn').textContent(),'Start official challenge');
@@ -72,14 +72,16 @@ const fakeMap=`(()=>{
   }
   await page.waitForFunction(()=>document.getElementById('soloRecordStatus').textContent.includes('Unranked game'));
   assert.equal((await db.ref(`dailyScores/${day}/${attempt.entryKey}`).get()).val(),total);
-  // Historical completed days earn km, missed days subtract 500 with a zero floor.
+  // Historical completed days earn km, missed days use progressive penalties with a zero floor.
   const privatePath=`accountData/${uid}/dailyAttempts`,generation=attempt.generation;
   const historical=[[-4,5000],[-3,5000],[-1,0]];
   for(const [offset,score] of historical){const entryKey=`00000000-0000-0000-0000-${String(day+offset).padStart(12,'0')}`;await db.ref(`${privatePath}/${day+offset}`).set({entryKey,generation,startedAt:(day+offset)*86400000,version:1,score});await db.ref(`dailyScores/${day+offset}/${entryKey}`).set(score);}
-  const expectedKm=500+total/10;
+  const expectedKm=900+total/10;
   // Export includes only day/status/score; erase also removes the shared contribution.
   await page.goto('http://localhost/account.html');
   await page.locator('#dailyTravel .daily-travel-distance').waitFor();assert.equal(await page.locator('#dailyTravel .daily-travel-distance').textContent(),`${new Intl.NumberFormat('en-US',{maximumFractionDigits:1}).format(expectedKm)} km`);
+  assert.ok((await page.locator('#dailyAverage').textContent()).includes(new Intl.NumberFormat('en-US',{maximumFractionDigits:1}).format((10000+total)/4)));
+  assert.match(await page.locator('#dailyAverage').textContent(),/4 completed challenges/);
   const exportedPromise=page.waitForEvent('download');await page.locator('#exportAccount').click();const download=await exportedPromise;const data=JSON.parse(fs.readFileSync(await download.path(),'utf8'));
   assert.deepEqual(data.dailyAttempts.find(row=>row.day===day),{day,status:'completed',score:total});assert.equal(data.dailyJourney.km,expectedKm);assert.equal(data.dailyJourney.missedDays,1);assert.equal(JSON.stringify(data).includes(attempt.entryKey),false);
   await page.locator('#deleteStatistics').click();await page.waitForFunction(()=>document.getElementById('accountStatus').textContent.includes('deleted'));
@@ -90,7 +92,7 @@ const fakeMap=`(()=>{
   const reserved=(await db.ref(`accountData/${uid}/dailyAttempts/${day}`).get()).val();await page.reload();await page.waitForFunction(()=>document.getElementById('dailyGameNotice').textContent.includes('Unranked'));
   assert.equal((await db.ref(`accountData/${uid}/dailyAttempts/${day}`).get()).val().entryKey,reserved.entryKey);
   // Account deletion also removes a completed public contribution after reauthentication.
-  await page.evaluate(async data=>(await import('./daily-service.js?v=3')).complete({...data.reserved,uid:data.uid,day:data.day,official:true},0),{reserved,uid,day});
+  await page.evaluate(async data=>(await import('./daily-service.js?v=4')).complete({...data.reserved,uid:data.uid,day:data.day,official:true},0),{reserved,uid,day});
   assert.equal((await db.ref(`dailyScores/${day}/${reserved.entryKey}`).get()).val(),0);
   await page.goto('http://localhost/account.html');await page.locator('#currentPassword').fill('Explorer123!');await page.locator('#deleteAccount').click();await page.locator('#accountAuth').waitFor({state:'visible'});
   assert.equal((await db.ref(`dailyScores/${day}/${reserved.entryKey}`).get()).exists(),false);assert.equal((await db.ref(`accountData/${uid}`).get()).exists(),false);

@@ -5,7 +5,7 @@ import {
   serverTimestamp, set, update
 } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js';
 import { firebaseConfig } from './firebase-config.js';
-import { beginRound, saveSample } from './account-service.js?v=4';
+import { beginRound, saveSample } from './account-service.js?v=6';
 
 const parameters = new URLSearchParams(location.search);
 const multiplayerMode = parameters.get('multiplayer') === '1';
@@ -179,14 +179,14 @@ if (multiplayerMode) {
     const ranking = window.BussoleScoring.rank(results, players, round);
     const personal = entries.find(entry => entry.uid === user.uid)?.submission;
     if (personal) {
-      // Only the current account's scalar errors enter durable statistics.
+      // Scalar errors and the owner's private Pro highlights are saved separately.
       const personalTarget = {...target}, personalMode = settings.mode || 'medium';
       const recordKey = `${roomCode}:${roomMeta.createdAt}:${round}`;
       accountRound.then(context => {
         if (!context) return false;
         const measured = window.BussoleReportGeometry.measure(personal, personalTarget, personalMode);
         const sample = window.BussoleAccountStatistics.sample(measured, personal, personalMode, 'multiplayer');
-        return saveSample(context, sample, recordKey);
+        return saveSample(context, sample, recordKey, {submission:personal,target:personalTarget});
       })
         .then(saved => { if(saved)document.getElementById('accountSaveStatus').textContent = 'Statistics saved.'; })
         .catch(() => { document.getElementById('accountSaveStatus').textContent = 'Statistics could not be saved. Check your connection.'; });

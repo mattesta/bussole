@@ -1,0 +1,22 @@
+for(const key of ['HTTP_PROXY','HTTPS_PROXY','http_proxy','https_proxy'])delete process.env[key];
+const fs=require('node:fs'),assert=require('node:assert/strict'),{initializeTestEnvironment,assertSucceeds:ok,assertFails:no}=require('@firebase/rules-unit-testing'),{ref,get,set,update}=require('firebase/database');
+(async()=>{const env=await initializeTestEnvironment({projectId:'demo-bussole',database:{host:'127.0.0.1',port:9000,rules:fs.readFileSync('database.rules.json','utf8')}});try{
+ const db=uid=>env.authenticatedContext(uid,{email_verified:true,firebase:{sign_in_provider:'password'}}).database(),a=db('shot-owner'),b=db('shot-friend'),c=db('shot-stranger'),generation='12345678-1234-1234-1234-123456789012',day=Math.floor(Date.now()/86400000),id='12345678-1234-1234-1234-123456789abc';
+ const profile={username:'',useInRooms:false,communityConsent:false,consentVersion:1,generation,socialEnabled:true};
+ for(const [uid,database] of [['shot-owner',a],['shot-friend',b]])await ok(set(ref(database,`accountData/${uid}/profile`),profile));
+ const sample={day,mode:'hard',kind:'solo',points:999,generation,relativeError:1};
+ await ok(set(ref(a,`accountData/shot-owner/samples/${id}`),sample));
+ const shot={...sample,sampleId:id,target:{lat:45,lon:12,label:'Venice'},submission:{lat:48,lon:11,heading:90,distanceMeters:20000}};
+ await ok(set(ref(a,`accountData/shot-owner/proShots/0`),shot));await ok(get(ref(a,'accountData/shot-owner/proShots')));
+ await env.withSecurityRulesDisabled(context=>update(ref(context.database()),{'connections/shot-owner/shot-friend':{state:'accepted',requestedBy:'shot-owner'},'connections/shot-friend/shot-owner':{state:'accepted',requestedBy:'shot-owner'}}));
+ await no(get(ref(b,'accountData/shot-owner/proShots')));await no(get(ref(b,`accountData/shot-owner/proShots/0`)));await no(get(ref(c,'accountData/shot-owner')));await no(set(ref(b,`accountData/shot-owner/proShots/0`),shot));
+ const share={generation,journey:{asOfDay:day,tenths:0,lastDay:-1},proShots:[{points:999,destination:'Venice'}]};
+ await ok(set(ref(a,'friendShares/shot-owner'),share));const visible=(await ok(get(ref(b,'friendShares/shot-owner/proShots')))).val();assert.deepEqual(visible,[{points:999,destination:'Venice'}]);await no(get(ref(c,'friendShares/shot-owner/proShots')));
+ for(const extra of [{lat:48},{heading:90},{target:shot.target},{submission:shot.submission},{route:[[48,11],[45,12]]}])await no(set(ref(a,'friendShares/shot-owner'),{...share,proShots:[{...share.proShots[0],...extra}]}));
+ await no(set(ref(a,`accountData/shot-owner/proShots/0`),{...shot,submission:{...shot.submission,lat:91}}));
+ await no(set(ref(a,`accountData/shot-owner/proShots/0`),{...shot,target:{...shot.target,secret:'no'}}));
+ await no(set(ref(a,'accountData/shot-owner/proShots'),Object.fromEntries([0,1,2,3].map(n=>[n,shot]))));
+ await ok(update(ref(a),{'accountData/shot-owner/proShots':null,'accountData/shot-owner/samples':null,'friendShares/shot-owner':null,'accountData/shot-owner/profile/generation':'22345678-1234-1234-1234-123456789012'}));
+ await no(set(ref(a,`accountData/shot-owner/proShots/0`),shot));
+ console.log('Pro highlights: owner-only geometry, accepted-friend score/destination projection, stranger denial, forbidden shared geometry, strict fields, bounded retention and stale-generation rejection passed.');
+}finally{await env.cleanup();}})().catch(error=>{console.error(error);process.exitCode=1});

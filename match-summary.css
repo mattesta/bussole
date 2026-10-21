@@ -49,3 +49,5 @@
 .chart-selected-stroke {stroke:white;stroke-width:4.5;stroke-linecap:round;}
 .chart-inspection-box {fill:#111c2c;stroke:#ffffff70;stroke-width:1;}
 .chart-inspection-text {fill:white;font:12px system-ui,sans-serif;}
+
+.chart-zoom-controls{display:flex;gap:6px;justify-content:center;margin:5px 0 8px}.chart-zoom-controls button{min-width:42px;min-height:36px;padding:5px 10px;font-size:13px;background:var(--ui-panel,#151c27);color:var(--ui-text,#fff);border:1px solid var(--ui-border,#ffffff30);border-radius:8px}.chart-zoom-controls button:disabled{opacity:.4}.summary-chart svg{overflow:hidden}.summary-chart .chart-label{font-size:10px}

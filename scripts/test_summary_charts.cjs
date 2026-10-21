@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
-class Element{constructor(tag){this.tag=tag;this.children=[];this.attrs={};this.events={};}setAttribute(k,v){this.attrs[k]=String(v)}getAttribute(k){return this.attrs[k]}replaceChildren(...nodes){this.children=nodes}addEventListener(type,fn){this.events[type]=fn}getBoundingClientRect(){return{left:0,top:0,width:320}}append(...nodes){this.children.push(...nodes)}appendChild(n){this.children.push(n);return n}}
+class Element{constructor(tag){this.tag=tag;this.children=[];this.attrs={};this.events={};this.dataset={};}setAttribute(k,v){this.attrs[k]=String(v)}getAttribute(k){return this.attrs[k]}get lastChild(){return this.children.at(-1)}insertBefore(n,before){this.children.splice(this.children.indexOf(before),0,n)}replaceChildren(...nodes){this.children=nodes}addEventListener(type,fn){this.events[type]=fn}getBoundingClientRect(){return{left:0,top:0,width:320}}append(...nodes){this.children.push(...nodes)}appendChild(n){this.children.push(n);return n}}
 const c=vm.createContext({window:{},document:{createElement:tag=>new Element(tag),createElementNS:(ns,tag)=>new Element(tag)},Intl});vm.runInContext(fs.readFileSync('summary-charts.js','utf8'),c);
 const chart=c.window.BussoleSummaryCharts;
 const walk=element=>[element,...element.children.flatMap(walk)];

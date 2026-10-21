@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js';
 import {
-  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
+  getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
   sendEmailVerification, sendPasswordResetEmail, reload, EmailAuthProvider,
   reauthenticateWithCredential, updatePassword, verifyBeforeUpdateEmail, deleteUser,
   GoogleAuthProvider, signInWithPopup, linkWithPopup, reauthenticateWithPopup, linkWithCredential
@@ -11,7 +11,7 @@ import { firebaseConfig } from './firebase-config.js';
 const app=initializeApp(firebaseConfig);
 export const auth=getAuth(app);
 export const db=getDatabase(app);
-export { ref, get, update, runTransaction, set, onValue, serverTimestamp };
+export { ref, get, update, runTransaction, set, onValue, serverTimestamp, onAuthStateChanged };
 export const defaultProfile={username:'',useInRooms:false,communityConsent:false,consentVersion:1,leaderboardOptIn:false,socialEnabled:false};
 const account=user=>Boolean(user&&!user.isAnonymous&&user.email);
 const verified=user=>account(user)&&user.emailVerified;
@@ -36,7 +36,7 @@ export async function google(){
 }
 let syncTask;
 export function scheduleSocialSync(){
- if(!syncTask)syncTask=import('./social-service.js?v=1').then(s=>s.syncOwn()).catch(()=>null).finally(()=>{syncTask=null;});
+ if(!syncTask)syncTask=import('./social-service.js?v=3').then(s=>s.syncOwn()).catch(()=>null).finally(()=>{syncTask=null;});
  return syncTask;
 }
 export const logout=()=>signOut(auth);
@@ -57,6 +57,10 @@ export async function loadData(){
   if(!data.profile)data.profile=await loadProfile();
   return data;
 }
+export async function usernameOwner(username){
+ const key=String(username||'').trim().toLowerCase();if(!/^[a-z0-9_]{3,20}$/.test(key))return null;
+ return (await get(ref(db,`usernames/${key}`))).val();
+}
 export async function saveProfile(profile){
   const user=current();
   const username=String(profile.username||'').trim();
@@ -64,10 +68,15 @@ export async function saveProfile(profile){
   if(profile.leaderboardOptIn&&!username)throw Error('Choose a username before joining the global leaderboard.');
   if(profile.communityConsent&&!verified(user))throw new Error('Verify your email before contributing.');
   const existingProfile=await loadProfile();
+  if(username&&!verified(user))throw Error('Verify your email before reserving a username.');
+  const key=username.toLowerCase(),oldKey=String(existingProfile.username||'').toLowerCase();
+  if(key){const owner=await usernameOwner(key);if(owner&&owner!==user.uid)throw Error('This username is taken. Choose a different one.');}
   const fields={username,useInRooms:Boolean(username&&profile.useInRooms),communityConsent:Boolean(profile.communityConsent),consentVersion:1,leaderboardOptIn:Boolean(profile.leaderboardOptIn)};
   const changes=Object.fromEntries(Object.entries(fields).map(([key,value])=>[`${path(user.uid)}/profile/${key}`,value]));
-  if(!fields.leaderboardOptIn){changes[`journeyLeaderboard/${user.uid}`]=null;if(!existingProfile.socialEnabled){changes[`publicProfiles/${user.uid}`]=null;changes[`friendShares/${user.uid}`]=null;}}
-  await update(ref(db),changes);
+  if(key){changes[`usernames/${key}`]=user.uid;changes[`${path(user.uid)}/profile/socialEnabled`]=true;}
+  if(oldKey&&oldKey!==key&&await usernameOwner(oldKey)===user.uid)changes[`usernames/${oldKey}`]=null;
+  if(!fields.leaderboardOptIn){changes[`journeyLeaderboard/${user.uid}`]=null;if(!existingProfile.socialEnabled&&!key){changes[`publicProfiles/${user.uid}`]=null;changes[`friendShares/${user.uid}`]=null;}}
+  try{await update(ref(db),changes);}catch(error){if(key&&await usernameOwner(key).catch(()=>null)!==user.uid)throw Error('This username could not be reserved. It may already be taken; retry or choose another.');throw error;}
   await scheduleSocialSync();
 }
 export async function roomName(){
@@ -81,7 +90,7 @@ export async function beginRound(){
   try{const profile=await loadProfile();return {uid:user.uid,id:crypto.randomUUID(),generation:profile.generation};}
   catch{return null;}
 }
-export async function saveSample(context,sample,key){
+export async function saveSample(context,sample,key,detail){
   if(!context||!sample)return false;
   const user=auth.currentUser;
   if(!verified(user)||user.uid!==context.uid)return false;
@@ -90,6 +99,15 @@ export async function saveSample(context,sample,key){
   const clean=window.BussoleAccountStatistics.clean(sample);
   if(!clean)return false;
   await set(ref(db,`${path(user.uid)}/samples/${id}`),{...clean,generation:context.generation});
+  const geometry=clean.mode==='hard'?window.BussoleAccountStatistics.shotGeometry(detail):null;
+  if(geometry){
+    const candidate={...clean,...geometry,sampleId:id,generation:context.generation};
+    await runTransaction(ref(db,`${path(user.uid)}/proShots`),previous=>{
+      const rows=Object.values(previous||{}).filter(row=>row.generation===context.generation&&window.BussoleAccountStatistics.clean(row)).map(row=>[row.sampleId,row]);
+      const records=Object.fromEntries(rows);records[id]=candidate;
+      return Object.fromEntries(window.BussoleAccountStatistics.bestShotEntries(records).map((row,index)=>[index,records[row.id]]));
+    });
+  }
   scheduleSocialSync();
   return true;
 }
@@ -112,7 +130,7 @@ export async function deleteStatistics(){
   const user=current();
   await loadProfile();
   const data=await loadData(), changes=dailyRemovals(data.dailyAttempts);
-  Object.assign(changes,{[`${path(user.uid)}/samples`]:null,[`${path(user.uid)}/soloBests`]:null,[`${path(user.uid)}/dailyAttempts`]:null,[`${path(user.uid)}/profile/communityConsent`]:false,[`${path(user.uid)}/profile/leaderboardOptIn`]:false,[`${path(user.uid)}/profile/consentVersion`]:1,[`${path(user.uid)}/profile/generation`]:crypto.randomUUID(),[`friendShares/${user.uid}`]:null,[`journeyLeaderboard/${user.uid}`]:null});
+  Object.assign(changes,{[`${path(user.uid)}/samples`]:null,[`${path(user.uid)}/proShots`]:null,[`${path(user.uid)}/soloBests`]:null,[`${path(user.uid)}/dailyAttempts`]:null,[`${path(user.uid)}/profile/communityConsent`]:false,[`${path(user.uid)}/profile/leaderboardOptIn`]:false,[`${path(user.uid)}/profile/consentVersion`]:1,[`${path(user.uid)}/profile/generation`]:crypto.randomUUID(),[`friendShares/${user.uid}`]:null,[`journeyLeaderboard/${user.uid}`]:null});
   if(!data.profile?.socialEnabled)changes[`publicProfiles/${user.uid}`]=null;
   await update(ref(db),changes);
 }
@@ -126,6 +144,7 @@ export async function deleteAccount(password){
   // Remove database data while cleanup is still authorized, before deleting Authentication.
   const data=await loadData();
   const links=(await get(ref(db,`connections/${user.uid}`))).val()||{},changes={...dailyRemovals(data.dailyAttempts),[path(user.uid)]:null,[`friendShares/${user.uid}`]:null,[`journeyLeaderboard/${user.uid}`]:null,[`publicProfiles/${user.uid}`]:null};
+  const username=data.profile?.username;if(username&&await usernameOwner(username)===user.uid)changes[`usernames/${username.toLowerCase()}`]=null;
   for(const other of Object.keys(links)){changes[`connections/${other}/${user.uid}`]=null;changes[`connections/${user.uid}/${other}`]=null;}
   await update(ref(db),changes);
   await deleteUser(user);

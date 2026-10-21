@@ -1,8 +1,8 @@
-import * as accounts from './account-service.js?v=4';
-import { today } from './daily-service.js?v=3';
-import * as social from './social-service.js?v=1';
+import * as accounts from './account-service.js?v=6';
+import { today } from './daily-service.js?v=4';
+import * as social from './social-service.js?v=3';
 const byId=id=>document.getElementById(id),show=(id,visible)=>byId(id).classList.toggle('hidden',!visible);
-let registration=false,data={},mode='all',days=0,busy=false,requestId=0,travelDay=null,stopConnections=null,socialScope='friends',selectedFriend=null,currentConnections={},friendRenderVersion=0;
+let loadedOwner=null,registration=false,data={},mode='all',days=0,busy=false,requestId=0,travelDay=null,stopConnections=null,socialScope='friends',selectedFriend=null,currentConnections={},friendRenderVersion=0;
 function message(text,error=false){byId('accountStatus').textContent=text;byId('accountStatus').classList.toggle('error',error);}
 async function action(work){
   if(busy)return;busy=true;document.querySelectorAll('button').forEach(button=>button.disabled=true);
@@ -11,23 +11,28 @@ async function action(work){
 }
 async function refresh(){
   const user=await accounts.ready();show('accountAuth',!user);show('accountDetails',Boolean(user));
+  closeShotGlobe();
   stopConnections?.();stopConnections=null;show('friendStatistics',false);selectedFriend=null;currentConnections={};friendRenderVersion++;byId('friendList').replaceChildren();
   if(!user){data={};message('An account is optional. Guest games are not added to your history.');return;}
   byId('signedInEmail').textContent=user.email;byId('connectGoogle').textContent=accounts.hasGoogle()?'Google connected':'Connect Google';byId('connectGoogle').disabled=accounts.hasGoogle();show('emailSecurity',accounts.hasPassword());byId('googleSecurityNote').textContent=accounts.hasGoogle()?'Google is connected. Leave Current password blank to confirm sensitive changes with Google. You can add an email/password login by setting a new password.':'Connecting Google keeps this account and its statistics. Guest games are never imported.';show('verificationPanel',!user.emailVerified);
-  data=await accounts.loadData();const profile={...accounts.defaultProfile,...data.profile};
+  data=await accounts.loadData();loadedOwner=user.uid;const profile={...accounts.defaultProfile,...data.profile};
   byId('accountUsername').value=profile.username;byId('useUsernameInRooms').checked=profile.useInRooms;
   byId('leaderboardOptIn').checked=Boolean(profile.leaderboardOptIn);byId('leaderboardOptIn').disabled=!user.emailVerified;
   byId('communityConsent').checked=profile.communityConsent;byId('communityConsent').disabled=!user.emailVerified;
-  await renderJourney();renderBests();renderStatistics();
+  await renderJourney();renderBests();renderBestShots();renderStatistics();
+  const claimed=profile.username?await accounts.usernameOwner(profile.username).catch(()=>null):null;
+  byId('usernameStatus').textContent=profile.username&&claimed!==user.uid?'Save preferences to reserve your existing username. If it is taken, choose a different one.':'';
   await refreshSocial();message(user.emailVerified?'Your account is ready.':'Verify your email to start saving statistics.');
 }
 async function renderJourney(){
  const element=byId('dailyTravel'),status=byId('dailyTravelStatus');travelDay=null;
- window.BussoleDailyProgress.render(element,null);
+ window.BussoleDailyProgress.render(element,null);byId('dailyAverage').textContent='';
  if(!accounts.auth.currentUser?.emailVerified){status.textContent='Verify your email to collect Daily kilometres.';return;}
  try{
   travelDay=await today();
   window.BussoleDailyProgress.render(element,window.BussoleDailyProgress.calculate(data.dailyAttempts,travelDay,data.profile?.generation));
+  const progress=window.BussoleDailyProgress.calculate(data.dailyAttempts,travelDay,data.profile?.generation);
+  byId('dailyAverage').textContent=progress.completed?`Daily average: ${window.BussoleDailyProgress.number(progress.averageScore)} / 5,000 points · ${progress.completed} completed challenges. Missed and unfinished days are excluded.`:'Complete an official Daily to see your average.';
   status.textContent='Only completed official Daily challenges count. Today is not missed until 00:00 UTC. Earth’s circumference: approximately 40,075 km.';
  }catch{status.textContent='Your journey is temporarily unavailable. Refresh when connected.';}
 }
@@ -43,6 +48,32 @@ function renderBests(){
     list.append(item);
   }
 }
+function closeShotGlobe(){const frame=byId('privateShotFrame');frame.src='about:blank';byId('privateShotDialog').close();}
+function openShotGlobe(id){
+ if(accounts.auth.currentUser?.uid!==loadedOwner)return;
+ const shot=Object.values(data.proShots||{}).find(row=>row.sampleId===id);if(!shot||shot.generation!==data.profile?.generation)return;
+ const report={version:1,uid:'owner',solo:true,publicRoom:true,rounds:[{round:1,mode:'hard',target:shot.target,entries:[{uid:'owner',name:'You',color:'#e41a1c',errorColor:'#ff8587',submission:shot.submission}]}]};
+ const frame=byId('privateShotFrame');frame.onload=()=>frame.contentWindow.postMessage({type:'bussole-match-report',report},location.origin);
+ frame.src='match-summary.html?embedded=1';byId('privateShotDialog').showModal();
+}
+byId('closePrivateShot').onclick=closeShotGlobe;
+accounts.onAuthStateChanged(accounts.auth,closeShotGlobe);
+window.addEventListener('message',event=>{if(event.origin===location.origin&&event.source===byId('privateShotFrame').contentWindow&&['bussole-summary-close','bussole-summary-home'].includes(event.data?.type))closeShotGlobe();});
+byId('privateShotDialog').addEventListener('close',()=>{byId('privateShotFrame').onload=null;byId('privateShotFrame').src='about:blank';});
+function renderBestShots(){
+ const list=byId('proBestShotList');list.replaceChildren();
+ const current=Object.fromEntries(Object.entries(data.samples||{}).filter(([,row])=>row.generation===data.profile?.generation));
+ const shots=window.BussoleAccountStatistics.bestShotEntries(current);
+ for(const shot of shots){
+  const item=document.createElement('li'),saved=Object.values(data.proShots||{}).find(row=>row.sampleId===shot.id);
+  item.textContent=`${shot.points} / 1,000 points · ${saved?.target.label||'Destination not saved'} · ${new Date(shot.day*86400000).toISOString().slice(0,10)}`;
+  if(saved?.generation===data.profile?.generation){const button=document.createElement('button');button.type='button';button.textContent='View on globe · private';button.onclick=()=>openShotGlobe(shot.id);item.append(button);}
+  else{const note=document.createElement('small');note.textContent='Globe unavailable for this earlier shot.';item.append(note);}
+  list.append(item);
+ }
+ if(!shots.length){const item=document.createElement('li');item.textContent='No saved Pro guesses yet.';list.append(item);}
+}
+
 const format=(value,unit,signed=false)=>Number.isFinite(value)?`${signed&&value>0?'+':''}${(Math.round(value*10)/10||0).toFixed(1)}${unit}`:'—';
 function metric(list,label,value,unit,signed=false,explanation='',chart){
   const term=document.createElement('dt');term.textContent=label;const detail=document.createElement('dd'),number=document.createElement('strong');
@@ -108,7 +139,7 @@ byId('changePassword').onclick=()=>action(async()=>{const next=byId('newPassword
 byId('changeEmail').onclick=()=>action(async()=>{const input=byId('newEmail');if(!input.value||!input.reportValidity())throw new Error('Enter your new email address.');await accounts.changeEmail(password(),input.value);byId('securityForm').reset();message('Open the verification link sent to your new email to finish changing it.');});
 byId('exportAccount').onclick=()=>action(async()=>{
   const values=await accounts.loadData();
-  const exported={version:1,connections:await social.connections().catch(()=>null),dailyJourney:travelDay===null?null:window.BussoleDailyProgress.calculate(values.dailyAttempts,travelDay,values.profile?.generation),email:accounts.auth.currentUser.email,profile:values.profile||{},samples:window.BussoleAccountStatistics.select(values.samples),soloBests:Object.values(values.soloBests||{}).map(({generation,...record})=>record),dailyAttempts:Object.entries(values.dailyAttempts||{}).map(([day,record])=>({day:Number(day),status:record.score===undefined?'started':'completed',...(record.score===undefined?{}:{score:record.score})}))};
+  const exported={version:1,privateProShots:Object.values(values.proShots||{}).map(({generation,sampleId,...shot})=>shot),connections:await social.connections().catch(()=>null),dailyJourney:travelDay===null?null:window.BussoleDailyProgress.calculate(values.dailyAttempts,travelDay,values.profile?.generation),email:accounts.auth.currentUser.email,profile:values.profile||{},samples:window.BussoleAccountStatistics.select(values.samples),soloBests:Object.values(values.soloBests||{}).map(({generation,...record})=>record),dailyAttempts:Object.entries(values.dailyAttempts||{}).map(([day,record])=>({day:Number(day),status:record.score===undefined?'started':'completed',...(record.score===undefined?{}:{score:record.score})}))};
   delete exported.profile.generation;
   const url=URL.createObjectURL(new Blob([JSON.stringify(exported,null,2)],{type:'application/json'})),link=document.createElement('a');
   link.href=url;link.download='bussole-my-data.json';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);message('Your data export is ready.');
@@ -146,7 +177,7 @@ async function refreshSocial(){
  try{
   await social.syncOwn();byId('socialStatus').textContent='Friends see statistics only after you both accept.';
   stopConnections=social.watchConnections(links=>renderFriends(links).catch(()=>{}),()=>{byId('socialStatus').textContent='Friend access is temporarily unavailable.';});
-  const invite=new URLSearchParams(location.search).get('friend');if(invite)byId('friendInvite').value=invite;
+  const invite=new URLSearchParams(location.search).get('friend');if(invite)byId('friendInvite').value=new URL(location.href).href;
  }catch{byId('socialStatus').textContent='Friends and rankings are being prepared. Updated Firebase rules are required; your personal statistics still work.';}
 }
 async function viewFriend(uid){
@@ -159,6 +190,7 @@ async function viewFriend(uid){
  const currentDay=await today(),balance=window.BussoleSocialModel.balance(share.journey,currentDay);
  window.BussoleDailyProgress.render(byId('friendJourney'),balance?{...balance,started:true}:null);
  byId('friendBests').replaceChildren();for(const best of Object.values(share.bests||{}))byId('friendBests').append(element('li',`${{easy:'Easy',medium:'Normal',hard:'Pro'}[best.mode]} · ${best.timerSeconds?best.timerSeconds+' s':'No timer'} · Blur ${best.blurEnabled?'on':'off'} — ${best.score} / 5000`));
+ byId('friendProShots').replaceChildren();for(const shot of Object.values(share.proShots||{}))byId('friendProShots').append(element('li',`${shot.points} / 1,000 points · ${shot.destination}`));
  byId('friendStatistics').scrollIntoView({block:'start',behavior:'smooth'});
 }
 async function renderLeaderboard(){
@@ -175,7 +207,7 @@ for(const [id,scope] of [['friendsTab','friends'],['friendsBoardTab','friends-bo
 });
 byId('refreshLeaderboard').onclick=()=>action(renderLeaderboard);
 byId('closeFriendStatistics').onclick=()=>{show('friendStatistics',false);selectedFriend=null;};
-byId('friendRequestForm').onsubmit=event=>{event.preventDefault();action(async()=>{await social.request(social.parseInvite(byId('friendInvite').value));byId('friendInvite').value='';byId('socialStatus').textContent='Friend request sent.';});};
+byId('friendRequestForm').onsubmit=event=>{event.preventDefault();action(async()=>{await social.request(await social.resolveFriend(byId('friendInvite').value));byId('friendInvite').value='';byId('socialStatus').textContent='Friend request sent.';});};
 byId('copyFriendLink').onclick=()=>{
  const user=accounts.auth.currentUser;if(!user?.emailVerified){message('Sign in and verify your email first.',true);return;}
  const url=new URL('account.html',location.href);url.searchParams.set('friend',user.uid);const input=byId('myFriendLink');input.value=url.href;show('myFriendLink',true);

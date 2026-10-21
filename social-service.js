@@ -1,5 +1,5 @@
-import {auth,db,ready,loadData,ref,get,update,onValue} from './account-service.js?v=4';
-import {today} from './daily-service.js?v=3';
+import {auth,db,ready,loadData,ref,get,update,onValue,usernameOwner} from './account-service.js?v=6';
+import {today} from './daily-service.js?v=4';
 const model=window.BussoleSocialModel;
 const verified=()=>Boolean(auth.currentUser?.emailVerified&&auth.currentUser?.email);
 function me(){if(!verified())throw Error('Sign in and verify your email first.');return auth.currentUser.uid;}
@@ -32,6 +32,12 @@ export async function leaderboard(scope){
  const links=await connections(),ids=[uid,...Object.entries(links).filter(([,r])=>r.state==='accepted').map(([id])=>id)],entries={};
  await Promise.all(ids.map(async id=>{try{const value=await friend(id);if(value.share?.journey)entries[id]={...value.share.journey,name:value.profile?.name||'Explorer'};}catch{ /* Removed friendships revoke access immediately. */ }}));
  return {rows:model.ranked(entries,day),day};
+}
+export async function resolveFriend(value){
+ const text=String(value||'').trim();
+ if(/[?&]friend=/.test(text))return parseInvite(text);
+ if(!/^[a-zA-Z0-9_]{3,20}$/.test(text))throw Error('Enter a username or paste a friend link.');
+ const uid=await usernameOwner(text);if(!uid)throw Error('Username not found. Ask your friend to save their username in My account first.');return uid;
 }
 export function parseInvite(value){try{const url=new URL(value,location.href);return url.searchParams.get('friend')||String(value).trim();}catch{return String(value).trim();}}
 export function watchConnections(callback,error){return onValue(ref(db,`connections/${me()}`),s=>callback(s.val()||{}),error);}
