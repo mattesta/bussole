@@ -36,7 +36,7 @@ const fakeMap=`(()=>{
   });
   await page.goto('http://localhost/account.html');await page.locator('#showRegister').click();await page.locator('#accountEmail').fill('daily@example.test');await page.locator('#accountPassword').fill('Explorer123!');await page.locator('#authSubmit').click();
   await page.waitForFunction(()=>document.getElementById('accountStatus').textContent.includes('Account created'));
-  const uid=await page.evaluate(async()=>(await import('./account-service.js?v=5')).auth.currentUser.uid);await admin.updateUser(uid,{emailVerified:true});await page.locator('#checkVerification').click();await page.waitForFunction(()=>document.getElementById('accountStatus').textContent==='Your account is ready.');
+  const uid=await page.evaluate(async()=>(await import('./account-service.js?v=6')).auth.currentUser.uid);await admin.updateUser(uid,{emailVerified:true});await page.locator('#checkVerification').click();await page.waitForFunction(()=>document.getElementById('accountStatus').textContent==='Your account is ready.');
   const day=Math.floor(Date.now()/86400000);
   async function openDaily(){await page.goto('http://localhost/');await page.locator('#singlePlayerBtn').click();await page.locator('#soloDailyBtn').click();await page.waitForFunction(()=>!document.getElementById('startSoloBtn').disabled);}
   await openDaily();assert.equal(await page.locator('#soloConfigControls').isVisible(),false);assert.equal(await page.locator('#startSoloBtn').textContent(),'Start official challenge');

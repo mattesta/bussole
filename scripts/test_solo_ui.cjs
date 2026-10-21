@@ -36,7 +36,7 @@ const fakeMap=`(()=>{
   });
   await page.goto('http://localhost/account.html');await page.locator('#showRegister').click();await page.locator('#accountEmail').fill('solo@example.test');await page.locator('#accountPassword').fill('Explorer123!');await page.locator('#authSubmit').click();
   await page.waitForFunction(()=>document.getElementById('accountStatus').textContent.includes('Account created'));
-  const uid=await page.evaluate(async()=>(await import('./account-service.js?v=5')).auth.currentUser.uid);await admin.updateUser(uid,{emailVerified:true});await page.locator('#checkVerification').click();await page.waitForFunction(()=>document.getElementById('accountStatus').textContent==='Your account is ready.');
+  const uid=await page.evaluate(async()=>(await import('./account-service.js?v=6')).auth.currentUser.uid);await admin.updateUser(uid,{emailVerified:true});await page.locator('#checkVerification').click();await page.waitForFunction(()=>document.getElementById('accountStatus').textContent==='Your account is ready.');
   await page.goto('http://localhost/');await page.locator('#singlePlayerBtn').click();assert.equal(await page.locator('#soloGameBtn').isVisible(),true);assert.equal(await page.locator('#soloPracticeBtn').isVisible(),true);
   await page.locator('#soloGameBtn').click();assert.equal(await page.locator('#soloMode').inputValue(),'medium');
   await page.locator('#timerCheckbox').check();await page.locator('#timerDuration').fill('2');assert.equal(await page.locator('#startSoloBtn').isDisabled(),true);await page.locator('#timerCheckbox').uncheck();

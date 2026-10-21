@@ -34,7 +34,14 @@
       absoluteDistance:mean(distances.map(Math.abs)),distanceBias:mean(distances),
       angleSamples:angles.map(error=>({error})),distanceSamples:distances.map(error=>({error}))};
   }
-  function bestShots(values){return select(values,{mode:'hard'}).sort((a,b)=>b.points-a.points||(a.relativeError??Infinity)-(b.relativeError??Infinity)||Math.abs(a.angleError??180)-Math.abs(b.angleError??180)||b.day-a.day).slice(0,3);}
-  const api={sample,clean,select,summarize,bestShots};
+  const compareShots=(a,b)=>b.points-a.points||(a.relativeError??Infinity)-(b.relativeError??Infinity)||Math.abs(a.angleError??180)-Math.abs(b.angleError??180)||b.day-a.day;
+  function bestShotEntries(values){return Object.entries(values||{}).map(([id,value])=>{const row=clean(value);return row?.mode==='hard'?{id,...row}:null;}).filter(Boolean).sort(compareShots).slice(0,3);}
+  function bestShots(values){return bestShotEntries(values).map(({id,...row})=>row);}
+  function shotGeometry(detail){
+    const a=detail?.submission,t=detail?.target;
+    if(!a||!t||![a.lat,a.lon,a.heading,a.distanceMeters,t.lat,t.lon].every(finite)||Math.abs(a.lat)>90||Math.abs(t.lat)>90||Math.abs(a.lon)>180||Math.abs(t.lon)>180||a.heading<0||a.heading>=360||a.distanceMeters<0||a.distanceMeters>100000000||typeof t.label!=='string'||!t.label.trim()||t.label.length>300)return null;
+    return {submission:{lat:a.lat,lon:a.lon,heading:a.heading,distanceMeters:a.distanceMeters},target:{lat:t.lat,lon:t.lon,label:t.label}};
+  }
+  const api={sample,clean,select,summarize,bestShots,bestShotEntries,shotGeometry,compareShots};
   if(typeof module==='object'&&module.exports)module.exports=api;else root.BussoleAccountStatistics=api;
 })(typeof window==='object'?window:globalThis);

@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js';
 import {
-  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
+  getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
   sendEmailVerification, sendPasswordResetEmail, reload, EmailAuthProvider,
   reauthenticateWithCredential, updatePassword, verifyBeforeUpdateEmail, deleteUser,
   GoogleAuthProvider, signInWithPopup, linkWithPopup, reauthenticateWithPopup, linkWithCredential
@@ -11,7 +11,7 @@ import { firebaseConfig } from './firebase-config.js';
 const app=initializeApp(firebaseConfig);
 export const auth=getAuth(app);
 export const db=getDatabase(app);
-export { ref, get, update, runTransaction, set, onValue, serverTimestamp };
+export { ref, get, update, runTransaction, set, onValue, serverTimestamp, onAuthStateChanged };
 export const defaultProfile={username:'',useInRooms:false,communityConsent:false,consentVersion:1,leaderboardOptIn:false,socialEnabled:false};
 const account=user=>Boolean(user&&!user.isAnonymous&&user.email);
 const verified=user=>account(user)&&user.emailVerified;
@@ -36,7 +36,7 @@ export async function google(){
 }
 let syncTask;
 export function scheduleSocialSync(){
- if(!syncTask)syncTask=import('./social-service.js?v=2').then(s=>s.syncOwn()).catch(()=>null).finally(()=>{syncTask=null;});
+ if(!syncTask)syncTask=import('./social-service.js?v=3').then(s=>s.syncOwn()).catch(()=>null).finally(()=>{syncTask=null;});
  return syncTask;
 }
 export const logout=()=>signOut(auth);
@@ -90,7 +90,7 @@ export async function beginRound(){
   try{const profile=await loadProfile();return {uid:user.uid,id:crypto.randomUUID(),generation:profile.generation};}
   catch{return null;}
 }
-export async function saveSample(context,sample,key){
+export async function saveSample(context,sample,key,detail){
   if(!context||!sample)return false;
   const user=auth.currentUser;
   if(!verified(user)||user.uid!==context.uid)return false;
@@ -99,6 +99,15 @@ export async function saveSample(context,sample,key){
   const clean=window.BussoleAccountStatistics.clean(sample);
   if(!clean)return false;
   await set(ref(db,`${path(user.uid)}/samples/${id}`),{...clean,generation:context.generation});
+  const geometry=clean.mode==='hard'?window.BussoleAccountStatistics.shotGeometry(detail):null;
+  if(geometry){
+    const candidate={...clean,...geometry,sampleId:id,generation:context.generation};
+    await runTransaction(ref(db,`${path(user.uid)}/proShots`),previous=>{
+      const rows=Object.values(previous||{}).filter(row=>row.generation===context.generation&&window.BussoleAccountStatistics.clean(row)).map(row=>[row.sampleId,row]);
+      const records=Object.fromEntries(rows);records[id]=candidate;
+      return Object.fromEntries(window.BussoleAccountStatistics.bestShotEntries(records).map((row,index)=>[index,records[row.id]]));
+    });
+  }
   scheduleSocialSync();
   return true;
 }
@@ -121,7 +130,7 @@ export async function deleteStatistics(){
   const user=current();
   await loadProfile();
   const data=await loadData(), changes=dailyRemovals(data.dailyAttempts);
-  Object.assign(changes,{[`${path(user.uid)}/samples`]:null,[`${path(user.uid)}/soloBests`]:null,[`${path(user.uid)}/dailyAttempts`]:null,[`${path(user.uid)}/profile/communityConsent`]:false,[`${path(user.uid)}/profile/leaderboardOptIn`]:false,[`${path(user.uid)}/profile/consentVersion`]:1,[`${path(user.uid)}/profile/generation`]:crypto.randomUUID(),[`friendShares/${user.uid}`]:null,[`journeyLeaderboard/${user.uid}`]:null});
+  Object.assign(changes,{[`${path(user.uid)}/samples`]:null,[`${path(user.uid)}/proShots`]:null,[`${path(user.uid)}/soloBests`]:null,[`${path(user.uid)}/dailyAttempts`]:null,[`${path(user.uid)}/profile/communityConsent`]:false,[`${path(user.uid)}/profile/leaderboardOptIn`]:false,[`${path(user.uid)}/profile/consentVersion`]:1,[`${path(user.uid)}/profile/generation`]:crypto.randomUUID(),[`friendShares/${user.uid}`]:null,[`journeyLeaderboard/${user.uid}`]:null});
   if(!data.profile?.socialEnabled)changes[`publicProfiles/${user.uid}`]=null;
   await update(ref(db),changes);
 }

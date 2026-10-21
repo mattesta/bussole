@@ -1,4 +1,4 @@
-import { beginRound, saveSample, saveSoloBest } from './account-service.js?v=5';
+import { beginRound, saveSample, saveSoloBest } from './account-service.js?v=6';
 const multiplayer=new URLSearchParams(location.search).get('multiplayer')==='1';
 let context=multiplayer?Promise.resolve(null):beginRound();
 const matchOwner=context;
@@ -13,7 +13,7 @@ async function record(detail){
     const owner=await context;if(!owner)return;
     const measured=window.BussoleReportGeometry.measure(detail.submission,detail.target,detail.mode);
     const sample=window.BussoleAccountStatistics.sample(measured,detail.submission,detail.mode,'solo');
-    try{if(await saveSample(owner,sample)&&version===roundVersion){saved=true;status('Statistics saved.');}}
+    try{if(await saveSample(owner,sample,undefined,detail)&&version===roundVersion){saved=true;status('Statistics saved.');}}
     catch{if(version===roundVersion)status('Statistics could not be saved. Check your connection.');}
   })().finally(()=>{if(pending===task)pending=null;});
   pending=task;

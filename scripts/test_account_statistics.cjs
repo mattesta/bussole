@@ -32,3 +32,8 @@ console.log('Account statistics: strict scalar projection, guest-free samples, p
 const shotBase={day:100,mode:'hard',kind:'solo',points:900,relativeError:5,angleError:10};
 const best=require('../account-statistics.js').bestShots([{...shotBase,points:1000,mode:'easy'},{...shotBase,points:899},{...shotBase,relativeError:2},{...shotBase,points:999},{...shotBase,relativeError:3}]);
 assert.deepEqual(best.map(s=>s.points),[999,900,900]);assert.deepEqual(best.slice(1).map(s=>s.relativeError),[2,3]);
+
+const replay={submission:{lat:48,lon:11,heading:90,distanceMeters:20000,secret:'omit'},target:{lat:45,lon:12,label:'Venice',secret:'omit'}};
+assert.equal(model.shotGeometry(replay).target.label,'Venice');assert.doesNotMatch(JSON.stringify(model.shotGeometry(replay)),/secret/);
+assert.equal(model.shotGeometry({...replay,submission:{...replay.submission,lat:91}}),null);
+assert.equal(model.shotGeometry({...replay,target:{...replay.target,label:''}}),null);

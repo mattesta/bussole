@@ -193,6 +193,74 @@
               ".validate": false
             }
           }
+        },
+        "proShots": {
+          "$slot": {
+            ".validate": "auth.token.email_verified === true && $slot.matches(/^[0-2]$/) && newData.child('sampleId').isString() && newData.child('sampleId').val().matches(/^[a-zA-Z0-9-]{20,64}$/) && newData.hasChildren(['day','mode','kind','points','generation','target','submission']) && newData.child('mode').val() === 'hard' && newData.child('generation').val() === root.child('accountData').child($uid).child('profile/generation').val() && root.child('accountData').child($uid).child('samples').child(newData.child('sampleId').val()).child('generation').val() === newData.child('generation').val() && root.child('accountData').child($uid).child('samples').child(newData.child('sampleId').val()).child('points').val() === newData.child('points').val()",
+            "generation": {
+              ".validate": "newData.isString()"
+            },
+            "day": {
+              ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= now / 86400000 + 1"
+            },
+            "mode": {
+              ".validate": "newData.isString() && newData.val().matches(/^(easy|medium|hard)$/)"
+            },
+            "kind": {
+              ".validate": "newData.isString() && newData.val().matches(/^(solo|multiplayer)$/)"
+            },
+            "points": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000 && newData.val() % 1 === 0"
+            },
+            "relativeError": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000000000"
+            },
+            "angleError": {
+              ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() < 180"
+            },
+            "distanceError": {
+              ".validate": "newData.parent().child('mode').val() === 'hard' && newData.isNumber() && newData.val() >= -100 && newData.val() <= 1000000000000"
+            },
+            "$other": {
+              ".validate": false
+            },
+            "target": {
+              ".validate": "newData.hasChildren(['lat','lon','label'])",
+              "lat": {
+                ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90"
+              },
+              "lon": {
+                ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180"
+              },
+              "label": {
+                ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 300"
+              },
+              "$other": {
+                ".validate": false
+              }
+            },
+            "submission": {
+              ".validate": "newData.hasChildren(['lat','lon','heading','distanceMeters'])",
+              "lat": {
+                ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90"
+              },
+              "lon": {
+                ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180"
+              },
+              "heading": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() < 360"
+              },
+              "distanceMeters": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000000"
+              },
+              "$other": {
+                ".validate": false
+              }
+            },
+            "sampleId": {
+              ".validate": "newData.isString() && newData.val().matches(/^[a-zA-Z0-9-]{20,64}$/)"
+            }
+          }
         }
       }
     },
@@ -325,6 +393,20 @@
         },
         "$other": {
           ".validate": false
+        },
+        "proShots": {
+          "$index": {
+            ".validate": "$index.matches(/^[0-2]$/) && newData.hasChildren(['points','destination'])",
+            "points": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000 && newData.val() % 1 === 0"
+            },
+            "destination": {
+              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 300"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
         }
       }
     },

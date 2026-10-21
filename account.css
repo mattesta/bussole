@@ -27,3 +27,5 @@
 #friendStatistics {padding-top:14px;}#friendStatisticsName {overflow-wrap:anywhere;}
 #socialPanel .account-choices {flex-wrap:wrap;}#socialPanel .account-choices button {flex:1;min-width:90px;}
 #journeyRanking li {line-height:1.5;}
+
+#privateShotDialog{width:min(100vw,1000px);height:90dvh;max-width:100vw;padding:8px;background:#080e18;color:white;border:1px solid #566;box-sizing:border-box}#privateShotDialog::backdrop{background:#000b}#privateShotFrame{display:block;width:100%;height:calc(100% - 48px);border:0}#closePrivateShot{min-height:40px}#proBestShotList button,#proBestShotList small{display:block;margin-top:6px}
