@@ -1,4 +1,4 @@
-import { inspect, start, watch } from './daily-service.js?v=3';
+import { inspect, start, watch } from './daily-service.js?v=4';
 const byId=id=>document.getElementById(id),daily=window.BussoleDaily;
 let state,stopWatch,loading=false;
 function description(day){return `The same 5 targets for everyone. Normal · 30 s timer · Blur ${daily.settings(day).blurEnabled?'on':'off'}. A new challenge at 00:00 UTC.`;}

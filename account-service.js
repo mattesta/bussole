@@ -36,7 +36,7 @@ export async function google(){
 }
 let syncTask;
 export function scheduleSocialSync(){
- if(!syncTask)syncTask=import('./social-service.js?v=1').then(s=>s.syncOwn()).catch(()=>null).finally(()=>{syncTask=null;});
+ if(!syncTask)syncTask=import('./social-service.js?v=2').then(s=>s.syncOwn()).catch(()=>null).finally(()=>{syncTask=null;});
  return syncTask;
 }
 export const logout=()=>signOut(auth);
@@ -57,6 +57,10 @@ export async function loadData(){
   if(!data.profile)data.profile=await loadProfile();
   return data;
 }
+export async function usernameOwner(username){
+ const key=String(username||'').trim().toLowerCase();if(!/^[a-z0-9_]{3,20}$/.test(key))return null;
+ return (await get(ref(db,`usernames/${key}`))).val();
+}
 export async function saveProfile(profile){
   const user=current();
   const username=String(profile.username||'').trim();
@@ -64,10 +68,15 @@ export async function saveProfile(profile){
   if(profile.leaderboardOptIn&&!username)throw Error('Choose a username before joining the global leaderboard.');
   if(profile.communityConsent&&!verified(user))throw new Error('Verify your email before contributing.');
   const existingProfile=await loadProfile();
+  if(username&&!verified(user))throw Error('Verify your email before reserving a username.');
+  const key=username.toLowerCase(),oldKey=String(existingProfile.username||'').toLowerCase();
+  if(key){const owner=await usernameOwner(key);if(owner&&owner!==user.uid)throw Error('This username is taken. Choose a different one.');}
   const fields={username,useInRooms:Boolean(username&&profile.useInRooms),communityConsent:Boolean(profile.communityConsent),consentVersion:1,leaderboardOptIn:Boolean(profile.leaderboardOptIn)};
   const changes=Object.fromEntries(Object.entries(fields).map(([key,value])=>[`${path(user.uid)}/profile/${key}`,value]));
-  if(!fields.leaderboardOptIn){changes[`journeyLeaderboard/${user.uid}`]=null;if(!existingProfile.socialEnabled){changes[`publicProfiles/${user.uid}`]=null;changes[`friendShares/${user.uid}`]=null;}}
-  await update(ref(db),changes);
+  if(key){changes[`usernames/${key}`]=user.uid;changes[`${path(user.uid)}/profile/socialEnabled`]=true;}
+  if(oldKey&&oldKey!==key&&await usernameOwner(oldKey)===user.uid)changes[`usernames/${oldKey}`]=null;
+  if(!fields.leaderboardOptIn){changes[`journeyLeaderboard/${user.uid}`]=null;if(!existingProfile.socialEnabled&&!key){changes[`publicProfiles/${user.uid}`]=null;changes[`friendShares/${user.uid}`]=null;}}
+  try{await update(ref(db),changes);}catch(error){if(key&&await usernameOwner(key).catch(()=>null)!==user.uid)throw Error('This username could not be reserved. It may already be taken; retry or choose another.');throw error;}
   await scheduleSocialSync();
 }
 export async function roomName(){
@@ -126,6 +135,7 @@ export async function deleteAccount(password){
   // Remove database data while cleanup is still authorized, before deleting Authentication.
   const data=await loadData();
   const links=(await get(ref(db,`connections/${user.uid}`))).val()||{},changes={...dailyRemovals(data.dailyAttempts),[path(user.uid)]:null,[`friendShares/${user.uid}`]:null,[`journeyLeaderboard/${user.uid}`]:null,[`publicProfiles/${user.uid}`]:null};
+  const username=data.profile?.username;if(username&&await usernameOwner(username)===user.uid)changes[`usernames/${username.toLowerCase()}`]=null;
   for(const other of Object.keys(links)){changes[`connections/${other}/${user.uid}`]=null;changes[`connections/${user.uid}/${other}`]=null;}
   await update(ref(db),changes);
   await deleteUser(user);

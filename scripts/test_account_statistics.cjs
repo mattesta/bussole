@@ -28,3 +28,7 @@ accounts.u3=user();accounts.u0.samples.one.generation='stale';assert.equal(aggre
 accounts.u0=user();for(let i=0;i<4;i++){delete accounts[`u${i}`].samples.one.distanceError;delete accounts[`u${i}`].samples.one.angleError;}
 pooled=aggregate(accounts);assert.equal(pooled.all.available,true);assert.equal(pooled.all.absoluteDistance,null);assert.equal(pooled.all.absoluteAngle,null);
 console.log('Account statistics: strict scalar projection, guest-free samples, period/difficulty filters, circular means, no historical round IDs, consent withdrawal, deletion and per-metric contributor thresholds passed.');
+
+const shotBase={day:100,mode:'hard',kind:'solo',points:900,relativeError:5,angleError:10};
+const best=require('../account-statistics.js').bestShots([{...shotBase,points:1000,mode:'easy'},{...shotBase,points:899},{...shotBase,relativeError:2},{...shotBase,points:999},{...shotBase,relativeError:3}]);
+assert.deepEqual(best.map(s=>s.points),[999,900,900]);assert.deepEqual(best.slice(1).map(s=>s.relativeError),[2,3]);

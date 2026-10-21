@@ -1,4 +1,4 @@
-import { beginRound, saveSample, saveSoloBest } from './account-service.js?v=4';
+import { beginRound, saveSample, saveSoloBest } from './account-service.js?v=5';
 const multiplayer=new URLSearchParams(location.search).get('multiplayer')==='1';
 let context=multiplayer?Promise.resolve(null):beginRound();
 const matchOwner=context;

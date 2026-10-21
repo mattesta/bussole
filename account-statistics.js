@@ -34,6 +34,7 @@
       absoluteDistance:mean(distances.map(Math.abs)),distanceBias:mean(distances),
       angleSamples:angles.map(error=>({error})),distanceSamples:distances.map(error=>({error}))};
   }
-  const api={sample,clean,select,summarize};
+  function bestShots(values){return select(values,{mode:'hard'}).sort((a,b)=>b.points-a.points||(a.relativeError??Infinity)-(b.relativeError??Infinity)||Math.abs(a.angleError??180)-Math.abs(b.angleError??180)||b.day-a.day).slice(0,3);}
+  const api={sample,clean,select,summarize,bestShots};
   if(typeof module==='object'&&module.exports)module.exports=api;else root.BussoleAccountStatistics=api;
 })(typeof window==='object'?window:globalThis);

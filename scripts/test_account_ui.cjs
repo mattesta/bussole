@@ -13,7 +13,7 @@ const build=await esbuild.build({entryPoints:[path.join(root,'account.js')],bund
  build.onResolve({filter:/\.js\?v=/},args=>({path:path.resolve(path.dirname(args.importer),args.path.split('?')[0])}));
  build.onLoad({filter:/firebase-config\.js$/},()=>({contents:"export const firebaseConfig={apiKey:'demo-key',authDomain:'demo-bussole.firebaseapp.com',projectId:'demo-bussole',databaseURL:'https://demo-bussole-default-rtdb.firebaseio.com'}",loader:'js'}));
  build.onLoad({filter:/account-service\.js$/},args=>({contents:fs.readFileSync(args.path,'utf8').replace("const db=getDatabase(app);","const db=getDatabase(app);connectAuthEmulator(auth,'http://127.0.0.1:9099',{disableWarnings:true});connectDatabaseEmulator(db,'127.0.0.1',9000);")+"\nimport { connectAuthEmulator } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js';import { connectDatabaseEmulator } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js';",loader:'js',resolveDir:root}));
- build.onLoad({filter:/\/account\.js$/},args=>({contents:fs.readFileSync(args.path,'utf8')+"\nimport * as testing from './account-service.js?v=4';window.__accounts=testing;",loader:'js',resolveDir:root}));
+ build.onLoad({filter:/\/account\.js$/},args=>({contents:fs.readFileSync(args.path,'utf8')+"\nimport * as testing from './account-service.js?v=5';window.__accounts=testing;",loader:'js',resolveDir:root}));
 }}]});
 const js=build.outputFiles[0].text;
 const browser=await chromium.launch({executablePath:process.env.BUSSOLE_TEST_CHROMIUM||chromium.executablePath(),args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--no-zygote'],headless:true});
@@ -35,6 +35,7 @@ try{
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  await page.locator('#personalStatistics').scrollIntoViewIfNeeded();await page.screenshot({path:'/tmp/bussole-account-stats.png'});
  await page.locator('#modeFilters [data-mode=easy]').click();assert.match(await page.locator('#personalStatsCount').textContent(),/0 completed/);await page.locator('#modeFilters [data-mode=all]').click();
+ assert.equal(await page.locator('#proBestShotList li').count(),1);assert.match(await page.locator('#proBestShotList').textContent(),/800/);
  const download=page.waitForEvent('download');await page.locator('#exportAccount').click();const exported=await download;const exportedPath=await exported.path();const contents=JSON.parse(fs.readFileSync(exportedPath,'utf8'));assert.equal(contents.samples.length,1);assert.equal(contents.soloBests[0].score,3500);assert.equal(contents.soloBests[0].generation,undefined);assert.equal(contents.samples[0].angleError,-20);assert.equal(contents.profile.generation,undefined);assert.doesNotMatch(JSON.stringify(contents),/"(lat|lon|target|roomCode|heading)":/);
  await page.evaluate(async()=>{window.__stale=await window.__accounts.beginRound()});
  await page.locator('#deleteStatistics').click();await page.waitForFunction(()=>document.getElementById('accountStatus').textContent.startsWith('Your statistics have been deleted'));

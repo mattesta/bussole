@@ -2,8 +2,10 @@
 (function(root){
  function balance(snapshot,day){
   if(!snapshot||!Number.isInteger(snapshot.asOfDay)||snapshot.asOfDay>day)return null;
-  const missed=Math.max(0,day-snapshot.asOfDay-(snapshot.lastDay===snapshot.asOfDay?1:0));
-  const km=Math.max(0,snapshot.tenths-missed*5000)/10;
+  const missedBefore=snapshot.lastDay<0?0:Math.max(0,snapshot.asOfDay-1-snapshot.lastDay);
+  const missedNow=snapshot.lastDay<0?0:Math.max(0,day-1-snapshot.lastDay);
+  const cost=root.BussoleDailyProgress.penalty(missedNow)-root.BussoleDailyProgress.penalty(missedBefore);
+  const km=Math.max(0,snapshot.tenths-cost)/10;
   return {km,percent:km/40075*100};
  }
  function snapshot(data,day){

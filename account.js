@@ -1,6 +1,6 @@
-import * as accounts from './account-service.js?v=4';
-import { today } from './daily-service.js?v=3';
-import * as social from './social-service.js?v=1';
+import * as accounts from './account-service.js?v=5';
+import { today } from './daily-service.js?v=4';
+import * as social from './social-service.js?v=2';
 const byId=id=>document.getElementById(id),show=(id,visible)=>byId(id).classList.toggle('hidden',!visible);
 let registration=false,data={},mode='all',days=0,busy=false,requestId=0,travelDay=null,stopConnections=null,socialScope='friends',selectedFriend=null,currentConnections={},friendRenderVersion=0;
 function message(text,error=false){byId('accountStatus').textContent=text;byId('accountStatus').classList.toggle('error',error);}
@@ -18,16 +18,20 @@ async function refresh(){
   byId('accountUsername').value=profile.username;byId('useUsernameInRooms').checked=profile.useInRooms;
   byId('leaderboardOptIn').checked=Boolean(profile.leaderboardOptIn);byId('leaderboardOptIn').disabled=!user.emailVerified;
   byId('communityConsent').checked=profile.communityConsent;byId('communityConsent').disabled=!user.emailVerified;
-  await renderJourney();renderBests();renderStatistics();
+  await renderJourney();renderBests();renderBestShots();renderStatistics();
+  const claimed=profile.username?await accounts.usernameOwner(profile.username).catch(()=>null):null;
+  byId('usernameStatus').textContent=profile.username&&claimed!==user.uid?'Save preferences to reserve your existing username. If it is taken, choose a different one.':'';
   await refreshSocial();message(user.emailVerified?'Your account is ready.':'Verify your email to start saving statistics.');
 }
 async function renderJourney(){
  const element=byId('dailyTravel'),status=byId('dailyTravelStatus');travelDay=null;
- window.BussoleDailyProgress.render(element,null);
+ window.BussoleDailyProgress.render(element,null);byId('dailyAverage').textContent='';
  if(!accounts.auth.currentUser?.emailVerified){status.textContent='Verify your email to collect Daily kilometres.';return;}
  try{
   travelDay=await today();
   window.BussoleDailyProgress.render(element,window.BussoleDailyProgress.calculate(data.dailyAttempts,travelDay,data.profile?.generation));
+  const progress=window.BussoleDailyProgress.calculate(data.dailyAttempts,travelDay,data.profile?.generation);
+  byId('dailyAverage').textContent=progress.completed?`Daily average: ${window.BussoleDailyProgress.number(progress.averageScore)} / 5,000 points · ${progress.completed} completed challenges. Missed and unfinished days are excluded.`:'Complete an official Daily to see your average.';
   status.textContent='Only completed official Daily challenges count. Today is not missed until 00:00 UTC. Earth’s circumference: approximately 40,075 km.';
  }catch{status.textContent='Your journey is temporarily unavailable. Refresh when connected.';}
 }
@@ -42,6 +46,12 @@ function renderBests(){
     item.textContent=`${difficulty} · ${record.timerSeconds?`${record.timerSeconds} s`:'No timer'} · Blur ${record.blurEnabled?'on':'off'} — ${record.score} / 5000`;
     list.append(item);
   }
+}
+function renderBestShots(){
+ const list=byId('proBestShotList');list.replaceChildren();
+ const shots=window.BussoleAccountStatistics.bestShots(Object.values(data.samples||{}).filter(row=>row.generation===data.profile?.generation));
+ for(const shot of shots){const item=document.createElement('li');item.textContent=`${shot.points} / 1,000 points · ${Number.isFinite(shot.relativeError)?window.BussoleDailyProgress.number(shot.relativeError)+'% relative error':'Relative error unavailable'} · ${new Date(shot.day*86400000).toISOString().slice(0,10)}`;list.append(item);}
+ if(!shots.length){const item=document.createElement('li');item.textContent='No saved Pro guesses yet.';list.append(item);}
 }
 const format=(value,unit,signed=false)=>Number.isFinite(value)?`${signed&&value>0?'+':''}${(Math.round(value*10)/10||0).toFixed(1)}${unit}`:'—';
 function metric(list,label,value,unit,signed=false,explanation='',chart){
@@ -146,7 +156,7 @@ async function refreshSocial(){
  try{
   await social.syncOwn();byId('socialStatus').textContent='Friends see statistics only after you both accept.';
   stopConnections=social.watchConnections(links=>renderFriends(links).catch(()=>{}),()=>{byId('socialStatus').textContent='Friend access is temporarily unavailable.';});
-  const invite=new URLSearchParams(location.search).get('friend');if(invite)byId('friendInvite').value=invite;
+  const invite=new URLSearchParams(location.search).get('friend');if(invite)byId('friendInvite').value=new URL(location.href).href;
  }catch{byId('socialStatus').textContent='Friends and rankings are being prepared. Updated Firebase rules are required; your personal statistics still work.';}
 }
 async function viewFriend(uid){
@@ -175,7 +185,7 @@ for(const [id,scope] of [['friendsTab','friends'],['friendsBoardTab','friends-bo
 });
 byId('refreshLeaderboard').onclick=()=>action(renderLeaderboard);
 byId('closeFriendStatistics').onclick=()=>{show('friendStatistics',false);selectedFriend=null;};
-byId('friendRequestForm').onsubmit=event=>{event.preventDefault();action(async()=>{await social.request(social.parseInvite(byId('friendInvite').value));byId('friendInvite').value='';byId('socialStatus').textContent='Friend request sent.';});};
+byId('friendRequestForm').onsubmit=event=>{event.preventDefault();action(async()=>{await social.request(await social.resolveFriend(byId('friendInvite').value));byId('friendInvite').value='';byId('socialStatus').textContent='Friend request sent.';});};
 byId('copyFriendLink').onclick=()=>{
  const user=accounts.auth.currentUser;if(!user?.emailVerified){message('Sign in and verify your email first.',true);return;}
  const url=new URL('account.html',location.href);url.searchParams.set('friend',user.uid);const input=byId('myFriendLink');input.value=url.href;show('myFriendLink',true);

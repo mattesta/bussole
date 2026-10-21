@@ -779,3 +779,7 @@ select:focus-visible {
 .solo-difficulty .choice-buttons button.selected {border-color:var(--ui-red);background:#71181d;}
 #soloDailyBtn {border-color:var(--ui-red);}
 #dailyInfo,#dailyComparison {font-size:13px;line-height:1.5;color:var(--ui-text-muted,#b6bdc9);}
+
+/* Room entry choices keep their action groups and use visibility colours. */
+#createRoomBtn, #showJoinRoomBtn {border-color:#e32636;}
+#createPublicRoomBtn, #joinPublicRoomBtn {border-color:#4c9dff;}
