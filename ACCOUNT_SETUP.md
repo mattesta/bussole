@@ -42,6 +42,14 @@ After five rounds, completion stores a scalar score and publishes it under a ran
 
 Publish the full updated `database.rules.json` before official attempts can work. Guests can play unranked without these new writes. The account export includes day/status/score; deletion removes private attempts and public scores atomically together with the usual statistics/generation reset. User-facing participation and sharing details appear before the official Start and on `account-privacy.html`.
 
+## Private Daily journey
+
+Daily kilometres are derived from existing private, completed official `dailyAttempts` in the current profile generation. No new database fields, rules, Authentication provider, Cloud Functions or billing are needed. Ordinary Game, Practice, unranked replays and abandoned attempts do not earn kilometres. Historical completed official Dailies count automatically. A completed zero-point Daily counts as played, earns zero, and avoids a missed-day penalty.
+
+Each point earns 0.1 virtual km (1000 points = 100 km, maximum 500 km per Daily). Use integer score units internally to avoid rounding drift. Process completed days in UTC order: subtract 500 km for each intervening missed day, clamp at zero, then credit the next completed day. Only fully ended days are missed; today remains open until 00:00 UTC. Penalties begin after the first completed official Daily, with no penalty for earlier inactivity. Days elapsed while the app is closed are applied when the account is read, without scheduled writes. Cross-midnight results belong to their pinned challenge day, as before.
+
+The Home Daily panel, official results and account page show the current balance and its percentage of approximately 40,075 km (equatorial circumference). The percentage can exceed 100%; it describes a virtual journey, not tracked physical movement. Guests and unranked plays earn nothing. Balance is calculated using the database clock and owner-only history; there is no public journey leaderboard in this batch. Account export includes a derived snapshot alongside the underlying daily records. Deleting statistics/account removes those records and resets the journey, including its starting day.
+
 ## Optional server-side community comparison
 
 Cloud Functions deployment requires Firebase's **Blaze** plan (billing account). Do not enable billing just to test personal accounts. No functions or billing have been enabled by this repository change.
@@ -60,6 +68,8 @@ Only aggregate means and counts are published under `communityStatistics`; clien
 **Prototype scaling limit:** each change rebuilds the small pool by reading account statistics. A distributed lease serializes refreshes, handles duplicate/out-of-order events by re-reading the current source, and avoids retaining per-player aggregation state after deletion. Before substantial traffic or large histories, replace full-pool reads with batched/sharded aggregation and bounded events. Protect the deployment with appropriate quotas and monitor costs; the prototype does not claim an unlimited free service or cheat-proof self-reported scores.
 
 ## Validation
+
+- `node scripts/test_daily_progress.cjs`: chronological rewards/penalties, floor at zero, UTC/today handling, generation/future filters, completed zero vs abandoned days, multiple Earth laps and 200 histories checked against a reference wallet.
 
 - `scripts/test_daily_batch_ui.cjs`: mobile UI with service/map facades, settings and launch URL on both sides of the 2026-10-22 UTC blur transition, actual blur overlay and rank wording/layout.
 - `node scripts/test_daily_challenge.cjs`: pinned deterministic catalogue, UTC changeover, fixed settings and percentile/self/tie behavior.

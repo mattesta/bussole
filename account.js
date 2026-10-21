@@ -1,6 +1,7 @@
 import * as accounts from './account-service.js?v=3';
+import { today } from './daily-service.js?v=2';
 const byId=id=>document.getElementById(id),show=(id,visible)=>byId(id).classList.toggle('hidden',!visible);
-let registration=false,data={},mode='all',days=0,busy=false,requestId=0;
+let registration=false,data={},mode='all',days=0,busy=false,requestId=0,travelDay=null;
 function message(text,error=false){byId('accountStatus').textContent=text;byId('accountStatus').classList.toggle('error',error);}
 async function action(work){
   if(busy)return;busy=true;document.querySelectorAll('button').forEach(button=>button.disabled=true);
@@ -14,7 +15,17 @@ async function refresh(){
   data=await accounts.loadData();const profile={...accounts.defaultProfile,...data.profile};
   byId('accountUsername').value=profile.username;byId('useUsernameInRooms').checked=profile.useInRooms;
   byId('communityConsent').checked=profile.communityConsent;byId('communityConsent').disabled=!user.emailVerified;
-  renderBests();renderStatistics();message(user.emailVerified?'Your account is ready.':'Verify your email to start saving statistics.');
+  await renderJourney();renderBests();renderStatistics();message(user.emailVerified?'Your account is ready.':'Verify your email to start saving statistics.');
+}
+async function renderJourney(){
+ const element=byId('dailyTravel'),status=byId('dailyTravelStatus');travelDay=null;
+ window.BussoleDailyProgress.render(element,null);
+ if(!accounts.auth.currentUser?.emailVerified){status.textContent='Verify your email to collect Daily kilometres.';return;}
+ try{
+  travelDay=await today();
+  window.BussoleDailyProgress.render(element,window.BussoleDailyProgress.calculate(data.dailyAttempts,travelDay,data.profile?.generation));
+  status.textContent='Only completed official Daily challenges count. Today is not missed until 00:00 UTC. Earth’s circumference: approximately 40,075 km.';
+ }catch{status.textContent='Your journey is temporarily unavailable. Refresh when connected.';}
 }
 function renderBests(){
   const list=byId('soloBestList');list.replaceChildren();
@@ -93,7 +104,7 @@ byId('changePassword').onclick=()=>action(async()=>{const next=byId('newPassword
 byId('changeEmail').onclick=()=>action(async()=>{const input=byId('newEmail');if(!input.value||!input.reportValidity())throw new Error('Enter your new email address.');await accounts.changeEmail(password(),input.value);byId('securityForm').reset();message('Open the verification link sent to your new email to finish changing it.');});
 byId('exportAccount').onclick=()=>action(async()=>{
   const values=await accounts.loadData();
-  const exported={version:1,email:accounts.auth.currentUser.email,profile:values.profile||{},samples:window.BussoleAccountStatistics.select(values.samples),soloBests:Object.values(values.soloBests||{}).map(({generation,...record})=>record),dailyAttempts:Object.entries(values.dailyAttempts||{}).map(([day,record])=>({day:Number(day),status:record.score===undefined?'started':'completed',...(record.score===undefined?{}:{score:record.score})}))};
+  const exported={version:1,dailyJourney:travelDay===null?null:window.BussoleDailyProgress.calculate(values.dailyAttempts,travelDay,values.profile?.generation),email:accounts.auth.currentUser.email,profile:values.profile||{},samples:window.BussoleAccountStatistics.select(values.samples),soloBests:Object.values(values.soloBests||{}).map(({generation,...record})=>record),dailyAttempts:Object.entries(values.dailyAttempts||{}).map(([day,record])=>({day:Number(day),status:record.score===undefined?'started':'completed',...(record.score===undefined?{}:{score:record.score})}))};
   delete exported.profile.generation;
   const url=URL.createObjectURL(new Blob([JSON.stringify(exported,null,2)],{type:'application/json'})),link=document.createElement('a');
   link.href=url;link.download='bussole-my-data.json';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);message('Your data export is ready.');

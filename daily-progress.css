@@ -1,0 +1,7 @@
+.daily-travel {display:grid;gap:7px;margin:14px 0;padding:14px;border:1px solid var(--ui-border,#334155);border-radius:12px;background:var(--ui-field,#18212d);text-align:left;}
+.daily-travel.hidden {display:none;}
+.daily-travel-title {font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ui-muted,#adb6c3);}
+.daily-travel-distance {font-size:25px;line-height:1.15;color:var(--ui-text,#fff);}
+.daily-travel-percent,.daily-travel-earned {font-size:13px;line-height:1.4;color:var(--ui-text,#fff);}
+.daily-travel-earned {color:#a6dfb0;}
+.daily-travel-note {font-size:11px;line-height:1.5;color:var(--ui-muted,#adb6c3);}

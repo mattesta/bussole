@@ -8,6 +8,16 @@ export async function today(){
  });
  return daily.day(Date.now()+(Number(offset)||0));
 }
+export async function journey(expectedUid,asOfDay){
+ await ready();if(!verified()||(expectedUid&&auth.currentUser.uid!==expectedUid))return null;
+ const uid=auth.currentUser.uid;
+ const [day,attempts,generation]=await Promise.all([
+  Number.isInteger(asOfDay)?Promise.resolve(asOfDay):today(),
+  get(ref(db,`accountData/${uid}/dailyAttempts`)),get(ref(db,`accountData/${uid}/profile/generation`))
+ ]);
+ if(!verified()||auth.currentUser.uid!==uid||!generation.exists())return null;
+ return window.BussoleDailyProgress.calculate(attempts.val(),day,generation.val());
+}
 export async function inspect(){
  await ready();const day=await today();
  if(!verified())return {day,eligible:false,attempt:null};
@@ -15,7 +25,7 @@ export async function inspect(){
  let sharingPending=false;
  // Recover a completed private result if the separate public write was interrupted.
  if(attempt?.score!==undefined)try{await complete({...attempt,uid,day,official:true},attempt.score);}catch{sharingPending=true;}
- return {day,eligible:true,attempt,sharingPending};
+ return {day,eligible:true,attempt,sharingPending,journey:await journey(uid,day)};
 }
 export async function start(){
  await ready();const day=await today(),owner=await beginRound();
