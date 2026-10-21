@@ -56,7 +56,7 @@ const fakeMap=`(()=>{
   assert.equal((await db.ref(`dailyScores/${day}/${attempt.entryKey}`).get()).val(),total);assert.equal((await db.ref(`accountData/${uid}/soloBests`).get()).exists(),false);
   // A second completed entry updates the open percentile immediately; ties are not wins.
   await db.ref(`dailyScores/${day}/another-random-key`).set(total);
-  await page.waitForFunction(()=>document.getElementById('soloRecordStatus').textContent.includes('Tied with 1'));
+  await page.waitForFunction(()=>document.getElementById('soloRecordStatus').textContent.includes('#1 of 2 · tied'));
   assert.match(await page.locator('#soloRecordStatus').textContent(),/higher than 0%/);await page.screenshot({path:'/tmp/bussole-daily-results.png'});
   await page.locator('#soloSummaryBtn').click();const summary=page.frameLocator('#matchSummaryFrame');await summary.locator('#statisticsView').click();await summary.locator('#statisticsMetrics dt').first().waitFor();await summary.locator('#summaryBack').click();await page.locator('#soloGameResults').waitFor({state:'visible'});
   await db.ref(`dailyScores/${day}/${attempt.entryKey}`).remove();
