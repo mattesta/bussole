@@ -12,7 +12,7 @@ if(['game','daily'].includes(parameters.get('solo'))&&parameters.get('multiplaye
   show('dailyGameNotice',true);
  }
  const panel=byId('soloGameResults'),next=byId('soloNextRoundBtn'),badge=byId('globeRoomBadge'),frame=byId('matchSummaryFrame');
- const settings=isDaily?daily.SETTINGS:{mode:parameters.get('mode'),timerSeconds:parameters.get('timer'),blurEnabled:parameters.get('blur')==='1'};
+ const settings=isDaily?daily.settings(ticket.day):{mode:parameters.get('mode'),timerSeconds:parameters.get('timer'),blurEnabled:parameters.get('blur')==='1'};
  function progress(){
   byId('soloRoundLabel').textContent=`Round ${game.round} / 5`;
   byId('globeRoomProgress').textContent=`${game.total} pts · ${game.round}/5`;
@@ -61,6 +61,7 @@ if(['game','daily'].includes(parameters.get('solo'))&&parameters.get('multiplaye
    const response=await fetch('daily-targets-v1.json');if(!response.ok)throw Error('The daily catalogue could not be loaded. Return Home and retry.');
    game=daily.create(await response.json(),ticket.day);
   }else game=window.BussoleSoloGame.create(window.BUSSOLE_TARGETS,settings);
+  if(isDaily)window.BussoleGlobe.setBlurEnabled(game.settings.blurEnabled);
   show('soloRoundLabel',true);show('soloNextRoundBtn',true);show('globeRoomBadge',true);
   window.BussoleGlobe.registerSolo({canAim:()=>game.phase==='aiming',dismissResults:dismiss,expire(){
    if(game.phase!=='aiming')return;

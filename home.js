@@ -16,7 +16,7 @@
     const game=type==='game',daily=type==='daily';
     byId('soloConfigControls').classList.toggle('hidden',daily);byId('dailyDetails').classList.toggle('hidden',!daily);byId('dailyComparison').classList.add('hidden');
     byId('soloSettingsTitle').textContent=daily?'Daily Challenge':game?'Game · 5 rounds':'Practice';
-    byId('soloDescription').textContent=daily?'The same 5 targets for everyone. Normal · 30 s timer · Blur on. A new challenge at 00:00 UTC.':game?'5 random targets. No skips. Up to 5,000 points.':'Choose any target, search for a place or try a random one. Play as many rounds as you like.';
+    byId('soloDescription').textContent=daily?'The same 5 targets for everyone. Normal · 30 s timer. A new challenge at 00:00 UTC.':game?'5 random targets. No skips. Up to 5,000 points.':'Choose any target, search for a place or try a random one. Play as many rounds as you like.';
     byId('soloRecordNote').classList.toggle('hidden',!game);
     byId('startSoloBtn').textContent=daily?'Loading…':game?'Start game':'Start practice';
     validateTimer();

@@ -6,7 +6,11 @@ const AIMING_ZOOM = 16;
 // MapLibre. A lower deceleration gives a short, soft coast after a flick.
 const GLOBE_DRAG_INERTIA = { linearity: 0.4, maxSpeed: 1400, deceleration: 1200 };
 const pageParameters = new URLSearchParams(window.location.search);
-if(pageParameters.get('solo')==='daily'){pageParameters.set('mode','medium');pageParameters.set('timer','30');pageParameters.set('blur','1');}
+if(pageParameters.get('solo')==='daily'&&pageParameters.get('multiplayer')!=='1'){
+ const requestedDay=pageParameters.has('day')?Number(pageParameters.get('day')):undefined;
+ const config=window.BussoleDaily.settings(Number.isInteger(requestedDay)&&requestedDay>=0?requestedDay:undefined);
+ pageParameters.set('mode',config.mode);pageParameters.set('timer',String(config.timerSeconds));pageParameters.set('blur',config.blurEnabled?'1':'0');
+}
 const integratedMode = pageParameters.get('integrated') === '1';
 const multiplayerMode = pageParameters.get('multiplayer') === '1';
 const soloGameMode = !multiplayerMode && ['game','daily'].includes(pageParameters.get('solo'));
