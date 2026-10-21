@@ -1,6 +1,6 @@
 # Optional personal accounts
 
-This prototype keeps guest gameplay and anonymous Firebase authentication. It adds email/password accounts, an optional editable display username and a preference to use it for new multiplayer seats. Usernames are display names and need not be unique; email is the login.
+This prototype keeps guest gameplay and anonymous Firebase authentication. It adds email/password and optional Google accounts, an optional editable display username and a preference to use it for new multiplayer seats. Usernames are display names and need not be unique; email is the login.
 
 ## Enable personal accounts
 
@@ -12,15 +12,35 @@ This prototype keeps guest gameplay and anonymous Firebase authentication. It ad
 
 Accounts, profile preferences and personal error statistics do not require deploying Cloud Functions. Community comparison remains unavailable until the server functions below are deployed and there are enough contributors. The app handles this independently of personal statistics.
 
+## Enable Google and social features
+
+1. Publish the **complete updated** `database.rules.json` in Realtime Database → Rules. The rules now allow `password` and `google.com` account sessions, with verified-email checks for statistical writes/social features. They add owner-controlled `publicProfiles`, mutually accepted `connections`, restricted `friendShares` and an opt-in `journeyLeaderboard`. Existing guest room rules are unchanged.
+2. Authentication → Sign-in method → **Google** → Enable. Choose the project support email (the owner's email is suitable), then Save. Keep Email/Password and Anonymous enabled. Leave one-account-per-email enabled. Authorized domains must include `mattesta.github.io` and the project's Firebase auth domain. No Blaze upgrade, OAuth token in repository, new paid service or Cloud Functions deployment is needed.
+3. Test on a phone in Safari/Chrome: a new Google account, linking Google from an existing signed-in email/password account, logging out/in via Google, then reauthentication and in-app deletion. Popup blocking produces instructions to allow it/open the site directly. The app uses popup auth/link/reauth, not cross-origin redirect storage. Production Google OAuth and iOS/PWA popup behavior require a real-device check after enabling the provider; emulators cannot certify Google's live consent screen.
+
+Existing accounts should sign in first and press **Connect Google**; `linkWithPopup` keeps their UID and statistics. The app does not merge two independently created accounts, import guest history, or persist pending OAuth credentials. An account-exists error tells users to sign in with their existing method and connect Google. Google-only users can add a password via linked Email credentials after Google reauthentication. Their Google email is managed through Google; the separate email/password email controls appear once a password is attached.
+
+## Friends, consent and kilometre leaderboards
+
+Share/copy `account.html?friend={uid}` from My account. A verified player explicitly sends a request, and only the recipient can accept. Both directed connection edges must be atomically consistent on create/accept; both accepted states are required to read the other's shared snapshot. Either participant can remove the friendship; clients delete both edges and close revoked views. Pending requests, strangers and guests cannot read statistics or private account data. A display profile is enabled only by creating a friend link, sending/accepting a request or opting into the global board (`profile/socialEnabled` is false by default). Registration and ordinary play alone do not publish a profile. Display profiles expose only a chosen username (default Explorer), not Google names/photos or email. Individual profile reads require verified authentication; listing the profile directory is denied.
+
+`friendShares/{uid}` is a private statistical projection, readable by its owner and mutually accepted friends: cleaned scalar samples as a canonical array (no private attempt keys), personal bests without their internal generation field, and a Daily journey snapshot. A top-level generation validates against the current private profile to reject stale post-deletion publications. Friendship is explicit reciprocal consent to those snapshots, separate from global/community opt-in. Copies already downloaded cannot be recalled.
+
+Global leaderboard participation is optional (`profile/leaderboardOptIn`, default false) and requires a chosen username. `journeyLeaderboard/{uid}` contains name, balance in tenths of km, as-of UTC day and last completed day plus a technical generation key. Readers apply missed-day decay to each snapshot before ranking, including players who are offline. Friends' rankings use their restricted snapshots regardless of global opt-in. Ties share ranks. No public per-player error histories or raw Daily history are used for this board.
+
+**Prototype limits:** sharing reprojects existing private history when the player syncs; background sync is best-effort after saves, with refresh on account/Home and ranking actions. Public snapshot age is respected for inactivity penalties but a failed publish can delay newly earned credit until that player syncs again. Scores/balances are client-reported, not cheat-proof. Rebuilding snapshots reads/writes history linearly and global ranking downloads the small opted-in board; revisit batching/aggregation/pagination before large histories/traffic. This is intended for the existing small user group, within Spark quotas, not an unlimited free scale guarantee.
+
+Turning global participation off deletes its entry atomically with the preference change. Delete statistics clears shared error values and the global entry, opts out of global/community contributions and rotates generation; current empty snapshots may be rebuilt, without past data. Account deletion reauthenticates, removes private records, daily public contributions, social profile/snapshots/leaderboard and known request/friend edges before deleting Auth. In-app deletion handles cleanup without server functions; administrative Auth-only deletions still require explicit database cleanup. The optional legacy server trigger only removes the private account branch; it does not clean social edges, social snapshots or published Daily scores. Use in-app deletion for the full cleanup.
+
 ## Data model and privacy
 
-`accountData/{auth.uid}/profile`: `username`, `useInRooms`, `communityConsent` (default false), `consentVersion`, and an internal `generation` key.
+`accountData/{auth.uid}/profile`: `username`, `useInRooms`, `communityConsent` (default false), `consentVersion`, `leaderboardOptIn`, `socialEnabled`, and an internal `generation` key.
 
 `accountData/{auth.uid}/samples/{opaqueKey}`: UTC day number, difficulty, solo/multiplayer, points, relative final error, signed angular error, Pro signed relative distance error, plus the generation key. Undefined geometric measures are omitted. Sample payloads are explicitly projected to these fields on the client and validated by rules. Account history has **no starting coordinates, targets, routes, exact headings, room codes or round numbers**. Multiplayer keys are SHA-256 digests to make repeat saves idempotent without keeping room identities. Solo keys are random UUIDs.
 
-Only the account owner can read/write their account branch. Samples and consent require verified password authentication; unverified users can still play. Samples are captured only for accounts verified at the start of the attempt. Guest identities are not linked to new registrations. DNF attempts are excluded. Registration/authentication and account controls are outside active gameplay.
+Only the account owner can read/write their account branch. Samples and consent require verified password or Google authentication; unverified users can still play. Samples are captured only for accounts verified at the start of the attempt. Guest identities are not linked to new registrations. DNF attempts are excluded. Registration/authentication and account controls are outside active gameplay.
 
-Deleting statistics removes samples, opts out of community contributions and rotates the generation key atomically. Old games open in other tabs then fail rule validation instead of resurrecting deleted data. Deleting the account first reauthenticates with the current password, removes personal database data, then deletes the Authentication user. Already shared room results and the current match summary are separate from account history.
+Deleting statistics removes samples, opts out of community contributions and rotates the generation key atomically. Old games open in other tabs then fail rule validation instead of resurrecting deleted data. Deleting the account first reauthenticates with the current password or connected Google account, removes personal database data, then deletes the Authentication user. Already shared room results and the current match summary are separate from account history.
 
 ## Five-round single-player Games
 
@@ -48,7 +68,7 @@ Daily kilometres are derived from existing private, completed official `dailyAtt
 
 Each point earns 0.1 virtual km (1000 points = 100 km, maximum 500 km per Daily). Use integer score units internally to avoid rounding drift. Process completed days in UTC order: subtract 500 km for each intervening missed day, clamp at zero, then credit the next completed day. Only fully ended days are missed; today remains open until 00:00 UTC. Penalties begin after the first completed official Daily, with no penalty for earlier inactivity. Days elapsed while the app is closed are applied when the account is read, without scheduled writes. Cross-midnight results belong to their pinned challenge day, as before.
 
-The Home Daily panel, official results and account page show the current balance and its percentage of approximately 40,075 km (equatorial circumference). The percentage can exceed 100%; it describes a virtual journey, not tracked physical movement. Guests and unranked plays earn nothing. Balance is calculated using the database clock and owner-only history; there is no public journey leaderboard in this batch. Account export includes a derived snapshot alongside the underlying daily records. Deleting statistics/account removes those records and resets the journey, including its starting day.
+The Home Daily panel, official results and account page show the current balance and its percentage of approximately 40,075 km (equatorial circumference). The percentage can exceed 100%; it describes a virtual journey, not tracked physical movement. Guests and unranked plays earn nothing. Balance is calculated using the database clock and owner-only history. Optional social snapshots power the separate leaderboards described above. Account export includes a derived snapshot alongside the underlying daily records. Deleting statistics/account removes those records and resets the journey, including its starting day.
 
 ## Optional server-side community comparison
 
@@ -85,6 +105,10 @@ Only aggregate means and counts are published under `communityStatistics`; clien
 - Existing room identity, reconnect, matchmaking, multiplayer scoring, home and sensor-permission tests cover guest gameplay regressions.
 - `scripts/test_account_ui.cjs` runs native mobile-browser QA against Auth/Database emulators with Firebase's real JavaScript SDK (test dependencies: esbuild, Playwright, firebase-admin and firebase@12.2.1; use `BUSSOLE_TEST_CHROMIUM` for an existing browser binary). Production email deliverability and password recovery links must also be checked on a phone after enabling the provider.
 
+- `scripts/test_social_rules.cjs`: verified Google ownership, mutual friendship acceptance, pending/stranger denial, revocation, projection field restrictions, opt-in/out and stale generation.
+- `node scripts/test_social_model.cjs`: private projection, ranking ties and automatic offline decay.
+- `scripts/test_social_ui.cjs`: real SDK/emulator mobile request/accept/revoke flow, friend charts and rankings, global opt-in, Google popup linking/sign-in with stable UID and Google-only accounts.
+
 Official references:
 
 - https://firebase.google.com/docs/auth/web/password-auth
@@ -92,3 +116,6 @@ Official references:
 - https://firebase.google.com/docs/database/security/rules-conditions
 - https://firebase.google.com/docs/functions/database-events
 - https://firebase.google.com/docs/functions/get-started
+
+- https://firebase.google.com/docs/auth/web/google-signin
+- https://firebase.google.com/docs/auth/web/account-linking

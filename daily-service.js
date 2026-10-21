@@ -1,4 +1,4 @@
-import { auth, db, ready, beginRound, ref, get, runTransaction, set, onValue, serverTimestamp } from './account-service.js?v=3';
+import { auth, db, ready, beginRound, ref, get, runTransaction, set, onValue, serverTimestamp, scheduleSocialSync } from './account-service.js?v=4';
 const daily=window.BussoleDaily;
 const verified=()=>Boolean(auth.currentUser?.emailVerified&&auth.currentUser?.email);
 export async function today(){
@@ -54,6 +54,7 @@ export async function complete(ticket,score){
  const scoreRef=ref(db,`dailyScores/${ticket.day}/${ticket.entryKey}`);
  const existing=await get(scoreRef);
  if(!existing.exists())await set(scoreRef,score);
+ scheduleSocialSync();
  return {saved:true,score:record.score};
 }
 export function watch(day,score,key,onComparison,onError){

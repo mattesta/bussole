@@ -4,7 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>Bussole — My account</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1"><link rel="icon" type="image/svg+xml" href="icon.svg?v=1">
-  <link rel="stylesheet" href="style.css?v=29"><link rel="stylesheet" href="match-summary.css?v=7"><link rel="stylesheet" href="account.css?v=2">
+  <link rel="stylesheet" href="style.css?v=29"><link rel="stylesheet" href="match-summary.css?v=7"><link rel="stylesheet" href="account.css?v=3">
   <link rel="stylesheet" href="daily-progress.css?v=1">
 </head>
 <body class="account-page">
@@ -13,6 +13,8 @@
     <p id="accountStatus" role="status" aria-live="polite">Loading your account…</p>
     <section id="accountAuth" class="hidden">
       <div class="account-choices" role="group" aria-label="Account access"><button id="showLogin" class="selected" type="button">Sign in</button><button id="showRegister" type="button">Create account</button></div>
+      <button id="googleSignIn" class="google-button" type="button">Continue with Google</button>
+      <p class="muted">Or use email and password. If you already have an account, sign in first and connect Google to keep your statistics.</p>
       <form id="authForm">
         <label>Email<input id="accountEmail" type="email" autocomplete="email" required maxlength="254"></label>
         <label>Password<input id="accountPassword" type="password" autocomplete="current-password" required></label>
@@ -23,7 +25,7 @@
       <p><a href="./">Continue as guest</a></p>
     </section>
     <section id="accountDetails" class="hidden">
-      <p id="signedInEmail" class="muted"></p>
+      <p id="signedInEmail" class="muted"></p><button id="connectGoogle" type="button">Connect Google</button><p id="googleSecurityNote" class="muted"></p>
       <section id="verificationPanel" class="hidden">
         <h2>Verify your email</h2><p>You can play now. Statistics start saving after you verify your email; guest and earlier games are not imported.</p>
         <div class="account-choices"><button id="resendVerification" type="button">Send email again</button><button id="checkVerification" type="button">I have verified</button></div>
@@ -31,12 +33,23 @@
       <form id="profileForm">
         <h2>Your profile</h2>
         <label>Username<input id="accountUsername" maxlength="20" pattern="[a-zA-Z0-9_]{3,20}" autocomplete="nickname" placeholder="Optional"></label>
-        <p class="muted">3–20 letters, numbers or underscores. This is a display name, not a login, and can be changed.</p>
+        <p class="muted">3–20 letters, numbers or underscores. This is a display name, not a login, and can be changed. It is shared when you create a friend link, send/accept a request or opt into the global ranking.</p>
         <label class="check-row"><input id="useUsernameInRooms" type="checkbox">Use my username in multiplayer rooms</label>
         <label class="check-row"><input id="communityConsent" type="checkbox">Contribute my results to community statistics</label>
         <p class="muted">Optional, off by default. Only pooled statistics are shown to others. No email, username, location or target is included in the comparison. Turning this off also removes your past contributions from the pool after it refreshes. <a href="account-privacy.html">Privacy details</a></p>
+        <label class="check-row"><input id="leaderboardOptIn" type="checkbox">Show my username and Daily kilometres in the global leaderboard</label><p class="muted">Optional, off by default. Your display name, km balance and last completed Daily day become visible to signed-in players. Your email and error statistics stay private.</p>
         <button class="primary" type="submit">Save preferences</button>
       </form>
+      <section id="socialPanel">
+        <h2>Explorers</h2><p id="socialStatus" role="status" class="muted"></p>
+        <div class="account-choices" role="group" aria-label="Social view"><button id="friendsTab" class="selected" type="button">Friends</button><button id="friendsBoardTab" type="button">Friends ranking</button><button id="globalBoardTab" type="button">Global ranking</button></div>
+        <div id="friendsView"><button id="copyFriendLink" type="button">🔗 Copy my friend link</button><input id="myFriendLink" class="hidden" readonly aria-label="My friend link">
+          <form id="friendRequestForm"><label>Friend link or player ID<input id="friendInvite" type="text" autocomplete="off" placeholder="Paste a friend link"></label><button type="submit">Send friend request</button></form>
+          <p class="muted">Accepting a request shares your error statistics, personal bests and Daily journey with each other. No locations, targets, routes or email addresses are shared. Either player can remove the friendship to stop future access.</p><ul id="friendList" class="social-list"></ul>
+        </div>
+        <div id="leaderboardView" class="hidden"><p class="muted">Balances sync when players use Bussole. Missed-day penalties apply even while offline. Global participation is optional.</p><button id="refreshLeaderboard" type="button">Refresh ranking</button><ol id="journeyRanking" class="social-list"></ol></div>
+        <section id="friendStatistics" class="hidden"><button id="closeFriendStatistics" type="button">Close statistics</button><h3 id="friendStatisticsName"></h3><p id="friendStatisticsCount" class="muted"></p><div id="friendJourney" class="daily-travel hidden"></div><dl id="friendMetrics" class="account-metrics"></dl><ul id="friendBests"></ul></section>
+      </section>
       <section id="dailyJourney" aria-label="Daily journey"><div id="dailyTravel" class="daily-travel hidden"></div><p id="dailyTravelStatus" class="muted"></p></section>
       <section id="soloPersonalBests">
         <h2>Single-player personal bests</h2>
@@ -57,10 +70,10 @@
           <label>Current password<input id="currentPassword" type="password" autocomplete="current-password"></label>
           <label>New password<input id="newPassword" type="password" autocomplete="new-password" minlength="8"></label>
           <button id="changePassword" type="button">Change password</button>
-          <label>New email<input id="newEmail" type="email" autocomplete="email" maxlength="254"></label>
-          <button id="changeEmail" type="button">Change email</button>
+          <div id="emailSecurity"><label>Email/password login email<input id="newEmail" type="email" autocomplete="email" maxlength="254"></label>
+          <button id="changeEmail" type="button">Change email</button></div>
         </form>
-        <p class="muted">Changing your password, email or deleting your account requires your current password. An email change must be verified at the new address.</p>
+        <p class="muted">Changing your password, email or deleting your account requires your current password, or a Google confirmation if connected. An email change must be verified at the new address.</p>
       </section>
       <section>
         <h2>Your data</h2>
@@ -70,6 +83,6 @@
     </section>
     <footer><a href="account-privacy.html">Account privacy</a></footer>
   </main>
-  <script src="daily-challenge.js?v=2"></script><script src="daily-progress.js?v=1"></script><script src="solo-game.js?v=1"></script><script src="account-statistics.js?v=1"></script><script src="summary-charts.js?v=3"></script><script type="module" src="account.js?v=4"></script>
+  <script src="daily-challenge.js?v=2"></script><script src="daily-progress.js?v=1"></script><script src="social-model.js?v=1"></script><script src="solo-game.js?v=1"></script><script src="account-statistics.js?v=1"></script><script src="summary-charts.js?v=3"></script><script type="module" src="account.js?v=5"></script>
 </body>
 </html>
