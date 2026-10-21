@@ -1,15 +1,16 @@
-import { inspect, start, watch } from './daily-service.js?v=1';
+import { inspect, start, watch } from './daily-service.js?v=2';
 const byId=id=>document.getElementById(id),daily=window.BussoleDaily;
 let state,stopWatch,loading=false;
 function description(day){return `The same 5 targets for everyone. Normal · 30 s timer · Blur ${daily.settings(day).blurEnabled?'on':'off'}. A new challenge at 00:00 UTC.`;}
 function active(){return window.BussoleHome.soloType()==='daily';}
 async function prepare(){
- if(loading)return;loading=true;stopWatch?.();
+ if(loading)return;loading=true;stopWatch?.();window.BussoleDailyProgress.render(byId('dailyTravel'),null);
  try{
   state=await inspect();if(!active())return;
+  window.BussoleDailyProgress.render(byId('dailyTravel'),state.journey);
   byId('soloDescription').textContent=description(state.day);
   byId('startSoloBtn').textContent=state.eligible&&!state.attempt?'Start official challenge':'Play unranked';
-  byId('dailyInfo').textContent=`${daily.date(state.day)} · `+(!state.eligible?'Sign in and verify your email for an official attempt. You can play unranked now.':state.attempt?.score!==undefined?`Today's official score: ${state.attempt.score} / 5000. Further games are unranked.${state.sharingPending?' Your score is stored, but sharing is pending. Reopen Daily Challenge to retry.':''}`:state.attempt?'Your official attempt has already started. Further games are unranked.':'One official attempt today. Starting uses your attempt; leaving or reloading ends it. Your final score is shared without your name or location.');
+  byId('dailyInfo').textContent=`${daily.date(state.day)} · `+(!state.eligible?'Sign in and verify your email for an official attempt and to collect kilometres. You can play unranked now.':state.attempt?.score!==undefined?`Today's official score: ${state.attempt.score} / 5000. Further games are unranked.${state.sharingPending?' Your score is stored, but sharing is pending. Reopen Daily Challenge to retry.':''}`:state.attempt?'Your official attempt has already started. Further games are unranked.':'One official attempt today. Starting uses your attempt; leaving or reloading ends it. Your final score is shared without your name or location.');
   if(state.attempt?.score!==undefined&&!state.sharingPending){
    byId('dailyComparison').classList.remove('hidden');
    stopWatch=watch(state.day,state.attempt.score,state.attempt.entryKey,result=>{byId('dailyComparison').textContent=daily.describe(result,state.day);},()=>{byId('dailyComparison').textContent='The comparison is temporarily unavailable.';});
@@ -30,4 +31,4 @@ async function launch(access){
  const config=daily.settings(ticket.day);
  location.href=`globe-prototype.html?integrated=1&solo=daily&day=${ticket.day}&mode=${config.mode}&timer=${config.timerSeconds}${config.blurEnabled?'&blur=1':''}`;
 }
-window.BussoleHome.registerDaily({prepare,launch,leave(){stopWatch?.();stopWatch=null;}});
+window.BussoleHome.registerDaily({prepare,launch,leave(){stopWatch?.();stopWatch=null;window.BussoleDailyProgress.render(byId('dailyTravel'),null);}});

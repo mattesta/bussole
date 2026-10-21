@@ -40,7 +40,7 @@ const fakeMap=`(()=>{
   const day=Math.floor(Date.now()/86400000);
   async function openDaily(){await page.goto('http://localhost/');await page.locator('#singlePlayerBtn').click();await page.locator('#soloDailyBtn').click();await page.waitForFunction(()=>!document.getElementById('startSoloBtn').disabled);}
   await openDaily();assert.equal(await page.locator('#soloConfigControls').isVisible(),false);assert.equal(await page.locator('#startSoloBtn').textContent(),'Start official challenge');
-  assert.match(await page.locator('#soloDescription').textContent(),/30 s/);assert.match(await page.locator('#dailyInfo').textContent(),/leaving or reloading/);
+  assert.match(await page.locator('#soloDescription').textContent(),/30 s/);assert.match(await page.locator('#dailyTravel .daily-travel-distance').textContent(),/^0 km$/);assert.match(await page.locator('#dailyInfo').textContent(),/leaving or reloading/);
   await page.setViewportSize({width:320,height:740});await page.screenshot({path:'/tmp/bussole-daily-lobby.png'});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.setViewportSize({width:390,height:844});
   await page.locator('#startSoloBtn').click();await page.waitForURL(/solo=daily/);await page.waitForFunction(()=>!document.getElementById('showPrototypeLineBtn').disabled);
   assert.match(await page.locator('#dailyGameNotice').textContent(),/Official attempt/);
@@ -54,6 +54,8 @@ const fakeMap=`(()=>{
   }
   await page.waitForFunction(()=>document.getElementById('soloRecordStatus').textContent.includes('first to finish'));
   assert.equal((await db.ref(`dailyScores/${day}/${attempt.entryKey}`).get()).val(),total);assert.equal((await db.ref(`accountData/${uid}/soloBests`).get()).exists(),false);
+  assert.equal(await page.locator('#dailyTravel .daily-travel-distance').textContent(),`${new Intl.NumberFormat('en-US',{maximumFractionDigits:1}).format(total/10)} km`);
+  assert.match(await page.locator('#dailyTravel .daily-travel-earned').textContent(),/from this challenge/);
   // A second completed entry updates the open percentile immediately; ties are not wins.
   await db.ref(`dailyScores/${day}/another-random-key`).set(total);
   await page.waitForFunction(()=>document.getElementById('soloRecordStatus').textContent.includes('#1 of 2 · tied'));
@@ -70,23 +72,30 @@ const fakeMap=`(()=>{
   }
   await page.waitForFunction(()=>document.getElementById('soloRecordStatus').textContent.includes('Unranked game'));
   assert.equal((await db.ref(`dailyScores/${day}/${attempt.entryKey}`).get()).val(),total);
+  // Historical completed days earn km, missed days subtract 500 with a zero floor.
+  const privatePath=`accountData/${uid}/dailyAttempts`,generation=attempt.generation;
+  const historical=[[-4,5000],[-3,5000],[-1,0]];
+  for(const [offset,score] of historical){const entryKey=`00000000-0000-0000-0000-${String(day+offset).padStart(12,'0')}`;await db.ref(`${privatePath}/${day+offset}`).set({entryKey,generation,startedAt:(day+offset)*86400000,version:1,score});await db.ref(`dailyScores/${day+offset}/${entryKey}`).set(score);}
+  const expectedKm=500+total/10;
   // Export includes only day/status/score; erase also removes the shared contribution.
   await page.goto('http://localhost/account.html');
+  await page.locator('#dailyTravel .daily-travel-distance').waitFor();assert.equal(await page.locator('#dailyTravel .daily-travel-distance').textContent(),`${new Intl.NumberFormat('en-US',{maximumFractionDigits:1}).format(expectedKm)} km`);
   const exportedPromise=page.waitForEvent('download');await page.locator('#exportAccount').click();const download=await exportedPromise;const data=JSON.parse(fs.readFileSync(await download.path(),'utf8'));
-  assert.deepEqual(data.dailyAttempts,[{day,status:'completed',score:total}]);assert.equal(JSON.stringify(data).includes(attempt.entryKey),false);
+  assert.deepEqual(data.dailyAttempts.find(row=>row.day===day),{day,status:'completed',score:total});assert.equal(data.dailyJourney.km,expectedKm);assert.equal(data.dailyJourney.missedDays,1);assert.equal(JSON.stringify(data).includes(attempt.entryKey),false);
   await page.locator('#deleteStatistics').click();await page.waitForFunction(()=>document.getElementById('accountStatus').textContent.includes('deleted'));
-  assert.equal((await db.ref(`dailyScores/${day}/${attempt.entryKey}`).get()).exists(),false);assert.equal((await db.ref(`accountData/${uid}/dailyAttempts`).get()).exists(),false);
+  assert.equal((await db.ref(`dailyScores/${day}/${attempt.entryKey}`).get()).exists(),false);assert.equal((await db.ref(`accountData/${uid}/dailyAttempts`).get()).exists(),false);assert.equal(await page.locator('#dailyTravel .daily-travel-distance').textContent(),'0 km');
+  for(const [offset] of historical){const entryKey=`00000000-0000-0000-0000-${String(day+offset).padStart(12,'0')}`;assert.equal((await db.ref(`dailyScores/${day+offset}/${entryKey}`).get()).exists(),false);}
   // Reserve then reload: the ticket is consumed, so no second official attempt.
   await openDaily();await page.locator('#startSoloBtn').click();await page.waitForURL(/solo=daily/);await page.waitForFunction(()=>document.getElementById('dailyGameNotice').textContent.includes('Official attempt'));
   const reserved=(await db.ref(`accountData/${uid}/dailyAttempts/${day}`).get()).val();await page.reload();await page.waitForFunction(()=>document.getElementById('dailyGameNotice').textContent.includes('Unranked'));
   assert.equal((await db.ref(`accountData/${uid}/dailyAttempts/${day}`).get()).val().entryKey,reserved.entryKey);
   // Account deletion also removes a completed public contribution after reauthentication.
-  await page.evaluate(async data=>(await import('./daily-service.js?v=1')).complete({...data.reserved,uid:data.uid,day:data.day,official:true},0),{reserved,uid,day});
+  await page.evaluate(async data=>(await import('./daily-service.js?v=2')).complete({...data.reserved,uid:data.uid,day:data.day,official:true},0),{reserved,uid,day});
   assert.equal((await db.ref(`dailyScores/${day}/${reserved.entryKey}`).get()).val(),0);
   await page.goto('http://localhost/account.html');await page.locator('#currentPassword').fill('Explorer123!');await page.locator('#deleteAccount').click();await page.locator('#accountAuth').waitFor({state:'visible'});
   assert.equal((await db.ref(`dailyScores/${day}/${reserved.entryKey}`).get()).exists(),false);assert.equal((await db.ref(`accountData/${uid}`).get()).exists(),false);
   // Guests see the same challenge but do not create an attempt or publish scores.
   await openDaily();assert.equal(await page.locator('#startSoloBtn').textContent(),'Play unranked');await page.locator('#startSoloBtn').click();await page.waitForURL(/solo=daily/);await page.waitForFunction(()=>!document.getElementById('showPrototypeLineBtn').disabled);assert.equal(await page.locator('#prototypeTarget').textContent(),targets[0]);assert.match(await page.locator('#dailyGameNotice').textContent(),/Unranked/);
-  assert.deepEqual(errors,[]);console.log('Native daily flow + real SDK/emulators: official five-round challenge, live percentile/ties, same-target replay and guest exclusion, one-use reload, Summary, export and atomic private/shared erasure passed.');
+  assert.deepEqual(errors,[]);console.log('Native daily journey + real SDK/emulators: rewards, historical penalties, Home/results/account balance, export/erasure; official five-round challenge, live percentile/ties, same-target replay and guest exclusion, one-use reload, Summary, export and atomic private/shared erasure passed.');
  }finally{await browser.close();await app.delete();}
 })().catch(error=>{console.error(error);process.exitCode=1});

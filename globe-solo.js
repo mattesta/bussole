@@ -1,5 +1,5 @@
 import { completeGame } from './account-game.js?v=3';
-import * as dailyService from './daily-service.js?v=1';
+import * as dailyService from './daily-service.js?v=2';
 const parameters=new URLSearchParams(location.search);
 if(['game','daily'].includes(parameters.get('solo'))&&parameters.get('multiplayer')!=='1'){
  const byId=id=>document.getElementById(id),show=(id,visible)=>byId(id).classList.toggle('hidden',!visible);
@@ -24,13 +24,18 @@ if(['game','daily'].includes(parameters.get('solo'))&&parameters.get('multiplaye
   panel.classList.add('hidden');badge.classList.add('results-available');
  }
  function showResults(){panel.classList.remove('hidden');badge.classList.remove('results-available');}
+ async function showJourney(earnedKm){
+  try{window.BussoleDailyProgress.render(byId('dailyTravel'),await dailyService.journey(ticket.uid),earnedKm);}
+  catch{byId('dailyTravel').classList.add('hidden');}
+ }
  async function saveRecord(){
   if(saving)return;saving=true;progress();show('soloSaveRetry',false);
   byId('soloRecordStatus').textContent=isDaily?'Submitting daily result…':'Checking your personal best…';
   try{
    if(isDaily){
     const result=await dailyService.complete(ticket,game.total);
-    if(!result.saved){byId('soloRecordStatus').textContent='Unranked game. No daily score submitted.';return;}
+    if(!result.saved){byId('soloRecordStatus').textContent='Unranked game. No daily score submitted or kilometres earned.';return;}
+    await showJourney(result.score/10);
     byId('soloRecordStatus').textContent='Official score saved. Loading today’s comparison…';
     stopComparison?.();stopComparison=dailyService.watch(ticket.day,game.total,ticket.entryKey,result=>{byId('soloRecordStatus').textContent=daily.describe(result,ticket.day);},()=>{byId('soloRecordStatus').textContent='Official score saved. The comparison is temporarily unavailable; reopen Daily Challenge from Home to check it.';});
     return;
@@ -41,6 +46,7 @@ if(['game','daily'].includes(parameters.get('solo'))&&parameters.get('multiplaye
   }catch{
    byId('soloRecordStatus').textContent=isDaily?'Your game is complete, but the daily result could not be submitted. Check your connection and retry.':'Your game is complete, but the record could not be saved. Check your connection and retry.';
    show('soloSaveRetry',true);
+   if(isDaily&&ticket.official)await showJourney();
   }finally{saving=false;progress();}
  }
  function finish(submission,points,errorMeters){

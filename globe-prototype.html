@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="globe-prototype.css?v=25">
   <link rel="stylesheet" href="round-timer.css?v=2">
   <link rel="stylesheet" href="player-blur.css?v=1">
+  <link rel="stylesheet" href="daily-progress.css?v=1">
 </head>
 <body>
   <main id="globeMap" aria-label="Interactive 3D globe"></main>
@@ -103,6 +104,7 @@
     <h2 id="soloResultsTitle"></h2>
     <p id="soloRoundScore"></p>
     <p id="soloRecordStatus" role="status"></p>
+    <div id="dailyTravel" class="daily-travel hidden"></div>
     <div class="globe-results-actions">
       <button id="soloSummaryBtn" class="hidden" type="button">Summary</button>
       <button id="soloSaveRetry" class="hidden" type="button">Retry saving record</button>
@@ -128,13 +130,14 @@
   <script src="distance-input.js?v=1"></script>
   <script src="solo-game.js?v=1"></script>
   <script src="daily-challenge.js?v=2"></script>
+  <script src="daily-progress.js?v=1"></script>
   <script src="account-statistics.js?v=1"></script>
   <script src="report-geometry.js?v=2"></script>
   <script src="globe-prototype.js?v=42"></script>
   <script src="public-rooms.js?v=3"></script>
   <script src="match-report.js?v=1"></script>
   <script type="module" src="account-game.js?v=3"></script>
-  <script type="module" src="globe-solo.js?v=3"></script>
+  <script type="module" src="globe-solo.js?v=4"></script>
   <script type="module" src="globe-multiplayer.js?v=16"></script>
 </body>
 </html>
