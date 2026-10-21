@@ -19,3 +19,11 @@
 .account-home-link {display:block;margin:16px auto 0;text-align:center;color:#ffffffb3;font-size:14px;}
 #soloBestList {padding-left:18px;font-size:13px;line-height:1.6;}
 #soloBestList li {margin:8px 0;}
+.google-button {width:100%;margin:12px 0;font-weight:700!important;}
+.social-list {list-style:none;padding:0;display:grid;gap:10px;}
+.social-list li {display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px;border:1px solid var(--ui-border);border-radius:10px;font-size:13px;overflow-wrap:anywhere;}
+.social-list li strong {flex:1 0 100%;}.social-list li span {color:var(--ui-muted);}
+#friendRequestForm input,#myFriendLink {width:100%;min-width:0;}
+#friendStatistics {padding-top:14px;}#friendStatisticsName {overflow-wrap:anywhere;}
+#socialPanel .account-choices {flex-wrap:wrap;}#socialPanel .account-choices button {flex:1;min-width:90px;}
+#journeyRanking li {line-height:1.5;}

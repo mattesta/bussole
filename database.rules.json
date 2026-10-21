@@ -99,12 +99,12 @@
     },
     "accountData": {
       "$uid": {
-        ".read": "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider === 'password'",
-        ".write": "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider === 'password'",
+        ".read": "auth != null && auth.uid === $uid && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com')",
+        ".write": "auth != null && auth.uid === $uid && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com')",
         "profile": {
-          ".validate": "newData.hasChildren(['username','useInRooms','communityConsent','consentVersion','generation']) && newData.child('username').isString() && (newData.child('username').val() === '' || newData.child('username').val().matches(/^[a-zA-Z0-9_]{3,20}$/)) && newData.child('useInRooms').isBoolean() && newData.child('communityConsent').isBoolean() && (newData.child('communityConsent').val() !== true || auth.token.email_verified === true) && newData.child('consentVersion').val() === 1 && newData.child('generation').isString() && newData.child('generation').val().matches(/^[a-zA-Z0-9-]{36}$/)",
+          ".validate": "newData.hasChildren(['username','useInRooms','communityConsent','consentVersion','generation']) && newData.child('username').isString() && (newData.child('username').val() === '' || newData.child('username').val().matches(/^[a-zA-Z0-9_]{3,20}$/)) && newData.child('useInRooms').isBoolean() && newData.child('communityConsent').isBoolean() && (newData.child('communityConsent').val() !== true || auth.token.email_verified === true) && newData.child('consentVersion').val() === 1 && newData.child('generation').isString() && newData.child('generation').val().matches(/^[a-zA-Z0-9-]{36}$/) && (!newData.child('leaderboardOptIn').exists() || (newData.child('leaderboardOptIn').isBoolean() && (newData.child('leaderboardOptIn').val() !== true || auth.token.email_verified === true))) && (!newData.child('socialEnabled').exists() || (newData.child('socialEnabled').isBoolean() && (newData.child('socialEnabled').val() !== true || auth.token.email_verified === true)))",
           "$other": {
-            ".validate": "$other === 'username' || $other === 'useInRooms' || $other === 'communityConsent' || $other === 'consentVersion' || $other === 'generation'"
+            ".validate": "$other === 'username' || $other === 'useInRooms' || $other === 'communityConsent' || $other === 'consentVersion' || $other === 'generation' || $other === 'leaderboardOptIn' || $other === 'socialEnabled'"
           }
         },
         "samples": {
@@ -197,7 +197,7 @@
       }
     },
     "communityStatistics": {
-      ".read": "auth != null && auth.token.email_verified === true && auth.token.firebase.sign_in_provider === 'password'",
+      ".read": "auth != null && auth.token.email_verified === true && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com')",
       ".write": false
     },
     "accountInternal": {
@@ -208,9 +208,149 @@
       "$day": {
         ".read": "$day.matches(/^[0-9]{1,8}$/)",
         "$entry": {
-          ".write": "auth != null && auth.token.firebase.sign_in_provider === 'password' && root.child('accountData').child(auth.uid).child('dailyAttempts').child($day).child('entryKey').val() === $entry && (!newData.exists() || (auth.token.email_verified === true && root.child('accountData').child(auth.uid).child('dailyAttempts').child($day).child('generation').val() === root.child('accountData').child(auth.uid).child('profile/generation').val() && root.child('accountData').child(auth.uid).child('dailyAttempts').child($day).child('score').val() === newData.val() && (!data.exists() || data.val() === newData.val())))",
+          ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && root.child('accountData').child(auth.uid).child('dailyAttempts').child($day).child('entryKey').val() === $entry && (!newData.exists() || (auth.token.email_verified === true && root.child('accountData').child(auth.uid).child('dailyAttempts').child($day).child('generation').val() === root.child('accountData').child(auth.uid).child('profile/generation').val() && root.child('accountData').child(auth.uid).child('dailyAttempts').child($day).child('score').val() === newData.val() && (!data.exists() || data.val() === newData.val())))",
           ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 5000"
         }
+      }
+    },
+    "publicProfiles": {
+      "$uid": {
+        ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && auth.token.email_verified === true",
+        ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && auth.uid === $uid && (!newData.exists() || auth.token.email_verified === true)",
+        ".validate": "newData.hasChildren(['name']) && (root.child('accountData').child($uid).child('profile/socialEnabled').val() === true || root.child('accountData').child($uid).child('profile/leaderboardOptIn').val() === true)",
+        "name": {
+          ".validate": "newData.isString() && newData.val().matches(/^[a-zA-Z0-9_]{1,20}$/)"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "connections": {
+      "$uid": {
+        ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && auth.uid === $uid",
+        "$otherUid": {
+          ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && (auth.uid === $uid || auth.uid === $otherUid)",
+          ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && (auth.uid === $uid || auth.uid === $otherUid) && (!newData.exists() || (auth.token.email_verified === true && ((!data.exists() && newData.child('state').val() === 'pending' && newData.child('requestedBy').val() === auth.uid) || (data.child('state').val() === 'pending' && data.child('requestedBy').val() !== auth.uid && newData.child('state').val() === 'accepted' && newData.child('requestedBy').val() === data.child('requestedBy').val()))))",
+          ".validate": "$uid !== $otherUid && root.child('publicProfiles').child($uid).exists() && root.child('publicProfiles').child($otherUid).exists() && newData.hasChildren(['state','requestedBy']) && (newData.child('requestedBy').val() === $uid || newData.child('requestedBy').val() === $otherUid) && newData.parent().parent().child($otherUid).child($uid).child('state').val() === newData.child('state').val() && newData.parent().parent().child($otherUid).child($uid).child('requestedBy').val() === newData.child('requestedBy').val()",
+          "state": {
+            ".validate": "newData.val() === 'pending' || newData.val() === 'accepted'"
+          },
+          "requestedBy": {
+            ".validate": "newData.isString()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
+    "friendShares": {
+      "$uid": {
+        ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && auth.uid === $uid || (auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && auth.token.email_verified === true && root.child('connections').child($uid).child(auth.uid).child('state').val() === 'accepted' && root.child('connections').child(auth.uid).child($uid).child('state').val() === 'accepted' && root.child('accountData').child($uid).child('profile/generation').exists() && data.child('generation').val() === root.child('accountData').child($uid).child('profile/generation').val())",
+        ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && auth.uid === $uid && (!newData.exists() || auth.token.email_verified === true)",
+        ".validate": "newData.hasChildren(['generation','journey']) && root.child('accountData').child($uid).child('profile/generation').exists() && newData.child('generation').val() === root.child('accountData').child($uid).child('profile/generation').val()",
+        "generation": {
+          ".validate": "newData.isString()"
+        },
+        "samples": {
+          "$index": {
+            ".validate": "$index.matches(/^(0|[1-9][0-9]{0,5})$/) && newData.hasChildren(['day','mode','kind','points'])",
+            "day": {
+              ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= now / 86400000 + 1"
+            },
+            "mode": {
+              ".validate": "newData.isString() && newData.val().matches(/^(easy|medium|hard)$/)"
+            },
+            "kind": {
+              ".validate": "newData.isString() && newData.val().matches(/^(solo|multiplayer)$/)"
+            },
+            "points": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000 && newData.val() % 1 === 0"
+            },
+            "relativeError": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000000000"
+            },
+            "angleError": {
+              ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() < 180"
+            },
+            "distanceError": {
+              ".validate": "newData.parent().child('mode').val() === 'hard' && newData.isNumber() && newData.val() >= -100 && newData.val() <= 1000000000000"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "bests": {
+          "$index": {
+            ".validate": "$index.matches(/^(0|[1-9][0-9]{0,3})$/) && newData.hasChildren(['mode','timerSeconds','blurEnabled','score','rounds','day'])",
+            "mode": {
+              ".validate": "newData.isString() && newData.val().matches(/^(easy|medium|hard)$/)"
+            },
+            "timerSeconds": {
+              ".validate": "newData.isNumber() && newData.val() % 1 === 0 && (newData.val() === 0 || (newData.val() >= 3 && newData.val() <= 60))"
+            },
+            "blurEnabled": {
+              ".validate": "newData.isBoolean()"
+            },
+            "score": {
+              ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 5000"
+            },
+            "rounds": {
+              ".validate": "newData.val() === 5"
+            },
+            "day": {
+              ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= now / 86400000 + 1"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "journey": {
+          ".validate": "newData.hasChildren(['asOfDay','tenths','lastDay']) && newData.child('lastDay').val() <= newData.child('asOfDay').val()",
+          "asOfDay": {
+            ".validate": "newData.isNumber() && newData.val() === (now - now % 86400000) / 86400000"
+          },
+          "tenths": {
+            ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 1000000000"
+          },
+          "lastDay": {
+            ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= -1"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "journeyLeaderboard": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && auth.token.email_verified === true",
+      "$uid": {
+        ".validate": "newData.hasChildren(['asOfDay','tenths','lastDay']) && newData.child('lastDay').val() <= newData.child('asOfDay').val() && newData.hasChildren(['name','generation']) && root.child('accountData').child($uid).child('profile/generation').exists() && newData.child('generation').val() === root.child('accountData').child($uid).child('profile/generation').val() && root.child('accountData').child($uid).child('profile/leaderboardOptIn').val() === true",
+        "asOfDay": {
+          ".validate": "newData.isNumber() && newData.val() === (now - now % 86400000) / 86400000"
+        },
+        "tenths": {
+          ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 1000000000"
+        },
+        "lastDay": {
+          ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= -1"
+        },
+        "$other": {
+          ".validate": false
+        },
+        "name": {
+          ".validate": "newData.isString() && newData.val().matches(/^[a-zA-Z0-9_]{1,20}$/)"
+        },
+        "generation": {
+          ".validate": "newData.isString()"
+        },
+        ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && auth.uid === $uid && (!newData.exists() || auth.token.email_verified === true)"
       }
     }
   }

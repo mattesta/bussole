@@ -13,7 +13,7 @@ const build=await esbuild.build({entryPoints:[path.join(root,'account.js')],bund
  build.onResolve({filter:/\.js\?v=/},args=>({path:path.resolve(path.dirname(args.importer),args.path.split('?')[0])}));
  build.onLoad({filter:/firebase-config\.js$/},()=>({contents:"export const firebaseConfig={apiKey:'demo-key',authDomain:'demo-bussole.firebaseapp.com',projectId:'demo-bussole',databaseURL:'https://demo-bussole-default-rtdb.firebaseio.com'}",loader:'js'}));
  build.onLoad({filter:/account-service\.js$/},args=>({contents:fs.readFileSync(args.path,'utf8').replace("const db=getDatabase(app);","const db=getDatabase(app);connectAuthEmulator(auth,'http://127.0.0.1:9099',{disableWarnings:true});connectDatabaseEmulator(db,'127.0.0.1',9000);")+"\nimport { connectAuthEmulator } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js';import { connectDatabaseEmulator } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js';",loader:'js',resolveDir:root}));
- build.onLoad({filter:/\/account\.js$/},args=>({contents:fs.readFileSync(args.path,'utf8')+"\nimport * as testing from './account-service.js?v=3';window.__accounts=testing;",loader:'js',resolveDir:root}));
+ build.onLoad({filter:/\/account\.js$/},args=>({contents:fs.readFileSync(args.path,'utf8')+"\nimport * as testing from './account-service.js?v=4';window.__accounts=testing;",loader:'js',resolveDir:root}));
 }}]});
 const js=build.outputFiles[0].text;
 const browser=await chromium.launch({executablePath:process.env.BUSSOLE_TEST_CHROMIUM||chromium.executablePath(),args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--no-zygote'],headless:true});
