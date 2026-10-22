@@ -133,3 +133,7 @@ Validation: test_usernames_rules.cjs covers atomic case-insensitive races, owner
 
 ## Private Pro shot replay
 Publish the complete rules before saving Pro highlights. The three best replayable Pro shots are stored in owner-only accountData/{uid}/proShots, separately from scalar statistics. These include starting coordinates, heading, chosen distance and target coordinates/name. Only the owner can load them; account exports include them, and statistics/account erasure removes them. Friends receive a strict projection of points and destination name only for the overall top three saved guesses. Historical scalar-only shots remain ranked but cannot be reconstructed. The globe uses the existing report renderer through a same-origin iframe message, without route data in URLs, links or session storage. Only your three retained replayable highlights preserve geometry; ordinary scalar samples remain unchanged.
+
+
+## Daily push reminders
+See DAILY_REMINDERS_SETUP.md for the free GitHub Actions + standard Web Push sender, scoped Firebase password identity, setup, iPhone installation, opt-in, retention and delivery limits. No billing plan, Cloud Function or location access is added. Public configuration defaults to unavailable until owner setup.

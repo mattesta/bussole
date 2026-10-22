@@ -36,14 +36,14 @@ export async function google(){
 }
 let syncTask;
 export function scheduleSocialSync(){
- if(!syncTask)syncTask=import('./social-service.js?v=3').then(s=>s.syncOwn()).catch(()=>null).finally(()=>{syncTask=null;});
+ if(!syncTask)syncTask=Promise.allSettled([import('./social-service.js?v=4').then(s=>s.syncOwn()),import('./daily-reminder-service.js?v=1').then(s=>s.syncIfEnrolled())]).finally(()=>{syncTask=null;});
  return syncTask;
 }
-export const logout=()=>signOut(auth);
+export const logout=async()=>{await import('./daily-reminder-service.js?v=1').then(m=>m.disable()).catch(()=>{});return signOut(auth);};
 export const resetPassword=email=>sendPasswordResetEmail(auth,email.trim());
 export const resendVerification=()=>sendEmailVerification(current());
 export async function refreshVerification(){const user=current();await reload(user);await user.getIdToken(true);return user.emailVerified;}
-async function loadProfile(){
+export async function loadProfile(){
   const user=current(),profileRef=ref(db,`${path(user.uid)}/profile`);
   let profile=(await get(profileRef)).val();
   if(!profile){
@@ -129,8 +129,10 @@ function dailyRemovals(attempts={}){
 export async function deleteStatistics(){
   const user=current();
   await loadProfile();
-  const data=await loadData(), changes=dailyRemovals(data.dailyAttempts);
-  Object.assign(changes,{[`${path(user.uid)}/samples`]:null,[`${path(user.uid)}/proShots`]:null,[`${path(user.uid)}/soloBests`]:null,[`${path(user.uid)}/dailyAttempts`]:null,[`${path(user.uid)}/profile/communityConsent`]:false,[`${path(user.uid)}/profile/leaderboardOptIn`]:false,[`${path(user.uid)}/profile/consentVersion`]:1,[`${path(user.uid)}/profile/generation`]:crypto.randomUUID(),[`friendShares/${user.uid}`]:null,[`journeyLeaderboard/${user.uid}`]:null});
+  const data=await loadData(), changes=dailyRemovals(data.dailyAttempts),nextGeneration=crypto.randomUUID();
+  const reminderActive=await get(ref(db,`dailyReminderDevices/${user.uid}`)).then(row=>row.exists()).catch(()=>false);
+  if(reminderActive)changes[`dailyReminderJourneys/${user.uid}`]={generation:nextGeneration,asOfDay:Math.floor(Date.now()/86400000),tenths:0,lastDay:-1};
+  Object.assign(changes,{[`${path(user.uid)}/samples`]:null,[`${path(user.uid)}/proShots`]:null,[`${path(user.uid)}/soloBests`]:null,[`${path(user.uid)}/dailyAttempts`]:null,[`${path(user.uid)}/profile/communityConsent`]:false,[`${path(user.uid)}/profile/leaderboardOptIn`]:false,[`${path(user.uid)}/profile/consentVersion`]:1,[`${path(user.uid)}/profile/generation`]:nextGeneration,[`friendShares/${user.uid}`]:null,[`journeyLeaderboard/${user.uid}`]:null});
   if(!data.profile?.socialEnabled)changes[`publicProfiles/${user.uid}`]=null;
   await update(ref(db),changes);
 }
@@ -143,7 +145,8 @@ export async function deleteAccount(password){
   const user=await reauthenticate(password);
   // Remove database data while cleanup is still authorized, before deleting Authentication.
   const data=await loadData();
-  const links=(await get(ref(db,`connections/${user.uid}`))).val()||{},changes={...dailyRemovals(data.dailyAttempts),[path(user.uid)]:null,[`friendShares/${user.uid}`]:null,[`journeyLeaderboard/${user.uid}`]:null,[`publicProfiles/${user.uid}`]:null};
+  const reminderAccess=await get(ref(db,`dailyReminderDevices/${user.uid}`)).then(()=>true).catch(()=>false);
+  const links=(await get(ref(db,`connections/${user.uid}`))).val()||{},changes={...(reminderAccess?{[`dailyReminderDevices/${user.uid}`]:null,[`dailyReminderJourneys/${user.uid}`]:null,[`dailyReminderDeliveries/${user.uid}`]:null}:{}),...dailyRemovals(data.dailyAttempts),[path(user.uid)]:null,[`friendShares/${user.uid}`]:null,[`journeyLeaderboard/${user.uid}`]:null,[`publicProfiles/${user.uid}`]:null};
   const username=data.profile?.username;if(username&&await usernameOwner(username)===user.uid)changes[`usernames/${username.toLowerCase()}`]=null;
   for(const other of Object.keys(links)){changes[`connections/${other}/${user.uid}`]=null;changes[`connections/${user.uid}/${other}`]=null;}
   await update(ref(db),changes);

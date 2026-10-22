@@ -1,0 +1,42 @@
+name: Free Daily reminders
+on:
+  schedule:
+    - cron: '0,10,20,30,40,50 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: daily-reminders
+  cancel-in-progress: false
+jobs:
+  send:
+    if: github.repository == 'mattesta/bussole' && github.event.repository.private == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check whether owner setup is complete
+        id: config
+        env:
+          BUSSOLE_REMINDERS_SECRET: ${{ secrets.BUSSOLE_REMINDERS_SECRET }}
+        run: |
+          if [ -n "$BUSSOLE_REMINDERS_SECRET" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Daily reminders are not configured; nothing sent."
+          fi
+      - uses: actions/checkout@v4
+        if: steps.config.outputs.ready == 'true'
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        if: steps.config.outputs.ready == 'true'
+        with:
+          node-version: '22'
+      - if: steps.config.outputs.ready == 'true'
+        run: npm ci --prefix notification-sender --omit=dev --ignore-scripts --no-audit --no-fund
+      - name: Send opted-in reminders due around 17:00 local time
+        if: steps.config.outputs.ready == 'true'
+        run: node notification-sender/send.cjs
+        env:
+          BUSSOLE_REMINDERS_SECRET: ${{ secrets.BUSSOLE_REMINDERS_SECRET }}

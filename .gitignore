@@ -3,3 +3,6 @@ __pycache__/
 
 firebase-debug.log
 database-debug.log
+
+node_modules/
+bussole-reminders-secret.json

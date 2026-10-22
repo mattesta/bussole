@@ -441,6 +441,89 @@
         ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && ((newData.exists() && auth.token.email_verified === true && (!data.exists() || data.val() === auth.uid) && newData.val() === auth.uid) || (!newData.exists() && data.val() === auth.uid && (!newData.parent().parent().child('accountData').child(auth.uid).child('profile/username').isString() || newData.parent().parent().child('accountData').child(auth.uid).child('profile/username').val().toLowerCase() !== $name)))",
         ".validate": "$name.matches(/^[a-z0-9_]{3,20}$/) && newData.isString() && newData.val() === auth.uid && newData.parent().parent().child('accountData').child(auth.uid).child('profile/username').isString() && newData.parent().parent().child('accountData').child(auth.uid).child('profile/username').val().toLowerCase() === $name"
       }
+    },
+    "dailyReminderConfig": {
+      ".read": true,
+      ".write": false
+    },
+    "dailyReminderDevices": {
+      ".read": "auth != null && auth.uid === root.child('dailyReminderConfig/senderUid').val()",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com')",
+        "$device": {
+          ".write": "(auth != null && auth.uid === $uid && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && (!newData.exists() || (auth.token.email_verified === true && root.child('accountData').child($uid).child('profile/generation').exists()))) || (auth != null && auth.uid === root.child('dailyReminderConfig/senderUid').val() && !newData.exists())",
+          ".validate": "$device.matches(/^[a-f0-9]{64}$/) && newData.hasChildren(['subscription','timeZone','binding','updatedAt'])",
+          "subscription": {
+            ".validate": "newData.hasChildren(['endpoint','keys'])",
+            "endpoint": {
+              ".validate": "newData.isString() && newData.val().length <= 4096 && newData.val().beginsWith('https://')"
+            },
+            "keys": {
+              ".validate": "newData.hasChildren(['auth','p256dh'])",
+              "auth": {
+                ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{22}$/)"
+              },
+              "p256dh": {
+                ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{87}$/)"
+              },
+              "$other": {
+                ".validate": false
+              }
+            },
+            "expirationTime": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "$other": {
+              ".validate": false
+            }
+          },
+          "timeZone": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 80 && newData.val().matches(/^[A-Za-z0-9_+\\/-]+$/)"
+          },
+          "binding": {
+            ".validate": "newData.isString() && newData.val().matches(/^[a-f0-9]{32}$/)"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() && newData.val() === now"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        ".write": "auth != null && auth.uid === $uid && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && !newData.exists()"
+      }
+    },
+    "dailyReminderJourneys": {
+      "$uid": {
+        ".read": "(auth != null && auth.uid === $uid && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com')) || (auth != null && auth.uid === root.child('dailyReminderConfig/senderUid').val() && root.child('accountData').child($uid).child('profile/generation').exists() && (!data.exists() || root.child('accountData').child($uid).child('profile/generation').val() === data.child('generation').val()))",
+        ".write": "auth != null && auth.uid === $uid && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && (!newData.exists() || auth.token.email_verified === true)",
+        ".validate": "newData.hasChildren(['generation','asOfDay','tenths','lastDay']) && newData.child('generation').val() === newData.parent().parent().child('accountData').child($uid).child('profile/generation').val() && newData.parent().parent().child('accountData').child($uid).child('profile/generation').exists() && newData.child('lastDay').val() <= newData.child('asOfDay').val()",
+        "generation": {
+          ".validate": "newData.isString()"
+        },
+        "asOfDay": {
+          ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= now / 86400000 + 1"
+        },
+        "tenths": {
+          ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 1000000000"
+        },
+        "lastDay": {
+          ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= -1"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "dailyReminderDeliveries": {
+      ".read": "auth != null && auth.uid === root.child('dailyReminderConfig/senderUid').val()",
+      ".write": "auth != null && auth.uid === root.child('dailyReminderConfig/senderUid').val()",
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && !newData.exists()",
+        "$device": {
+          ".write": "auth != null && auth.uid === $uid && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && !newData.exists()"
+        }
+      }
     }
   }
 }
