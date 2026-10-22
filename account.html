@@ -6,6 +6,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1"><link rel="icon" type="image/svg+xml" href="icon.svg?v=1">
   <link rel="stylesheet" href="style.css?v=31"><link rel="stylesheet" href="match-summary.css?v=9"><link rel="stylesheet" href="account.css?v=5">
   <link rel="stylesheet" href="daily-progress.css?v=1">
+<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#080e18">
 </head>
 <body class="account-page">
   <main class="account-card">
@@ -41,6 +42,11 @@
         <label class="check-row"><input id="leaderboardOptIn" type="checkbox">Show my username and Daily kilometres in the global leaderboard</label><p class="muted">Optional, off by default. Your display name, km balance and last completed Daily day become visible to signed-in players. Your email and error statistics stay private.</p>
         <button class="primary" type="submit">Save preferences</button>
       </form>
+      <section id="dailyReminderPanel" aria-label="Daily reminders">
+        <h2>Daily reminder · 17:00</h2><p>Optional, off by default. Receive the Daily Challenge and your world progress around 17:00 in this device’s time zone. Delivery may be delayed or missed.</p>
+        <p class="muted">On iPhone or iPad, add Bussole to your Home Screen, open it there and allow notifications. Your private push subscription and time zone are stored to deliver reminders; no location is requested. The notification may show your progress on the lock screen.</p>
+        <div class="account-choices"><button id="enableDailyReminder" type="button" disabled>Enable on this device</button><button id="disableDailyReminder" type="button" disabled>Turn off</button><button id="testDailyReminder" type="button" disabled>Test notification</button></div><p id="dailyReminderStatus" role="status" class="muted">Loading reminder settings…</p>
+      </section>
       <section id="socialPanel">
         <h2>Explorers</h2><p id="socialStatus" role="status" class="muted"></p>
         <div class="account-choices" role="group" aria-label="Social view"><button id="friendsTab" class="selected" type="button">Friends</button><button id="friendsBoardTab" type="button">Friends ranking</button><button id="globalBoardTab" type="button">Global ranking</button></div>
@@ -86,6 +92,6 @@
     <footer><a href="account-privacy.html">Account privacy</a></footer>
   </main>
   <dialog id="privateShotDialog" aria-label="Private Pro shot globe"><button id="closePrivateShot" type="button">Close globe</button><iframe id="privateShotFrame" title="Your private Pro shot" src="about:blank"></iframe></dialog>
-  <script src="daily-challenge.js?v=2"></script><script src="daily-progress.js?v=2"></script><script src="social-model.js?v=3"></script><script src="solo-game.js?v=1"></script><script src="account-statistics.js?v=3"></script><script src="summary-charts.js?v=4"></script><script type="module" src="account.js?v=7"></script>
+  <script src="daily-challenge.js?v=2"></script><script src="daily-progress.js?v=2"></script><script src="social-model.js?v=3"></script><script src="solo-game.js?v=1"></script><script src="account-statistics.js?v=3"></script><script src="summary-charts.js?v=4"></script><script type="module" src="account.js?v=8"></script>
 </body>
 </html>

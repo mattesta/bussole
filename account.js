@@ -1,13 +1,14 @@
-import * as accounts from './account-service.js?v=6';
-import { today } from './daily-service.js?v=4';
-import * as social from './social-service.js?v=3';
+import './daily-reminder-ui.js?v=1';
+import * as accounts from './account-service.js?v=7';
+import { today } from './daily-service.js?v=5';
+import * as social from './social-service.js?v=4';
 const byId=id=>document.getElementById(id),show=(id,visible)=>byId(id).classList.toggle('hidden',!visible);
 let loadedOwner=null,registration=false,data={},mode='all',days=0,busy=false,requestId=0,travelDay=null,stopConnections=null,socialScope='friends',selectedFriend=null,currentConnections={},friendRenderVersion=0;
 function message(text,error=false){byId('accountStatus').textContent=text;byId('accountStatus').classList.toggle('error',error);}
 async function action(work){
   if(busy)return;busy=true;document.querySelectorAll('button').forEach(button=>button.disabled=true);
   try{await work();}catch(error){message(accounts.friendlyError(error),true);}
-  finally{busy=false;document.querySelectorAll('button').forEach(button=>button.disabled=false);if(accounts.auth.currentUser&&!accounts.auth.currentUser.emailVerified){byId('communityConsent').disabled=true;byId('leaderboardOptIn').disabled=true;}byId('connectGoogle').disabled=accounts.hasGoogle();}
+  finally{busy=false;document.querySelectorAll('button').forEach(button=>button.disabled=false);if(accounts.auth.currentUser&&!accounts.auth.currentUser.emailVerified){byId('communityConsent').disabled=true;byId('leaderboardOptIn').disabled=true;}byId('connectGoogle').disabled=accounts.hasGoogle();window.dispatchEvent(new Event('bussole-account-refresh'));}
 }
 async function refresh(){
   const user=await accounts.ready();show('accountAuth',!user);show('accountDetails',Boolean(user));
@@ -139,7 +140,7 @@ byId('changePassword').onclick=()=>action(async()=>{const next=byId('newPassword
 byId('changeEmail').onclick=()=>action(async()=>{const input=byId('newEmail');if(!input.value||!input.reportValidity())throw new Error('Enter your new email address.');await accounts.changeEmail(password(),input.value);byId('securityForm').reset();message('Open the verification link sent to your new email to finish changing it.');});
 byId('exportAccount').onclick=()=>action(async()=>{
   const values=await accounts.loadData();
-  const exported={version:1,privateProShots:Object.values(values.proShots||{}).map(({generation,sampleId,...shot})=>shot),connections:await social.connections().catch(()=>null),dailyJourney:travelDay===null?null:window.BussoleDailyProgress.calculate(values.dailyAttempts,travelDay,values.profile?.generation),email:accounts.auth.currentUser.email,profile:values.profile||{},samples:window.BussoleAccountStatistics.select(values.samples),soloBests:Object.values(values.soloBests||{}).map(({generation,...record})=>record),dailyAttempts:Object.entries(values.dailyAttempts||{}).map(([day,record])=>({day:Number(day),status:record.score===undefined?'started':'completed',...(record.score===undefined?{}:{score:record.score})}))};
+  const exported={version:1,dailyReminderDevices:await accounts.get(accounts.ref(accounts.db,`dailyReminderDevices/${accounts.auth.currentUser.uid}`)).then(row=>row.val()||{}).catch(()=>({})),privateProShots:Object.values(values.proShots||{}).map(({generation,sampleId,...shot})=>shot),connections:await social.connections().catch(()=>null),dailyJourney:travelDay===null?null:window.BussoleDailyProgress.calculate(values.dailyAttempts,travelDay,values.profile?.generation),email:accounts.auth.currentUser.email,profile:values.profile||{},samples:window.BussoleAccountStatistics.select(values.samples),soloBests:Object.values(values.soloBests||{}).map(({generation,...record})=>record),dailyAttempts:Object.entries(values.dailyAttempts||{}).map(([day,record])=>({day:Number(day),status:record.score===undefined?'started':'completed',...(record.score===undefined?{}:{score:record.score})}))};
   delete exported.profile.generation;
   const url=URL.createObjectURL(new Blob([JSON.stringify(exported,null,2)],{type:'application/json'})),link=document.createElement('a');
   link.href=url;link.download='bussole-my-data.json';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);message('Your data export is ready.');

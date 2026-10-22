@@ -1,0 +1,1 @@
+{"name":"bussole-free-daily-reminders","private":true,"version":"1.0.0","engines":{"node":">=22"},"dependencies":{"web-push":"3.6.7"}}

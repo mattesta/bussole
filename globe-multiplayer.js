@@ -5,7 +5,7 @@ import {
   serverTimestamp, set, update
 } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js';
 import { firebaseConfig } from './firebase-config.js';
-import { beginRound, saveSample } from './account-service.js?v=6';
+import { beginRound, saveSample } from './account-service.js?v=7';
 
 const parameters = new URLSearchParams(location.search);
 const multiplayerMode = parameters.get('multiplayer') === '1';

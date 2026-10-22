@@ -1,4 +1,4 @@
-import { inspect, start, watch } from './daily-service.js?v=4';
+import { inspect, start, watch } from './daily-service.js?v=5';
 const byId=id=>document.getElementById(id),daily=window.BussoleDaily;
 let state,stopWatch,loading=false;
 function description(day){return `The same 5 targets for everyone. Normal · 30 s timer · Blur ${daily.settings(day).blurEnabled?'on':'off'}. A new challenge at 00:00 UTC.`;}
@@ -32,3 +32,6 @@ async function launch(access){
  location.href=`globe-prototype.html?integrated=1&solo=daily&day=${ticket.day}&mode=${config.mode}&timer=${config.timerSeconds}${config.blurEnabled?'&blur=1':''}`;
 }
 window.BussoleHome.registerDaily({prepare,launch,leave(){stopWatch?.();stopWatch=null;window.BussoleDailyProgress.render(byId('dailyTravel'),null);}});
+
+// Open the Daily lobby only; the user still starts the official attempt explicitly.
+if(new URLSearchParams(location.search).get('daily')==='1'){byId('singlePlayerBtn').click();byId('soloDailyBtn').click();}
