@@ -1,4 +1,4 @@
-import { auth, db, ready, beginRound, ref, get, runTransaction, set, onValue, serverTimestamp, scheduleSocialSync } from './account-service.js?v=7';
+import { auth, db, ready, beginRound, ref, get, runTransaction, set, onValue, serverTimestamp, scheduleSocialSync } from './account-service.js?v=8';
 const daily=window.BussoleDaily;
 const verified=()=>Boolean(auth.currentUser?.emailVerified&&auth.currentUser?.email);
 export async function today(){

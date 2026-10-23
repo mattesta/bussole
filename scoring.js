@@ -43,6 +43,8 @@ window.BussoleScoring = {
     if (newMatch) {
       // Keep round IDs increasing so old submissions can never reappear.
       updates['meta/matchStartRound'] = round;
+      updates['meta/roundHistory'] = null;
+      updates.publicResults = null;
       updates.target = null;
     }
     Object.keys(players).forEach(uid => {

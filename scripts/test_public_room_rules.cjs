@@ -15,8 +15,9 @@ const player = (name, slot) => ({ name, colorIndex: slot, slotId: String(slot), 
     await assert.rejects(get(ref(db('clock'), '.info/serverTimeOffset')), /invalid token in path/i);
     const offset = await new Promise((resolve,reject)=>onValue(ref(db('clock'),'.info/serverTimeOffset'),snapshot=>resolve(snapshot.val()),reject,{onlyOnce:true}));
     assert.equal(typeof offset,'number');
-    const room = { meta: { hostId: 'host', visibility: 'public', phase: 'lobby', round: 0, createdAt: Date.now() }, settings: { mode: 'medium', timerEnabled: false, timerDuration: 60 }, players: { host: player('Host', 0) }, seats: { 0: { uid: 'host', claimedAt: Date.now() } } };
-    await assertSucceeds(set(ref(db('host'), 'rooms/ABCDEF'), room));
+    const room = { meta: { schemaVersion:2,expiresAt:Date.now()+86300000,hostId: 'host', visibility: 'public', phase: 'lobby', round: 0, createdAt: Date.now() }, settings: { mode: 'medium', timerEnabled: false, timerDuration: 60 }, players: { host: player('Host', 0) }, seats: { 0: { uid: 'host', claimedAt: Date.now() } } };
+    const create=(database,code,value)=>update(ref(database),{[`rooms/${code}`]:value,[`roomExpirations/${code}`]:{createdAt:value.meta.createdAt,expiresAt:value.meta.expiresAt}});
+    await assertSucceeds(create(db('host'),'ABCDEF',room));
     await assertFails(get(ref(env.unauthenticatedContext().database(), 'publicRooms')));
     await assertSucceeds(set(ref(db('host'), 'publicRooms/ABCDEF'), { count: 1, phase: 'lobby', createdAt: room.meta.createdAt, updatedAt: Date.now() }));
     await assertFails(set(ref(db('stranger'), 'publicRooms/ABCDEF'), { count: 1, phase: 'lobby', createdAt: room.meta.createdAt, updatedAt: Date.now() }));
@@ -56,10 +57,9 @@ const player = (name, slot) => ({ name, colorIndex: slot, slotId: String(slot), 
     await assertSucceeds(update(ref(db('host'), 'rooms/ABCDEF/players/host'), { roundScores: { 1: 900 }, totalPoints: 900 }));
     const raw = { lat: 41.12345, lon: 12.98765, heading: 20, distanceMeters: 20000000 };
     const reduced = { version: 1, points: 700, route: Array.from({length:61},(_,i)=>[45,i/10]), errorArc: [[45,3],[46,3]] };
-    await assertSucceeds(update(ref(db('new'), 'rooms/ABCDEF'), {
-      'submissions/1/new': raw, 'publicResults/1/new': reduced
-    }));
-    await assertSucceeds(get(ref(db('new'), 'rooms/ABCDEF/submissions/1/new')));
+    await assertFails(update(ref(db('new'), 'rooms/ABCDEF'), {'submissions/1/new':raw,'publicResults/1/new':reduced}));
+    await assertSucceeds(set(ref(db('new'),'rooms/ABCDEF/publicResults/1/new'),{version:1,points:700}));
+    await assertFails(get(ref(db('new'), 'rooms/ABCDEF/submissions/1/new')));
     await assertFails(get(ref(db('host'), 'rooms/ABCDEF/submissions/1/new')));
     await assertFails(get(ref(db(owner), 'rooms/ABCDEF/submissions/1/new')));
     await assertFails(get(ref(db('new'), 'rooms/ABCDEF/publicResults/1'))); // reveal barrier
@@ -68,7 +68,7 @@ const player = (name, slot) => ({ name, colorIndex: slot, slotId: String(slot), 
     await assertFails(set(ref(db('new'), 'rooms/ABCDEF/publicResults/1/new'), {...reduced,points:199}));
     await assertFails(set(ref(db('new'), 'rooms/ABCDEF/publicResults/1/new'), {...reduced,route:[[0,0]]}));
     await assertSucceeds(set(ref(db('new'), 'rooms/ABCDEF/publicResults/1/new'), {version:1,points:100}));
-    await assertSucceeds(set(ref(db('new'), 'rooms/ABCDEF/publicResults/1/new'), reduced));
+    await assertFails(set(ref(db('new'), 'rooms/ABCDEF/publicResults/1/new'), reduced));
     await assertSucceeds(update(ref(db('host'), 'rooms/ABCDEF/meta'), {phase:'revealed'}));
     await assertSucceeds(get(ref(db('host'), 'rooms/ABCDEF/publicResults/1')));
     await assertFails(get(ref(db('outsider'), 'rooms/ABCDEF/publicResults/1')));
@@ -84,7 +84,7 @@ const player = (name, slot) => ({ name, colorIndex: slot, slotId: String(slot), 
     await assertFails(set(ref(db('late'), 'rooms/ABCDEF/seats/1'), { uid: 'late', claimedAt: Date.now() }));
     await assertFails(set(ref(db('host'), 'publicRooms/ABCDEF'), { count: 7, phase: 'lobby', createdAt: room.meta.createdAt, updatedAt: Date.now() }));
     const pendingRoom = { ...room, players: { host: player('Host', 0) }, seats: { 0: { uid: 'host', claimedAt: Date.now() } } };
-    await assertSucceeds(set(ref(db('host'), 'rooms/GHIJKL'), pendingRoom));
+    await assertSucceeds(create(db('host'),'GHIJKL',pendingRoom));
     await assertSucceeds(set(ref(db('pending'), 'rooms/GHIJKL/seats/1'), { uid: 'pending', claimedAt: Date.now() }));
     await assertFails(set(ref(db('replacement'), 'rooms/GHIJKL/seats/1'), { uid: 'replacement', claimedAt: Date.now() }));
     await env.withSecurityRulesDisabled(async context => {
@@ -92,13 +92,15 @@ const player = (name, slot) => ({ name, colorIndex: slot, slotId: String(slot), 
     });
     await assertSucceeds(set(ref(db('replacement'), 'rooms/GHIJKL/seats/1'), { uid: 'replacement', claimedAt: Date.now() }));
     // Private rooms remain unlisted and support the existing player format.
-    await assertSucceeds(set(ref(db('private'), 'rooms/PRIVATE'), { ...room, meta: { ...room.meta, hostId: 'private', visibility: 'private' }, players: { private: { ...player('Private', 0), slotId: null } }, seats: null }));
-    await assertFails(set(ref(db('private'), 'publicRooms/PRIVATE'), { count: 1, phase: 'lobby', createdAt: room.meta.createdAt, updatedAt: Date.now() }));
-    await assertSucceeds(set(ref(db('guest'), 'rooms/PRIVATE/players/guest'), { ...player('Guest', 1), slotId: null }));
-    await assertSucceeds(update(ref(db('private'), 'rooms/PRIVATE/meta'), {phase:'aiming',round:1}));
-    await assertSucceeds(set(ref(db('guest'), 'rooms/PRIVATE/submissions/1/guest'), raw));
-    await assertSucceeds(update(ref(db('private'), 'rooms/PRIVATE/meta'), {phase:'revealed'}));
-    assert.equal((await assertSucceeds(get(ref(db('private'), 'rooms/PRIVATE/submissions/1')))).val().guest.lat,raw.lat);
-    console.log('Firebase info-path regression, public directory, reservations, owner-only origins, reduced results, reveal barrier and private full-route compatibility tests passed.');
+    await assertSucceeds(create(db('private'),'PRIVAT', { ...room, meta: { ...room.meta, hostId: 'private', visibility: 'private' }, players: { private: { ...player('Private', 0), slotId: null } }, seats: null }));
+    await assertFails(set(ref(db('private'), 'publicRooms/PRIVAT'), { count: 1, phase: 'lobby', createdAt: room.meta.createdAt, updatedAt: Date.now() }));
+    await assertSucceeds(set(ref(db('guest'), 'rooms/PRIVAT/players/guest'), { ...player('Guest', 1), slotId: null }));
+    await assertSucceeds(update(ref(db('private'), 'rooms/PRIVAT/meta'), {phase:'aiming',round:1}));
+    await assertFails(set(ref(db('guest'), 'rooms/PRIVAT/submissions/1/guest'), raw));
+    await assertSucceeds(set(ref(db('guest'),'rooms/PRIVAT/publicResults/1/guest'),{version:1,points:800}));
+    await assertSucceeds(update(ref(db('private'), 'rooms/PRIVAT/meta'), {phase:'revealed'}));
+    await assertFails(get(ref(db('private'),'rooms/PRIVAT/submissions/1')));
+    assert.equal((await assertSucceeds(get(ref(db('private'),'rooms/PRIVAT/publicResults/1')))).val().guest.points,800);
+    console.log('Firebase info-path regression, public directory, reservations, no uploaded origins, points-only results, reveal barrier and private-room privacy tests passed.');
   } finally { await env.cleanup(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

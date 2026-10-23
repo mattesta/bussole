@@ -1,3 +1,5 @@
+import {deleteEmptyRoom} from './room-cleanup.js?v=1';
+import {saveGuess, guess, clearMatch} from './private-geometry.js?v=1';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js';
 import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js';
 import {
@@ -5,7 +7,7 @@ import {
   serverTimestamp, set, update
 } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js';
 import { firebaseConfig } from './firebase-config.js';
-import { beginRound, saveSample } from './account-service.js?v=7';
+import { beginRound, saveSample } from './account-service.js?v=8';
 
 const parameters = new URLSearchParams(location.search);
 const multiplayerMode = parameters.get('multiplayer') === '1';
@@ -108,11 +110,10 @@ if (multiplayerMode) {
   async function submitLine(submission) {
     if (roomMeta?.phase !== 'aiming' || players[user.uid]?.locked) return;
     try {
-      const changes = { [`submissions/${roomMeta.round}/${user.uid}`]: { ...submission, submittedAt: serverTimestamp() } };
-      if (roomMeta.visibility === 'public') {
-        changes[`publicResults/${roomMeta.round}/${user.uid}`] = window.BussoleGlobe.publicResult(submission, target, settings.mode || 'medium');
-      }
-      await update(ref(db, roomPath()), changes);
+      saveGuess(user.uid, roomCode, roomMeta.createdAt, roomMeta.round, submission);
+      const result = window.BussoleGlobe.publicResult(submission, target, settings.mode || 'medium');
+      // Deliberate allowlist: never send coordinates, headings, distances or routes.
+      await set(ref(db, roomPath(`publicResults/${roomMeta.round}/${user.uid}`)), {version:1,points:result.points});
       await update(ref(db, roomPath(`players/${user.uid}`)), { locked: true, ready: true });
       window.BussoleGlobe.setStatus('Line locked. Waiting for the other explorers…');
     } catch (error) {
@@ -159,11 +160,11 @@ if (multiplayerMode) {
     shownRound = roomMeta.round;
     clearTimeout(timerHandle);
     countdown.stop();
-    const publicRoom = roomMeta.visibility === 'public';
-    const resultPath = publicRoom ? 'publicResults' : 'submissions';
+    const publicRoom = true; // Every room keeps guesses on the player's device.
+    const resultPath = 'publicResults';
     const snapshot = await get(ref(db, roomPath(`${resultPath}/${roomMeta.round}`)));
     const submissions = snapshot.val() || {};
-    const ownSubmission = publicRoom ? (await get(ref(db, roomPath(`submissions/${roomMeta.round}/${user.uid}`)))).val() : null;
+    const ownSubmission = guess(user.uid, roomCode, roomMeta.createdAt, roomMeta.round);
     const entries = Object.entries(players)
       .filter(([, player]) => (player.eligibleRound || 1) <= roomMeta.round)
       .map(([uid, player]) => ({
@@ -171,8 +172,8 @@ if (multiplayerMode) {
         name: player.name,
         color: COLOURS[player.colorIndex],
         errorColor: ERROR_COLOURS[player.colorIndex],
-        submission: publicRoom ? (uid === user.uid ? ownSubmission : null) : submissions[uid] || null,
-        publicResult: publicRoom ? submissions[uid] || null : null
+        submission: uid === user.uid ? ownSubmission : null,
+        publicResult: submissions[uid] || null
       }));
     const round = roomMeta.round;
     const results = window.BussoleGlobe.revealMultiplayer(entries, target, settings.mode || 'medium');
@@ -237,7 +238,7 @@ if (multiplayerMode) {
   }
   function prepareReport() {
     if (reportLoading) return reportLoading;
-    const publicRoom = roomMeta.visibility === 'public';
+    const publicRoom = true; // Every room keeps guesses on the player's device.
     personalSummary.disabled = true;
     summaryStatus.textContent = 'Preparing your match summary…';
     nextRoundButton.disabled = true;
@@ -245,10 +246,10 @@ if (multiplayerMode) {
       try {
         matchReport = await window.BussoleMatchReport.load({
           publicRoom, uid: user.uid, meta: structuredClone(roomMeta), target, settings, players,
-          read: async path => (await get(ref(db, roomPath(path)))).val()
+          readOwnGuess: round => guess(user.uid, roomCode, roomMeta.createdAt, round)
         });
         window.BussoleMatchReport.save(matchReport, displayCode(roomCode));
-        summaryStatus.textContent = publicRoom ? 'Your complete guesses stay personal.' : 'Review your guesses or explore the room round by round.';
+        summaryStatus.textContent = 'Your guesses stay on this device. Other players share scores only.';
       } catch (error) {
         console.warn('Match summary unavailable.', error.code || error.message);
         summaryStatus.textContent = 'Summary unavailable. Tap Summary to retry.';
@@ -284,6 +285,7 @@ if (multiplayerMode) {
       window.BussoleScoring.standings(players), settings.scoreGoal
     ).length > 0;
     const changes = window.BussoleScoring.lobbyUpdates(players, roomMeta.round, newMatch);
+    if(newMatch)clearMatch(user.uid,roomCode,roomMeta.createdAt);
     changes.target = window.BussoleRoundTargets.next(target);
     changes['meta/lastActiveAt'] = serverTimestamp();
     advancingRound = true; updateNextRoundState();
@@ -317,13 +319,11 @@ if (multiplayerMode) {
     }
     if (presenceSaved && !otherOnlinePlayers) {
       await Promise.race([
-        update(ref(db, roomPath('meta')), {
-          phase: 'closed',
-          lastActiveAt: serverTimestamp()
-        }).catch(() => {}),
-        new Promise(resolve => setTimeout(resolve, 500))
+        deleteEmptyRoom(db,roomCode,user.uid,roomMeta.createdAt,Date.now()+serverTimeOffset).catch(()=>false),
+        new Promise(resolve=>setTimeout(resolve,1000))
       ]);
     }
+    clearMatch(user.uid,roomCode,roomMeta.createdAt);
     goHome();
   }
 
@@ -343,7 +343,7 @@ if (multiplayerMode) {
       settings = settingsSnapshot.val() || { mode: 'medium' };
       target = targetSnapshot.val();
       players = playersSnapshot.val() || {};
-      if (!roomMeta || roomMeta.phase === 'closed' || !players[user.uid]) return goHome();
+      if (!roomMeta || roomMeta.schemaVersion !== 2 || roomMeta.expiresAt <= Date.now()+serverTimeOffset || roomMeta.phase === 'closed' || !players[user.uid]) return goHome();
       if (!target) return goHome();
       if (roomMeta.phase === 'aiming') accountRound = beginRound();
 

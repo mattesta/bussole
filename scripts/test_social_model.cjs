@@ -14,6 +14,6 @@ for(let last=100;last<=104;last++)for(let asOf=last;asOf<=108;asOf++)for(let day
 }
 
 const highlight={day:100,mode:'hard',kind:'solo',points:999,generation:'g',relativeError:1,submission:{lat:48,lon:11,heading:90,distanceMeters:10000},target:{lat:45,lon:12,label:'Venice'}};
-const projected=api.snapshot({profile:{generation:'g'},samples:{opaque:highlight},proShots:{0:{...highlight,sampleId:"opaque"}}},100);
+const projected=api.snapshot({profile:{generation:'g'},samples:{opaque:highlight},proShots:{0:{...highlight,destination:'Venice',sampleId:"opaque"}}},100);
 assert.deepEqual(JSON.parse(JSON.stringify(projected.proShots)),[{points:999,destination:'Venice'}]);
 assert.doesNotMatch(JSON.stringify(projected),/"(submission|heading|distanceMeters|lat|lon|opaque)":/);

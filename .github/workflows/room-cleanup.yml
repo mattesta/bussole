@@ -1,0 +1,40 @@
+name: Free expired-room cleanup
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: room-cleanup
+  cancel-in-progress: false
+jobs:
+  cleanup:
+    if: github.repository == 'mattesta/bussole' && github.event.repository.private == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check configuration
+        id: config
+        env:
+          CLEANUP_SECRET: ${{ secrets.BUSSOLE_ROOM_CLEANUP_SECRET }}
+        run: |
+          if [ -n "$CLEANUP_SECRET" ]; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo 'Room cleanup is not configured.'
+          fi
+      - uses: actions/checkout@v4
+        if: steps.config.outputs.ready == 'true'
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        if: steps.config.outputs.ready == 'true'
+        with:
+          node-version: '22'
+      - name: Delete expired rooms
+        if: steps.config.outputs.ready == 'true'
+        run: node room-maintenance/cleanup.cjs
+        env:
+          BUSSOLE_ROOM_CLEANUP_SECRET: ${{ secrets.BUSSOLE_ROOM_CLEANUP_SECRET }}

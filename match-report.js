@@ -7,20 +7,15 @@
     if(!records.some(record=>record.round===meta.round))records.push({round:meta.round,target,mode:settings.mode,players,matchStartRound:start});
     return records.sort((a,b)=>a.round-b.round);
   }
-  async function load({publicRoom,uid,meta,target,settings,players,read}) {
+  async function load({uid,meta,target,settings,players,readOwnGuess}) {
     const records=rounds(meta,target,settings,players);
     const history=await Promise.all(records.map(async record=>{
-      // Public reports must never request the round parent or another UID.
-      const submissions=publicRoom
-        ? {[uid]:await read(`submissions/${record.round}/${uid}`)}
-        : await read(`submissions/${record.round}`)||{};
-      const participants=publicRoom ? {[uid]:record.players?.[uid]||players[uid]} : record.players||players;
-      const entries=Object.entries(participants).filter(([,player])=>player).map(([id,player])=>({
-        uid:id,name:player.name,color:colours[player.colorIndex]||colours[0],errorColor:errors[player.colorIndex]||errors[0],submission:submissions[id]||null
-      }));
+      const player=record.players?.[uid]||players[uid];
+      const submission=await readOwnGuess(record.round);
+      const entries=player?[{uid,name:player.name,color:colours[player.colorIndex]||colours[0],errorColor:errors[player.colorIndex]||errors[0],submission:submission||null}]:[];
       return {round:record.round-startRound(meta)+1,target:record.target,mode:record.mode||'medium',entries};
     }));
-    return {version:1,uid,publicRoom,rounds:history,partial:history.length!==meta.round-(meta.matchStartRound||0)};
+    return {version:1,uid,publicRoom:true,rounds:history,partial:history.length!==meta.round-(meta.matchStartRound||0)};
   }
   const startRound=meta=>(meta.matchStartRound||0)+1;
   function save(report,roomCode) {

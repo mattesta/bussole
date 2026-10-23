@@ -16,6 +16,7 @@ async function checkController(file, globe) {
     };
   }
   const updates = [];
+  const localGuesses=new Map();
   const redirects = [];
   const reads = [];
   let capturedEntries;
@@ -35,6 +36,10 @@ async function checkController(file, globe) {
     },
     initializeApp() {}, firebaseConfig: {}, getAuth() { return {}; }, getDatabase() {},
     onAuthStateChanged() {}, ref(db, path) { return path; }, serverTimestamp() { return 123; },
+    saveGuess(uid,room,createdAt,round,submission){localGuesses.set(round,submission)},
+    guess(uid,room,createdAt,round){return localGuesses.get(round)||null},
+    clearMatch(){},
+    async set(path,value){updates.push({[path.replace(/^rooms\/ABCDEF\//,'')]:value})},
     async get(path) {
       reads.push(path);
       return { val() { return path.endsWith('settings') ? settings : path.includes('submissions/2/a') ? raw : path.includes('publicResults/2') ? shared : {}; } };
@@ -146,7 +151,8 @@ async function checkController(file, globe) {
   context.test.setup(players,settings,true,'aiming');
   await context.test.submitLine(raw);
   const submitted = updates.findLast(change=>change['publicResults/2/a']);
-  assert.equal(submitted['submissions/2/a'].lat,raw.lat);
+  assert.equal(Object.hasOwn(submitted,'submissions/2/a'),false);
+  assert.equal(localGuesses.get(2).lat,raw.lat);
   assert.equal(submitted['publicResults/2/a'].lat,undefined);
   assert.equal(submitted['publicResults/2/a'].points,400);
   context.test.setup(players,settings,true);
