@@ -18,6 +18,6 @@ const {run}=require('../room-maintenance/cleanup.cjs'),{migrate}=require('../roo
  assert.deepEqual(await run({request,secret,now}),{removed:0});
  // A stale expiry entry must not grant deletion of a live room.
  await db.ref('roomExpirations/ACTIVE/expiresAt').set(now-1);
- await assert.rejects(run({request,secret,now}),/rejected/);assert.equal((await db.ref('rooms/ACTIVE').get()).exists(),true);
+ await assert.rejects(run({request,secret,now}),{cleanupCode:'ROOM_DELETE_DENIED'});assert.equal((await db.ref('rooms/ACTIVE').get()).exists(),true);
  console.log('Maintenance: real password auth/REST, expired-only deletion, stale-index safety, dry run, transactional legacy purge, metadata preservation and idempotence passed.');
 }finally{await env.cleanup();await app.delete();}})().catch(e=>{console.error(e);process.exitCode=1});

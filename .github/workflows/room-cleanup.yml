@@ -1,5 +1,10 @@
 name: Free expired-room cleanup
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'room-maintenance/cleanup.cjs'
+      - '.github/workflows/room-cleanup.yml'
   schedule:
     - cron: '23 * * * *'
   workflow_dispatch:
