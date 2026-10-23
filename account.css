@@ -29,3 +29,5 @@
 #journeyRanking li {line-height:1.5;}
 
 #privateShotDialog{width:min(100vw,1000px);height:90dvh;max-width:100vw;padding:8px;background:#080e18;color:white;border:1px solid #566;box-sizing:border-box}#privateShotDialog::backdrop{background:#000b}#privateShotFrame{display:block;width:100%;height:calc(100% - 48px);border:0}#closePrivateShot{min-height:40px}#proBestShotList button,#proBestShotList small{display:block;margin-top:6px}
+
+#importBackupDialog{width:min(90vw,480px);box-sizing:border-box;background:#080e18;color:white;border:1px solid #566;border-radius:12px;padding:20px;overflow-wrap:anywhere}#importBackupDialog::backdrop{background:#000b}#importBackupDialog p{font-size:14px;line-height:1.5}#importBackupDialog button{margin:6px;min-height:44px}

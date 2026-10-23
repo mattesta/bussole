@@ -34,3 +34,9 @@ Local errors and replay geometry do not sync. Clearing site data or browser evic
 ## Validation
 
 Real Auth/Database emulator and mobile browser checks cover local persistence, legacy migration, cloud projection, outgoing database frames, a second browser with no private history/replay, blocked device storage with no cloud fallback, generation reset, export and deletion. Rules reject error fields in account samples, Pro metadata and friend snapshots; legacy friend histories are unreadable. The maintenance test covers count-only dry runs, full purge, preserved score metadata and idempotence.
+
+## Move statistics to a new phone
+
+On the old device, open My account → Export my data. Keep the JSON private: it includes locally available replay locations. On the new device, sign in to the same Bussole account, choose Import my data, select the file and review the preview before Restore on this device. Import merges local guesses and restores included Pro replays. Repeated imports do not duplicate the same records. Official personal-best scores, Daily participation/progress, friendships, preferences and rankings remain unchanged in Firebase. No new rules are required for importing.
+
+New version-2 exports preserve sample/replay IDs and the account UID. Older version-1 exports are supported when the stored email matches the current account; because they lack IDs, merging uses sample-value occurrence counts and matches legacy replay metadata where possible. An old backup from before an email change needs a fresh export from the original device. After a statistics reset, a freshly selected backup can intentionally restore local history into the current generation; an already-open preview from before the reset is rejected. Device storage errors never trigger an upload fallback.
