@@ -1,6 +1,6 @@
 # Device-only detailed statistics: production rollout
 
-This release removes per-guess error history from Firebase and friends' snapshots. Personal charts read IndexedDB on the current device. Global error comparisons are disabled. Cloud score records, Daily participation, usernames, connections, optional kilometre rankings and minimal Pro points/destination records remain. Those records are visible to project administrators; do not promise that no possible location inference can ever be made.
+This release removes per-guess error history from Firebase and friends' snapshots. Personal charts read IndexedDB on the current device. Global error comparisons are disabled. Cloud score records, Daily participation, usernames, connections, optional kilometre rankings and minimal Pro points/destination records remain. Private rooms also relay public exchange keys and encrypted, temporary lines; see PRIVATE_ROOM_LINES.md. Those records are visible to project administrators; do not promise that no possible location inference can ever be made.
 
 ## Required order
 

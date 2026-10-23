@@ -1,0 +1,21 @@
+const fs=require('node:fs'),assert=require('node:assert/strict'),{webcrypto}=require('node:crypto');
+const source=fs.readFileSync('private-room-crypto.js','utf8');
+(async()=>{
+ global.crypto=webcrypto;const values={};global.sessionStorage=new Proxy(values,{get(t,k){if(k==='getItem')return k=>t[k]||null;if(k==='setItem')return(k,v)=>t[k]=v;if(k==='removeItem')return k=>delete t[k];return t[k]}});
+ const {roomIdentity,forgetRoomKey}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+ const a=await roomIdentity('a','ABCDEF',123),b=await roomIdentity('b','ABCDEF',123),c=await roomIdentity('c','ABCDEF',123),line={lat:48.123456,lon:11.987654,heading:17,distanceMeters:1234567};
+ assert.notEqual((await roomIdentity('a','ABCDEF',123,2)).publicKey,a.publicKey);
+ const packet=await a.seal(b.publicKey,1,'a','b',line);
+ assert.deepEqual(await b.open(a.publicKey,1,'a','b',packet),line);
+ assert.equal(JSON.stringify(packet).includes('lat'),false);assert.equal(JSON.stringify(packet).includes(String(line.lat)),false);
+ assert.equal((await roomIdentity('b','ABCDEF',123)).publicKey,b.publicKey);
+ for(const [round,sender,recipient] of [[2,'a','b'],[1,'c','b'],[1,'a','c']])await assert.rejects(b.open(a.publicKey,round,sender,recipient,packet));
+ await assert.rejects(c.open(a.publicKey,1,'a','b',packet));
+ await assert.rejects((await roomIdentity('b','ABCDEF',124)).open(a.publicKey,1,'a','b',packet));
+ const corrupted={...packet,data:(packet.data[0]==='A'?'B':'A')+packet.data.slice(1)};await assert.rejects(b.open(a.publicKey,1,'a','b',corrupted));
+ const other=await a.seal(b.publicKey,1,'a','b',line);assert.notEqual(other.iv,packet.iv);assert.notEqual(other.data,packet.data);
+ await assert.rejects(a.seal(b.publicKey,1,'a','b',{...line,lat:91}));
+ forgetRoomKey('b','ABCDEF',123);assert.notEqual((await roomIdentity('b','ABCDEF',123)).publicKey,b.publicKey);
+ global.sessionStorage={getItem(){throw Error('blocked')}};await assert.rejects(roomIdentity('blocked','ABCDEF',123),/Allow site storage/);
+ console.log('Private room crypto: peer decryption, independent keys, reload, tampering/replay/context rejection, fresh nonces, key deletion and blocked-storage failure passed.');
+})().catch(error=>{console.error(error);process.exitCode=1});

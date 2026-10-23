@@ -221,6 +221,40 @@
         ".validate": "newData.hasChildren(['meta','players','settings']) && newData.child('meta/schemaVersion').val() === 2 && newData.parent().parent().child('roomExpirations').child($room).child('expiresAt').val() === newData.child('meta/expiresAt').val()",
         "$other": {
           ".validate": false
+        },
+        "lineKeys": {
+          ".write": "auth != null && auth.uid === root.child('rooms').child($room).child('meta/hostId').val() && !newData.exists()",
+          "$round": {
+            ".read": "auth != null && root.child('rooms').child($room).child('players').child(auth.uid).exists() && root.child('rooms').child($room).child('meta/schemaVersion').val() === 2 && root.child('rooms').child($room).child('meta/expiresAt').val() > now && root.child('rooms').child($room).child('meta/visibility').val() === 'private'",
+            "$uid": {
+              ".write": "auth != null && root.child('rooms').child($room).child('players').child(auth.uid).exists() && auth.uid === $uid && root.child('rooms').child($room).child('meta/schemaVersion').val() === 2 && root.child('rooms').child($room).child('meta/expiresAt').val() > now && root.child('rooms').child($room).child('meta/visibility').val() === 'private' && (!data.exists() || newData.val() === data.val()) && $round === root.child('rooms').child($room).child('meta/round').val() + ''",
+              ".validate": "newData.isString() && newData.val().length === 88 && newData.val().matches(/^[A-Za-z0-9+\\/]+=*$/)"
+            }
+          }
+        },
+        "sealedLines": {
+          ".write": "auth != null && auth.uid === root.child('rooms').child($room).child('meta/hostId').val() && !newData.exists()",
+          "$round": {
+            ".read": "auth != null && root.child('rooms').child($room).child('players').child(auth.uid).exists() && root.child('rooms').child($room).child('meta/visibility').val() === 'private' && root.child('rooms').child($room).child('meta/schemaVersion').val() === 2 && root.child('rooms').child($room).child('meta/expiresAt').val() > now && root.child('rooms').child($room).child('meta/phase').val() === 'revealed'",
+            "$sender": {
+              "$recipient": {
+                ".write": "auth != null && root.child('rooms').child($room).child('players').child(auth.uid).exists() && auth.uid === $sender && root.child('rooms').child($room).child('meta/visibility').val() === 'private' && root.child('rooms').child($room).child('meta/schemaVersion').val() === 2 && root.child('rooms').child($room).child('meta/expiresAt').val() > now && root.child('rooms').child($room).child('meta/phase').val() === 'revealed' && $round === root.child('rooms').child($room).child('meta/round').val() + '' && root.child('rooms').child($room).child('players').child($recipient).exists() && root.child('rooms').child($room).child('lineKeys').child($round).child($sender).exists() && root.child('rooms').child($room).child('lineKeys').child($round).child($recipient).exists()",
+                ".validate": "newData.hasChildren(['version','iv','data'])",
+                "version": {
+                  ".validate": "newData.val() === 1"
+                },
+                "iv": {
+                  ".validate": "newData.isString() && newData.val().length === 16 && newData.val().matches(/^[A-Za-z0-9+\\/]+$/)"
+                },
+                "data": {
+                  ".validate": "newData.isString() && newData.val().length >= 24 && newData.val().length <= 1024 && newData.val().matches(/^[A-Za-z0-9+\\/]+=*$/)"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              }
+            }
+          }
         }
       }
     },

@@ -1,6 +1,6 @@
 # Privacy and room cleanup
 
-The code no longer sends starting positions, headings, distances or guess routes to Firebase. Both public and private rooms share points only. Best-shot geometry stays in the owner's browser; it is not synced across devices. Scores, destination labels and account information remain accessible to Firebase administrators. Detailed errors are device-only; follow DEVICE_STATISTICS_SETUP.md for the additional legacy purge. Do not promise that the operator cannot access all personal data.
+Public rooms share points only. Private rooms restore participants’ lines through encrypted, temporary messages, with secret keys kept in room tabs. Firebase stores no readable submitted positions, headings or distances through that exchange. See PRIVATE_ROOM_LINES.md for the precise threat model. Best-shot geometry stays in the owner's browser; it is not synced across devices. Scores, destination labels and account information remain accessible to Firebase administrators. Detailed errors are device-only; follow DEVICE_STATISTICS_SETUP.md for the additional legacy purge. Do not promise that the operator cannot access all personal data.
 
 ## Required production rollout
 

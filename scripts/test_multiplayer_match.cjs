@@ -70,7 +70,7 @@ async function checkController(file, globe) {
   let source = fs.readFileSync(file, 'utf8').replace(/^import[\s\S]*?;\s*/gm, '');
   const expose = `globalThis.test = {
     setup(p, s, publicRoom=false, phase='revealed') { user = { uid: 'a' }; roomMeta = { hostId: 'a', round: 2, phase, visibility:publicRoom?'public':'private' }; players = p; ${globe ? 'settings' : 'roomSettings'} = s; ${globe ? 'target' : 'selectedTarget'} = {lat:1,lon:2,label:'Old target, A'}; ${globe ? 'shownRound=null;resultsReady=false;advancingRound=false;' : "roomCode = 'ABCDEF';preparedRound=null;settingsReady=true;"} },
-    showResults, nextRound, submitLine${globe ? ', updateNextRoundState, dismissResults, guest() { roomMeta.hostId="b";updateNextRoundState(); }' : ', handlePhase, startRound, validateTimer, renderRoom, changeName, newMatch() { roomMeta.matchStartRound=roomMeta.round; }, setLobbyTarget(value) { selectedTarget=value; renderLobbyTarget(); }, setupLobby() { roomMeta.round = 0; roomMeta.phase = \"lobby\"; }'}
+    showResults, nextRound, submitLine${globe ? ', renderPrivateLines, updateNextRoundState, dismissResults, guest() { roomMeta.hostId="b";updateNextRoundState(); }' : ', handlePhase, startRound, validateTimer, renderRoom, changeName, newMatch() { roomMeta.matchStartRound=roomMeta.round; }, setLobbyTarget(value) { selectedTarget=value; renderLobbyTarget(); }, setupLobby() { roomMeta.round = 0; roomMeta.phase = \"lobby\"; }'}
   };`;
   source = globe ? source.replace('  initialize();', expose) : source + expose;
   vm.runInContext(source, context);
@@ -173,6 +173,13 @@ async function checkController(file, globe) {
     const before=redirects.length;await context.test.handlePhase();assert.equal(redirects.length,before);
   }
   if(globe) {
+    context.test.setup(players,settings,false);
+    await context.test.showResults({});
+    context.test.renderPrivateLines({b:raw},2);
+    assert.equal(capturedEntries.find(entry=>entry.uid==='b').submission.lat,raw.lat);
+    assert.match(elements.get('privateRoomStatus').textContent,/1\/1/);
+    const beforeEntries=capturedEntries;
+    context.test.renderPrivateLines({b:raw},1);assert.equal(capturedEntries,beforeEntries);
     context.test.setup({a:{name:'A',roundScores:{}}},settings,false,'aiming');
     context.test.updateNextRoundState();assert.equal(elements.get('globeNextRoundBtn').disabled,true);
     context.test.setup({a:{name:'A',roundScores:{}}},settings,false,'revealed');

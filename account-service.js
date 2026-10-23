@@ -1,3 +1,4 @@
+import {forgetRoomKeys} from './private-room-crypto.js?v=1';
 import {saveLocalSamples,loadLocalSamples,clearLocalSamples} from './local-statistics.js?v=1';
 import {saveHighlight, clearGeometry} from './private-geometry.js?v=1';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js';
@@ -41,7 +42,7 @@ export function scheduleSocialSync(){
  if(!syncTask)syncTask=Promise.allSettled([import('./social-service.js?v=6').then(s=>s.syncOwn()),import('./daily-reminder-service.js?v=3').then(s=>s.syncIfEnrolled())]).finally(()=>{syncTask=null;});
  return syncTask;
 }
-export const logout=async()=>{try{sessionStorage.removeItem('bussoleMatchReport');}catch{};await import('./daily-reminder-service.js?v=3').then(m=>m.disable()).catch(()=>{});return signOut(auth);};
+export const logout=async()=>{const uid=auth.currentUser?.uid;try{sessionStorage.removeItem('bussoleMatchReport');}catch{};await import('./daily-reminder-service.js?v=3').then(m=>m.disable()).catch(()=>{});if(uid)forgetRoomKeys(uid);return signOut(auth);};
 export const resetPassword=email=>sendPasswordResetEmail(auth,email.trim());
 export const resendVerification=()=>sendEmailVerification(current());
 export async function refreshVerification(){const user=current();await reload(user);await user.getIdToken(true);return user.emailVerified;}
@@ -184,6 +185,7 @@ export async function deleteAccount(password){
   await update(ref(db),changes);
   await clearLocalSamples(user.uid);
   clearGeometry(user.uid);
+  forgetRoomKeys(user.uid);
   await deleteUser(user);
 }
 export function friendlyError(error){
