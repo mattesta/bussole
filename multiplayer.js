@@ -7,7 +7,7 @@ import {
   runTransaction, serverTimestamp, set, update
 } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js';
 import { firebaseConfig } from './firebase-config.js';
-import { roomName } from './account-service.js?v=8';
+import { roomName } from './account-service.js?v=9';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);

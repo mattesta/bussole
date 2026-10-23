@@ -6,11 +6,11 @@ This prototype keeps guest gameplay and anonymous Firebase authentication. It ad
 
 1. In Firebase project `bussole-game`, open **Authentication → Sign-in method → Email/Password**. Enable **Email/Password**, leaving email-link sign-in off. Keep **Anonymous** enabled.
 2. Under Authentication settings, make sure **Authorized domains** includes `mattesta.github.io`. Set the password policy minimum to **8 characters**. Enable email enumeration protection if it is not already enabled.
-3. Publish the complete updated `database.rules.json` in **Realtime Database → Rules**. Existing room rules are preserved; the additions are `accountData`, `communityStatistics` and `accountInternal`. Never use global public read/write rules.
+3. Publish the complete updated `database.rules.json` in **Realtime Database → Rules**. Existing room cleanup permissions remain; account samples and communityStatistics uploads are disabled. Never use global public read/write rules.
 4. Review Authentication's verification and password-reset email templates. The default Firebase action handler can be used. If the Google API key has HTTP referrer restrictions, allow the game's origin and the Firebase action-handler origin (`https://bussole-game.firebaseapp.com/*`) for authentication to finish. Do not remove API restrictions globally.
 5. After the site update is published, open **Sign in → Create account**, verify the email, then press **I have verified**. Try a new single-player guess and open **My account**. Existing guest games are never imported.
 
-Accounts, profile preferences and personal error statistics do not require deploying Cloud Functions. Community comparison remains unavailable until the server functions below are deployed and there are enough contributors. The app handles this independently of personal statistics.
+Personal statistics are device-only. Global error comparisons are disabled; do not deploy aggregation functions or enable billing. Follow DEVICE_STATISTICS_SETUP.md for the required legacy cleanup and rules rollout.
 
 ## Enable Google and social features
 
@@ -24,23 +24,23 @@ Existing accounts should sign in first and press **Connect Google**; `linkWithPo
 
 Share/copy `account.html?friend={uid}` from My account. A verified player explicitly sends a request, and only the recipient can accept. Both directed connection edges must be atomically consistent on create/accept; both accepted states are required to read the other's shared snapshot. Either participant can remove the friendship; clients delete both edges and close revoked views. Pending requests, strangers and guests cannot read statistics or private account data. A display profile is enabled by explicitly saving a verified username, creating a friend link, sending/accepting a request or opting into the global board (`profile/socialEnabled` is false by default). Registration and ordinary play alone do not publish a profile. Display profiles expose only a chosen username (default Explorer), not Google names/photos or email. Individual profile reads require verified authentication; listing the profile directory is denied.
 
-`friendShares/{uid}` is a private statistical projection, readable by its owner and mutually accepted friends: cleaned scalar samples as a canonical array (no private attempt keys), personal bests without their internal generation field, and a Daily journey snapshot. A top-level generation validates against the current private profile to reject stale post-deletion publications. Friendship is explicit reciprocal consent to those snapshots, separate from global/community opt-in. Copies already downloaded cannot be recalled.
+`friendShares/{uid}` contains only record scores/settings, the Daily journey and Pro points/destination names. Detailed error samples are never shared. Old snapshots containing samples are unreadable by friends under the new rules until migrated or purged. The generation validates against the private profile. Copies already downloaded cannot be recalled.
 
 Global leaderboard participation is optional (`profile/leaderboardOptIn`, default false) and requires a chosen username. `journeyLeaderboard/{uid}` contains name, balance in tenths of km, as-of UTC day and last completed day plus a technical generation key. Readers apply missed-day decay to each snapshot before ranking, including players who are offline. Friends' rankings use their restricted snapshots regardless of global opt-in. Ties share ranks. No public per-player error histories or raw Daily history are used for this board.
 
 **Prototype limits:** sharing reprojects existing private history when the player syncs; background sync is best-effort after saves, with refresh on account/Home and ranking actions. Current snapshots apply the progressive inactivity schedule. Legacy balances made before this release are rebuilt from full history at the owner’s next sync; historical excess penalties cannot be reconstructed from a legacy public snapshot alone. Public snapshot age is respected for inactivity penalties but a failed publish can delay newly earned credit until that player syncs again. Scores/balances are client-reported, not cheat-proof. Rebuilding snapshots reads/writes history linearly and global ranking downloads the small opted-in board; revisit batching/aggregation/pagination before large histories/traffic. This is intended for the existing small user group, within Spark quotas, not an unlimited free scale guarantee.
 
-Turning global participation off deletes its entry atomically with the preference change. Delete statistics clears shared error values and the global entry, opts out of global/community contributions and rotates generation; current empty snapshots may be rebuilt, without past data. Account deletion reauthenticates, removes private records, daily public contributions, social profile/snapshots/leaderboard and known request/friend edges before deleting Auth. In-app deletion handles cleanup without server functions; administrative Auth-only deletions still require explicit database cleanup. The optional legacy server trigger only removes the private account branch; it does not clean social edges, social snapshots or published Daily scores. Use in-app deletion for the full cleanup.
+Turning global participation off deletes its entry atomically with the preference change. Delete statistics clears shared records and the global entry, opts out of global ranking and rotates generation; current empty snapshots may be rebuilt, without past data. Account deletion reauthenticates, removes private records, daily public contributions, social profile/snapshots/leaderboard and known request/friend edges before deleting Auth. In-app deletion handles cleanup without server functions; administrative Auth-only deletions still require explicit database cleanup. The optional legacy server trigger only removes the private account branch; it does not clean social edges, social snapshots or published Daily scores. Use in-app deletion for the full cleanup.
 
 ## Data model and privacy
 
-`accountData/{auth.uid}/profile`: `username`, `useInRooms`, `communityConsent` (default false), `consentVersion`, `leaderboardOptIn`, `socialEnabled`, and an internal `generation` key.
+`accountData/{uid}/profile` allows username, useInRooms, leaderboardOptIn, socialEnabled and generation. `samples` rejects every non-null write. Detailed per-guess errors are stored in IndexedDB only, scoped by account and reset generation. No fallback uploads occur if storage fails. Personal charts do not sync between devices; export preserves a local copy. Local records are hidden on sign-out and retained for the same account's next login.
 
-`accountData/{auth.uid}/samples/{opaqueKey}`: UTC day number, difficulty, solo/multiplayer, points, relative final error, signed angular error, Pro signed relative distance error, plus the generation key. Undefined geometric measures are omitted. Sample payloads are explicitly projected to these fields on the client and validated by rules. Scalar sample history has **no starting coordinates, targets, routes, exact headings, room codes or round numbers**; private Pro highlights are stored separately as described below. Multiplayer keys are SHA-256 digests to make repeat saves idempotent without keeping room identities. Solo keys are random UUIDs.
+Cloud Pro records contain only sampleId, points, destination and generation. Personal bests and official Daily records remain score-based cloud records. Administrators can access those records. Scores and destinations are not a guarantee against every possible inference.
 
-Only the account owner can read/write their account branch. Samples and consent require verified password or Google authentication; unverified users can still play. Samples are captured only for accounts verified at the start of the attempt. Guest identities are not linked to new registrations. DNF attempts are excluded. Registration/authentication and account controls are outside active gameplay.
+Legacy current-generation samples are copied to local storage before the cloud source is deleted. A storage error leaves the cloud source pending and displays a warning. Other accounts must migrate or be purged by the owner. See DEVICE_STATISTICS_SETUP.md.
 
-Deleting statistics removes samples, opts out of community contributions and rotates the generation key atomically. Old games open in other tabs then fail rule validation instead of resurrecting deleted data. Deleting the account first reauthenticates with the current password or connected Google account, removes personal database data, then deletes the Authentication user. Already shared room results and the current match summary are separate from account history.
+Statistics deletion clears this device's errors/replays and resets cloud records/generation. Other devices hide their previous-generation records on their next refresh, but cannot be physically erased remotely. Account deletion reauthenticates and deletes database data before deleting the Authentication user.
 
 ## Five-round single-player Games
 
@@ -50,7 +50,7 @@ Completed Games save only the highest total (0–5000) for each difficulty/timer
 
 **Required for existing installations:** publish the complete updated `database.rules.json` in Realtime Database → Rules. The new `soloBests` validation is needed even if account rules were published previously. No Authentication provider change, Cloud Functions deployment or billing upgrade is needed. Until rules are updated, gameplay works and a completed Game offers Retry if its record cannot be saved.
 
-The account page lists records and includes them in JSON export. Delete statistics removes both samples and personal bests, opts out of community contributions and rotates the generation key. Games already open before deletion cannot recreate their records.
+The account page lists records and includes them in JSON export. Delete statistics removes both samples and personal bests, clears shared records and rotates the generation key. Games already open before deletion cannot recreate their records.
 
 ## Daily Challenge (Spark-compatible)
 
@@ -70,22 +70,9 @@ Each point earns 0.1 virtual km (1000 points = 100 km, maximum 500 km per Daily)
 
 The Home Daily panel, official results and account page show the current balance and its percentage of approximately 40,075 km (equatorial circumference). The percentage can exceed 100%; it describes a virtual journey, not tracked physical movement. Guests and unranked plays earn nothing. Balance is calculated using the database clock and owner-only history. Optional social snapshots power the separate leaderboards described above. Account export includes a derived snapshot alongside the underlying daily records. Deleting statistics/account removes those records and resets the journey, including its starting day.
 
-## Optional server-side community comparison
+## Global error comparisons disabled
 
-Cloud Functions deployment requires Firebase's **Blaze** plan (billing account). Do not enable billing just to test personal accounts. No functions or billing have been enabled by this repository change.
-
-Once billing and the server deployment are deliberately chosen:
-
-```sh
-npm ci --prefix functions
-firebase deploy --only functions:refreshCommunityStatistics,functions:removeDeletedAccountData --project bussole-game
-```
-
-The database trigger uses `europe-west1`, on `bussole-game-default-rtdb`. It rebuilds aggregate statistics from the latest private account records, including only explicit version-1 consent. Revocation, statistics deletion and account deletion therefore remove past contributions from the next published pool. Auth deletion also has a cleanup trigger for administrative deletions. The database trigger retries failures. This is eventual consistency: aggregate updates are not immediate.
-
-Only aggregate means and counts are published under `communityStatistics`; clients cannot write there. Both the overall pool and every displayed measure require at least five distinct contributing accounts, separately for All/Easy/Normal/Pro. No per-player contribution cache is retained. The server reads account IDs to process/removes contributions; processing is **pseudonymized, not anonymous**.
-
-**Prototype scaling limit:** each change rebuilds the small pool by reading account statistics. A distributed lease serializes refreshes, handles duplicate/out-of-order events by re-reading the current source, and avoids retaining per-player aggregation state after deletion. Before substantial traffic or large histories, replace full-pool reads with batched/sharded aggregation and bounded events. Protect the deployment with appropriate quotas and monitor costs; the prototype does not claim an unlimited free service or cheat-proof self-reported scores.
+There is no active community-statistics reader, consent control or aggregation trigger in this version. Rules deny communityStatistics access. Do not deploy an aggregation function. If an earlier refreshCommunityStatistics function was actually deployed, remove it separately in the Firebase console; removing repository code does not delete a deployed function. The optional Daily kilometre leaderboard remains independent.
 
 ## Validation
 
@@ -99,15 +86,15 @@ Only aggregate means and counts are published under `communityStatistics`; clien
 - `node scripts/test_solo_game.cjs` and `node scripts/test_solo_camera.cjs`: five-round lifecycle, no skips/repeats, totals/DNF and camera reset under live compass updates.
 - `scripts/test_solo_ui.cjs`: mobile Game/Practice flow, five distinct targets, verified best, Summary, Practice reset and timed Pro DNF/guest behavior against real Auth/Database emulators. Uses a map/camera facade; it does not validate GPU globe rendering.
 
-- `node scripts/test_account_statistics.cjs`: scalar projection, filters, signed/circular means, undefined geometry, opt-in, deletion and per-measure thresholds.
-- Start the Database emulator and run `scripts/test_account_rules.cjs` with `@firebase/rules-unit-testing@5` and `firebase@12.2.1`: owner isolation, verification, field rejection, bounds, generation reset and aggregate privacy.
+- `node scripts/test_account_statistics.cjs`: local sample projection, filters, signed/circular means and undefined geometry.
+- Start the Database emulator and run `scripts/test_account_rules.cjs` with `@firebase/rules-unit-testing@5` and `firebase@12.2.1`: owner isolation, verification, field rejection, bounds, generation reset and cloud error rejection.
 - `scripts/test_public_room_rules.cjs` confirms existing guest room permissions still work with the combined rules.
 - Existing room identity, reconnect, matchmaking, multiplayer scoring, home and sensor-permission tests cover guest gameplay regressions.
 - `scripts/test_account_ui.cjs` runs native mobile-browser QA against Auth/Database emulators with Firebase's real JavaScript SDK (test dependencies: esbuild, Playwright, firebase-admin and firebase@12.2.1; use `BUSSOLE_TEST_CHROMIUM` for an existing browser binary). Production email deliverability and password recovery links must also be checked on a phone after enabling the provider.
 
 - `scripts/test_social_rules.cjs`: verified Google ownership, mutual friendship acceptance, pending/stranger denial, revocation, projection field restrictions, opt-in/out and stale generation.
 - `node scripts/test_social_model.cjs`: private projection, ranking ties and automatic offline decay.
-- `scripts/test_social_ui.cjs`: real SDK/emulator mobile request/accept/revoke flow, friend charts and rankings, global opt-in, Google popup linking/sign-in with stable UID and Google-only accounts.
+- `scripts/test_social_ui.cjs`: real SDK/emulator mobile request/accept/revoke flow, friend records and rankings, global opt-in, Google popup linking/sign-in with stable UID and Google-only accounts.
 
 Official references:
 
@@ -124,7 +111,7 @@ Official references:
 
 Publish the complete current database.rules.json before using username saves/search. `usernames/{lowercase-name}` maps to a UID. Verified users may read a specific name, but not enumerate the root. Profile edits atomically claim the new key and release the previous owned key; rules reject conflicting/case-only duplicate claims and require the key to match the final profile. The username can be changed, and account deletion releases it; statistics deletion keeps it. Saving a verified username makes the minimal display profile searchable for friend requests, without granting statistical access. Pending/stranger privacy and acceptance rules remain unchanged. Existing display names are preserved without silent migration: their owner must save preferences to reserve them; the first successful claim wins if legacy names collide. Guest explorer names remain independent. Name-based requests resolve the UID once; existing friendships survive later renames. Old friend links remain supported.
 
-My account derives the top three Pro shots from existing current-generation samples, ordered by points, relative error, absolute angular error and then day for ties. It shows points, destination and UTC date, with private globe replay for highlights saved with geometry. The Daily average uses completed official scores in the current generation, including completed zero scores and excluding missed, abandoned, guest and replay attempts. The Daily average stores no additional data; Pro geometry is stored privately as described below.
+My account lists the top three cloud Pro score records, ordered by points with an opaque identifier tie-break; no error values are uploaded for tie-breaking. It shows points and destination, with private globe replay only if that shot exists on this device. The Daily average includes completed official scores, including zero scores and excluding missed/abandoned/replay days. No additional cloud average is stored.
 
 Statistical charts support two-finger pinch and pan, zoom buttons and reset. Distance ticks update in original percent units. The angular overview remains a full circle; zoom opens a bounded upper angular window with original degree labels, deliberately magnifying separation without claiming that displayed fan angles equal unscaled physical bearings. One-finger hold inspection still selects only near an actual visible stroke; labels and mean use the same data after zoom.
 
@@ -132,7 +119,7 @@ Validation: test_usernames_rules.cjs covers atomic case-insensitive races, owner
 
 
 ## Private Pro shot replay
-Publish the complete rules and follow `PRIVACY_CLEANUP_SETUP.md` before deploying this version. The three best replayable Pro shots keep starting coordinates, heading, chosen distance and target coordinates only in the owner's browser, scoped by UID and statistics generation. `accountData/{uid}/proShots` now holds scalar metadata and destination names only. Friends receive points and destination names. Replay geometry does not sync between devices; clearing browser data removes it. Account exports include locally available replays, and statistics/account deletion clears them on the current device. Historical cloud geometry is migrated locally on account load or erased through the owner-run purge. The globe receives geometry through a same-origin iframe message, never through URLs. Both multiplayer room types now submit points only and load personal guesses from tab storage. Rooms are deleted on an explicit last-player exit, expire after at most 24 hours, and have a separately configured free cleanup workflow for abandoned sessions. Rules block legacy uploads but do not erase old records automatically. Administrators still have access to server-side profile information, scores, destination names and scalar statistics.
+Publish the complete rules and follow `PRIVACY_CLEANUP_SETUP.md` before deploying this version. The three best replayable Pro shots keep starting coordinates, heading, chosen distance and target coordinates only in the owner's browser, scoped by UID and statistics generation. `accountData/{uid}/proShots` now holds scalar metadata and destination names only. Friends receive points and destination names. Replay geometry does not sync between devices; clearing browser data removes it. Account exports include locally available replays, and statistics/account deletion clears them on the current device. Historical cloud geometry is migrated locally on account load or erased through the owner-run purge. The globe receives geometry through a same-origin iframe message, never through URLs. Both multiplayer room types now submit points only and load personal guesses from tab storage. Rooms are deleted on an explicit last-player exit, expire after at most 24 hours, and have a separately configured free cleanup workflow for abandoned sessions. Rules block legacy uploads but do not erase old records automatically. Administrators still have access to server-side profile information, scores and destination names; detailed per-guess errors are device-only in this version.
 
 
 ## Daily push reminders

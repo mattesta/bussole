@@ -1,0 +1,36 @@
+# Device-only detailed statistics: production rollout
+
+This release removes per-guess error history from Firebase and friends' snapshots. Personal charts read IndexedDB on the current device. Global error comparisons are disabled. Cloud score records, Daily participation, usernames, connections, optional kilometre rankings and minimal Pro points/destination records remain. Those records are visible to project administrators; do not promise that no possible location inference can ever be made.
+
+## Required order
+
+1. Publish the **complete database.rules.json from this release** in Firebase → Realtime Database → Rules. Check that accountData/$uid/samples has `.validate: false` and profile has no communityConsent field. These rules reject all new detailed-error uploads, including from old clients, and block friends from opening legacy snapshots containing samples. Existing records are not automatically deleted.
+2. Deploy/merge the site update. Refresh/reopen the app on each device. Old cached clients may fail saves under the stricter rules until refreshed.
+3. On an account's usual device, open My account and check the personal charts. The app saves current-generation legacy samples locally before deleting the cloud history. Export my data to retain a copy. A device storage warning means migration has not completed: do not assume that cloud history was removed.
+4. Purge remaining legacy data. For the current three-account installation, manual console cleanup is sufficient. Do not inspect or export other users' values. Deleting their old history without their device migration means those charts cannot be recovered from Firebase afterwards.
+
+## Manual cleanup for the small installation
+
+After the new site is live, for each UID under accountData:
+
+- Remove the entire `samples` child if it remains. Do not delete the UID/accountData parent.
+- Inspect only field names under `proShots`. Each saved row must contain only `sampleId`, `points`, `destination`, `generation`. Delete legacy extra fields (including all error and geometry fields). Alternatively delete the entire proShots child, which loses those old top-three cloud score records. Opening the account on the new site sanitizes these rows automatically.
+- Remove legacy `profile/communityConsent` and `profile/consentVersion` if present. Keep username, preferences and generation.
+
+Delete the roots `friendShares`, `communityStatistics` and `accountInternal` if present. Safe friend snapshots rebuild when their owners next sync; connections remain. Keep `soloBests`, `dailyAttempts`, `dailyScores`, profiles, connections, usernames and service configuration. In particular, keep roomMaintenanceConfig/uid and its service account: the working hourly room cleaner needs them.
+
+Recheck that no account has samples and no Pro row contains errors/geometry, and that rebuilt friend snapshots have no samples. Rules block new uploads. Retain no private export from this check. Existing exports/provider backups/downloaded copies require separate handling; this procedure cannot remotely erase them.
+
+## Optional owner script
+
+For a larger installation, use room-maintenance/migrate.cjs with trusted owner Application Default Credentials, as described in PRIVACY_CLEANUP_SETUP.md. Dry-run first; --apply deletes cloud histories and shared histories, removes obsolete consent/aggregation state, sanitizes Pro metadata and deletes legacy rooms. It logs counts only. This is a destructive cloud purge, not a device migration. Never send credentials in chat or commit them.
+
+No paid Firebase service or function deployment is required. If an old refreshCommunityStatistics function was deployed separately, delete that deployed function; source removal alone does not remove it. The room cleaner deliberately cannot read or purge account histories.
+
+## Device limitations
+
+Local errors and replay geometry do not sync. Clearing site data or browser eviction can remove them. Storage failures show an error and never fall back to cloud uploads. Statistics/account deletion clears the current device; other devices hide old generations on their next account refresh but existing physical copies cannot be erased remotely. Firebase Auth still uses its own local sign-in storage. This change addresses game error data, not every item of infrastructure metadata.
+
+## Validation
+
+Real Auth/Database emulator and mobile browser checks cover local persistence, legacy migration, cloud projection, outgoing database frames, a second browser with no private history/replay, blocked device storage with no cloud fallback, generation reset, export and deletion. Rules reject error fields in account samples, Pro metadata and friend snapshots; legacy friend histories are unreadable. The maintenance test covers count-only dry runs, full purge, preserved score metadata and idempotence.

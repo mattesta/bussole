@@ -1,5 +1,5 @@
-import {auth,db,ready,loadData,ref,get,update,onValue,usernameOwner} from './account-service.js?v=8';
-import {today} from './daily-service.js?v=6';
+import {auth,db,ready,loadData,ref,get,update,onValue,usernameOwner} from './account-service.js?v=9';
+import {today} from './daily-service.js?v=7';
 const model=window.BussoleSocialModel;
 const verified=()=>Boolean(auth.currentUser?.emailVerified&&auth.currentUser?.email);
 function me(){if(!verified())throw Error('Sign in and verify your email first.');return auth.currentUser.uid;}

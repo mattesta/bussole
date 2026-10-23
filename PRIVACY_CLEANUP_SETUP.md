@@ -1,6 +1,6 @@
 # Privacy and room cleanup
 
-The code no longer sends starting positions, headings, distances or guess routes to Firebase. Both public and private rooms share points only. Best-shot geometry stays in the owner's browser; it is not synced across devices. Scores, destination labels, account information and normalized statistics remain accessible to Firebase administrators. Do not promise that the operator cannot access all personal data.
+The code no longer sends starting positions, headings, distances or guess routes to Firebase. Both public and private rooms share points only. Best-shot geometry stays in the owner's browser; it is not synced across devices. Scores, destination labels and account information remain accessible to Firebase administrators. Detailed errors are device-only; follow DEVICE_STATISTICS_SETUP.md for the additional legacy purge. Do not promise that the operator cannot access all personal data.
 
 ## Required production rollout
 
@@ -19,7 +19,7 @@ node room-maintenance/migrate.cjs
 node room-maintenance/migrate.cjs --apply
 ```
 
-The first command reports counts only. `--apply` deletes all legacy rooms (including active legacy sessions) and strips geometry from old account highlights, preserving points/destination metadata and scalar account statistics. It does not export or log coordinates, names or account IDs. Transactions preserve concurrently upgraded v2 rooms/records. Run again to verify zero legacy records. This does not delete copies in exports, provider backups or another person's browser. Review any backups separately before making a deletion claim.
+The first command reports counts only. `--apply` deletes all legacy rooms (including active legacy sessions) and strips geometry and error fields from old account highlights, preserving minimal points/destination metadata. It also deletes cloud per-guess histories, shared error histories, obsolete consent fields and old community aggregation state. It does not export or log coordinates, names or account IDs. Transactions preserve concurrently upgraded v2 rooms/records. Run again to verify zero legacy records. This does not delete copies in exports, provider backups or another person's browser. Review any backups separately before making a deletion claim.
 
 The account screen opportunistically copies its owner's legacy replay geometry into that browser before stripping the cloud fields. An owner-wide purge cannot preserve old replays on every user's device; old cloud replays not already migrated will become unavailable.
 

@@ -1,5 +1,5 @@
-import {auth,onAuthStateChanged} from './account-service.js?v=8';
-import * as reminder from './daily-reminder-service.js?v=2';
+import {auth,onAuthStateChanged} from './account-service.js?v=9';
+import * as reminder from './daily-reminder-service.js?v=3';
 const byId=id=>document.getElementById(id);let config=null,version=0;
 const buttons=['enableDailyReminder','disableDailyReminder','testDailyReminder'];
 async function render(){

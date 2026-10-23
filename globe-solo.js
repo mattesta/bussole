@@ -1,5 +1,5 @@
-import { completeGame } from './account-game.js?v=8';
-import * as dailyService from './daily-service.js?v=6';
+import { completeGame } from './account-game.js?v=9';
+import * as dailyService from './daily-service.js?v=7';
 const parameters=new URLSearchParams(location.search);
 if(['game','daily'].includes(parameters.get('solo'))&&parameters.get('multiplayer')!=='1'){
  const byId=id=>document.getElementById(id),show=(id,visible)=>byId(id).classList.toggle('hidden',!visible);
