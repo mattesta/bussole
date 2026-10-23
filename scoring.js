@@ -39,7 +39,7 @@ window.BussoleScoring = {
       : `Draw: ${winners.map(player => player.name).join(' & ')} — ${winners[0].totalPoints} points!`;
   },
   lobbyUpdates(players, round, newMatch) {
-    const updates = { 'meta/phase': 'lobby', 'meta/deadline': null };
+    const updates = { 'meta/phase': 'lobby', 'meta/deadline': null, sealedLines:null, lineKeys:null };
     if (newMatch) {
       // Keep round IDs increasing so old submissions can never reappear.
       updates['meta/matchStartRound'] = round;

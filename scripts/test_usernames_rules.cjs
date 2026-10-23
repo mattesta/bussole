@@ -2,7 +2,7 @@ for(const k of ['HTTP_PROXY','HTTPS_PROXY','http_proxy','https_proxy'])delete pr
 const fs=require('node:fs'),assert=require('node:assert/strict'),{initializeTestEnvironment,assertSucceeds:ok,assertFails:no}=require('@firebase/rules-unit-testing'),{ref,get,set,update}=require('firebase/database');
 (async()=>{const env=await initializeTestEnvironment({projectId:'demo-bussole',database:{host:'127.0.0.1',port:9000,rules:fs.readFileSync('database.rules.json','utf8')}});try{
  const db=(uid,verified=true)=>env.authenticatedContext(uid,{email_verified:verified,firebase:{sign_in_provider:'password'}}).database(),a=db('name-a'),b=db('name-b'),pending=db('name-pending',false);
- const profile={username:'',useInRooms:false,communityConsent:false,consentVersion:1,generation:'12345678-1234-1234-1234-123456789012'};
+ const profile={username:'',useInRooms:false,generation:'12345678-1234-1234-1234-123456789012'};
  for(const [uid,database] of [['name-a',a],['name-b',b],['name-pending',pending]])await ok(set(ref(database,`accountData/${uid}/profile`),profile));
  const claim=(database,uid,name)=>update(ref(database),{[`accountData/${uid}/profile/username`]:name,[`usernames/${name.toLowerCase()}`]:uid});
  await no(set(ref(a,'accountData/name-a/profile/username'),'Marco'));await no(set(ref(a,'usernames/stray'),'name-a'));await no(claim(pending,'name-pending','Pending'));

@@ -221,6 +221,40 @@
         ".validate": "newData.hasChildren(['meta','players','settings']) && newData.child('meta/schemaVersion').val() === 2 && newData.parent().parent().child('roomExpirations').child($room).child('expiresAt').val() === newData.child('meta/expiresAt').val()",
         "$other": {
           ".validate": false
+        },
+        "lineKeys": {
+          ".write": "auth != null && auth.uid === root.child('rooms').child($room).child('meta/hostId').val() && !newData.exists()",
+          "$round": {
+            ".read": "auth != null && root.child('rooms').child($room).child('players').child(auth.uid).exists() && root.child('rooms').child($room).child('meta/schemaVersion').val() === 2 && root.child('rooms').child($room).child('meta/expiresAt').val() > now && root.child('rooms').child($room).child('meta/visibility').val() === 'private'",
+            "$uid": {
+              ".write": "auth != null && root.child('rooms').child($room).child('players').child(auth.uid).exists() && auth.uid === $uid && root.child('rooms').child($room).child('meta/schemaVersion').val() === 2 && root.child('rooms').child($room).child('meta/expiresAt').val() > now && root.child('rooms').child($room).child('meta/visibility').val() === 'private' && (!data.exists() || newData.val() === data.val()) && $round === root.child('rooms').child($room).child('meta/round').val() + ''",
+              ".validate": "newData.isString() && newData.val().length === 88 && newData.val().matches(/^[A-Za-z0-9+\\/]+=*$/)"
+            }
+          }
+        },
+        "sealedLines": {
+          ".write": "auth != null && auth.uid === root.child('rooms').child($room).child('meta/hostId').val() && !newData.exists()",
+          "$round": {
+            ".read": "auth != null && root.child('rooms').child($room).child('players').child(auth.uid).exists() && root.child('rooms').child($room).child('meta/visibility').val() === 'private' && root.child('rooms').child($room).child('meta/schemaVersion').val() === 2 && root.child('rooms').child($room).child('meta/expiresAt').val() > now && root.child('rooms').child($room).child('meta/phase').val() === 'revealed'",
+            "$sender": {
+              "$recipient": {
+                ".write": "auth != null && root.child('rooms').child($room).child('players').child(auth.uid).exists() && auth.uid === $sender && root.child('rooms').child($room).child('meta/visibility').val() === 'private' && root.child('rooms').child($room).child('meta/schemaVersion').val() === 2 && root.child('rooms').child($room).child('meta/expiresAt').val() > now && root.child('rooms').child($room).child('meta/phase').val() === 'revealed' && $round === root.child('rooms').child($room).child('meta/round').val() + '' && root.child('rooms').child($room).child('players').child($recipient).exists() && root.child('rooms').child($room).child('lineKeys').child($round).child($sender).exists() && root.child('rooms').child($room).child('lineKeys').child($round).child($recipient).exists()",
+                ".validate": "newData.hasChildren(['version','iv','data'])",
+                "version": {
+                  ".validate": "newData.val() === 1"
+                },
+                "iv": {
+                  ".validate": "newData.isString() && newData.val().length === 16 && newData.val().matches(/^[A-Za-z0-9+\\/]+$/)"
+                },
+                "data": {
+                  ".validate": "newData.isString() && newData.val().length >= 24 && newData.val().length <= 1024 && newData.val().matches(/^[A-Za-z0-9+\\/]+=*$/)"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -243,42 +277,13 @@
         ".read": "auth != null && auth.uid === $uid && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com')",
         ".write": "auth != null && auth.uid === $uid && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com')",
         "profile": {
-          ".validate": "newData.hasChildren(['username','useInRooms','communityConsent','consentVersion','generation']) && newData.child('username').isString() && (newData.child('username').val() === '' || newData.child('username').val().matches(/^[a-zA-Z0-9_]{3,20}$/)) && newData.child('useInRooms').isBoolean() && newData.child('communityConsent').isBoolean() && (newData.child('communityConsent').val() !== true || auth.token.email_verified === true) && newData.child('consentVersion').val() === 1 && newData.child('generation').isString() && newData.child('generation').val().matches(/^[a-zA-Z0-9-]{36}$/) && (!newData.child('leaderboardOptIn').exists() || (newData.child('leaderboardOptIn').isBoolean() && (newData.child('leaderboardOptIn').val() !== true || auth.token.email_verified === true))) && (!newData.child('socialEnabled').exists() || (newData.child('socialEnabled').isBoolean() && (newData.child('socialEnabled').val() !== true || auth.token.email_verified === true))) && (newData.child('username').val() === '' || newData.child('username').val() === data.child('username').val() || (auth.token.email_verified === true && newData.parent().parent().parent().child('usernames').child(newData.child('username').val().toLowerCase()).val() === $uid)) && (!data.child('username').isString() || data.child('username').val() === '' || data.child('username').val().toLowerCase() === newData.child('username').val().toLowerCase() || newData.parent().parent().parent().child('usernames').child(data.child('username').val().toLowerCase()).val() !== $uid)",
+          ".validate": "newData.hasChildren(['username','useInRooms','generation']) && newData.child('username').isString() && (newData.child('username').val() === '' || newData.child('username').val().matches(/^[a-zA-Z0-9_]{3,20}$/)) && newData.child('useInRooms').isBoolean() && newData.child('generation').isString() && newData.child('generation').val().matches(/^[a-zA-Z0-9-]{36}$/) && (!newData.child('leaderboardOptIn').exists() || (newData.child('leaderboardOptIn').isBoolean() && (newData.child('leaderboardOptIn').val() !== true || auth.token.email_verified === true))) && (!newData.child('socialEnabled').exists() || (newData.child('socialEnabled').isBoolean() && (newData.child('socialEnabled').val() !== true || auth.token.email_verified === true))) && (newData.child('username').val() === '' || newData.child('username').val() === data.child('username').val() || (auth.token.email_verified === true && newData.parent().parent().parent().child('usernames').child(newData.child('username').val().toLowerCase()).val() === $uid)) && (!data.child('username').isString() || data.child('username').val() === '' || data.child('username').val().toLowerCase() === newData.child('username').val().toLowerCase() || newData.parent().parent().parent().child('usernames').child(data.child('username').val().toLowerCase()).val() !== $uid)",
           "$other": {
-            ".validate": "$other === 'username' || $other === 'useInRooms' || $other === 'communityConsent' || $other === 'consentVersion' || $other === 'generation' || $other === 'leaderboardOptIn' || $other === 'socialEnabled'"
+            ".validate": "$other === 'username' || $other === 'useInRooms' || $other === 'generation' || $other === 'leaderboardOptIn' || $other === 'socialEnabled'"
           }
         },
         "samples": {
-          "$sample": {
-            ".validate": "auth.token.email_verified === true && $sample.matches(/^[a-zA-Z0-9-]{20,64}$/) && newData.hasChildren(['day','mode','kind','points','generation']) && root.child('accountData').child($uid).child('profile/generation').exists() && newData.child('generation').val() === root.child('accountData').child($uid).child('profile/generation').val()",
-            "generation": {
-              ".validate": "newData.isString()"
-            },
-            "day": {
-              ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= now / 86400000 + 1"
-            },
-            "mode": {
-              ".validate": "newData.isString() && newData.val().matches(/^(easy|medium|hard)$/)"
-            },
-            "kind": {
-              ".validate": "newData.isString() && newData.val().matches(/^(solo|multiplayer)$/)"
-            },
-            "points": {
-              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000 && newData.val() % 1 === 0"
-            },
-            "relativeError": {
-              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000000000"
-            },
-            "angleError": {
-              ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() < 180"
-            },
-            "distanceError": {
-              ".validate": "newData.parent().child('mode').val() === 'hard' && newData.isNumber() && newData.val() >= -100 && newData.val() <= 1000000000000"
-            },
-            "$other": {
-              ".validate": false
-            }
-          }
+          ".validate": false
         },
         "$other": {
           ".validate": false
@@ -337,47 +342,30 @@
         },
         "proShots": {
           "$slot": {
-            ".validate": "auth.token.email_verified === true && $slot.matches(/^[0-2]$/) && newData.child('sampleId').isString() && newData.child('sampleId').val().matches(/^[a-zA-Z0-9-]{20,64}$/) && newData.hasChildren(['day','mode','kind','points','generation','destination']) && newData.child('mode').val() === 'hard' && newData.child('generation').val() === root.child('accountData').child($uid).child('profile/generation').val() && root.child('accountData').child($uid).child('samples').child(newData.child('sampleId').val()).child('generation').val() === newData.child('generation').val() && root.child('accountData').child($uid).child('samples').child(newData.child('sampleId').val()).child('points').val() === newData.child('points').val()",
-            "generation": {
-              ".validate": "newData.isString()"
-            },
-            "day": {
-              ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= now / 86400000 + 1"
-            },
-            "mode": {
-              ".validate": "newData.isString() && newData.val().matches(/^(easy|medium|hard)$/)"
-            },
-            "kind": {
-              ".validate": "newData.isString() && newData.val().matches(/^(solo|multiplayer)$/)"
-            },
-            "points": {
-              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000 && newData.val() % 1 === 0"
-            },
-            "relativeError": {
-              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000000000"
-            },
-            "angleError": {
-              ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() < 180"
-            },
-            "distanceError": {
-              ".validate": "newData.parent().child('mode').val() === 'hard' && newData.isNumber() && newData.val() >= -100 && newData.val() <= 1000000000000"
-            },
-            "$other": {
-              ".validate": false
-            },
+            ".validate": "auth.token.email_verified === true && $slot.matches(/^[0-2]$/) && newData.hasChildren(['sampleId','points','destination','generation']) && newData.child('generation').val() === root.child('accountData').child($uid).child('profile/generation').val() && root.child('accountData').child($uid).child('profile/generation').exists()",
             "sampleId": {
               ".validate": "newData.isString() && newData.val().matches(/^[a-zA-Z0-9-]{20,64}$/)"
             },
+            "points": {
+              ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 1000"
+            },
             "destination": {
               ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 300"
+            },
+            "generation": {
+              ".validate": "newData.isString()"
+            },
+            "$other": {
+              ".validate": false
             }
           }
         }
       }
     },
     "communityStatistics": {
-      ".read": "auth != null && auth.token.email_verified === true && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com')",
-      ".write": false
+      ".read": false,
+      ".write": false,
+      ".validate": false
     },
     "accountInternal": {
       ".read": false,
@@ -426,40 +414,14 @@
     },
     "friendShares": {
       "$uid": {
-        ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && auth.uid === $uid || (auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && auth.token.email_verified === true && root.child('connections').child($uid).child(auth.uid).child('state').val() === 'accepted' && root.child('connections').child(auth.uid).child($uid).child('state').val() === 'accepted' && root.child('accountData').child($uid).child('profile/generation').exists() && data.child('generation').val() === root.child('accountData').child($uid).child('profile/generation').val())",
+        ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && auth.uid === $uid || (auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && auth.token.email_verified === true && !data.child('samples').exists() && root.child('connections').child($uid).child(auth.uid).child('state').val() === 'accepted' && root.child('connections').child(auth.uid).child($uid).child('state').val() === 'accepted' && root.child('accountData').child($uid).child('profile/generation').exists() && data.child('generation').val() === root.child('accountData').child($uid).child('profile/generation').val())",
         ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && auth.uid === $uid && (!newData.exists() || auth.token.email_verified === true)",
         ".validate": "newData.hasChildren(['generation','journey']) && root.child('accountData').child($uid).child('profile/generation').exists() && newData.child('generation').val() === root.child('accountData').child($uid).child('profile/generation').val()",
         "generation": {
           ".validate": "newData.isString()"
         },
         "samples": {
-          "$index": {
-            ".validate": "$index.matches(/^(0|[1-9][0-9]{0,5})$/) && newData.hasChildren(['day','mode','kind','points'])",
-            "day": {
-              ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= now / 86400000 + 1"
-            },
-            "mode": {
-              ".validate": "newData.isString() && newData.val().matches(/^(easy|medium|hard)$/)"
-            },
-            "kind": {
-              ".validate": "newData.isString() && newData.val().matches(/^(solo|multiplayer)$/)"
-            },
-            "points": {
-              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000 && newData.val() % 1 === 0"
-            },
-            "relativeError": {
-              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000000000"
-            },
-            "angleError": {
-              ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() < 180"
-            },
-            "distanceError": {
-              ".validate": "newData.parent().child('mode').val() === 'hard' && newData.isNumber() && newData.val() >= -100 && newData.val() <= 1000000000000"
-            },
-            "$other": {
-              ".validate": false
-            }
-          }
+          ".validate": false
         },
         "bests": {
           "$index": {

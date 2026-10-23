@@ -1,6 +1,5 @@
 const assert=require('node:assert/strict');
 const model=require('../account-statistics');
-const {aggregate}=require('../functions/community');
 const sample=model.sample({points:850,angleError:-20,initialDistance:1000,errorMeters:100},{lat:1,lon:2,heading:5,distanceMeters:700},'hard','multiplayer',86400000*20000);
 assert.deepEqual(sample,{day:20000,mode:'hard',kind:'multiplayer',points:850,relativeError:10,angleError:-20,distanceError:-30});
 assert.doesNotMatch(JSON.stringify(sample),/"(?:lat|lon|heading|target|room|uid|email)":/);
@@ -17,17 +16,7 @@ assert.equal(stats.angleSamples[0].round,undefined);assert.equal(stats.angleSamp
 stats=model.summarize([{...sample,angleError:179},{...sample,angleError:-179}]);assert.equal(Math.abs(stats.angleBias),180);
 assert.equal(model.summarize([{...sample,angleError:90},{...sample,angleError:-90}]).angleBias,null);
 assert.equal(model.clean({...sample,mode:'invalid'}),null);
-const user=(consent=true)=>({profile:{communityConsent:consent,consentVersion:1,generation:'abc'},samples:{one:{...sample,generation:'abc'}}});
-let accounts={};for(let i=0;i<4;i++)accounts[`u${i}`]=user();
-assert.deepEqual(aggregate(accounts).all,{available:false});accounts.u4=user();
-let pooled=aggregate(accounts);assert.equal(pooled.hard.available,true);assert.equal(pooled.all.contributors,5);assert.equal(pooled.hard.absoluteDistance,30);
-assert.doesNotMatch(JSON.stringify(pooled),/u0|generation|samples|day/);
-accounts.u4.profile.communityConsent=false;assert.equal(aggregate(accounts).all.available,false);
-accounts.u4=user();delete accounts.u3;assert.equal(aggregate(accounts).all.available,false);
-accounts.u3=user();accounts.u0.samples.one.generation='stale';assert.equal(aggregate(accounts).all.available,false);
-accounts.u0=user();for(let i=0;i<4;i++){delete accounts[`u${i}`].samples.one.distanceError;delete accounts[`u${i}`].samples.one.angleError;}
-pooled=aggregate(accounts);assert.equal(pooled.all.available,true);assert.equal(pooled.all.absoluteDistance,null);assert.equal(pooled.all.absoluteAngle,null);
-console.log('Account statistics: strict scalar projection, guest-free samples, period/difficulty filters, circular means, no historical round IDs, consent withdrawal, deletion and per-metric contributor thresholds passed.');
+console.log('Device statistics: scalar projection, filters, circular means and highlights passed.');
 
 const shotBase={day:100,mode:'hard',kind:'solo',points:900,relativeError:5,angleError:10};
 const best=require('../account-statistics.js').bestShots([{...shotBase,points:1000,mode:'easy'},{...shotBase,points:899},{...shotBase,relativeError:2},{...shotBase,points:999},{...shotBase,relativeError:3}]);

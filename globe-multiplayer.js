@@ -1,3 +1,5 @@
+import {privateRoomChannel} from './private-room-channel.js?v=1';
+import {forgetRoomKey} from './private-room-crypto.js?v=1';
 import {deleteEmptyRoom} from './room-cleanup.js?v=1';
 import {saveGuess, guess, clearMatch} from './private-geometry.js?v=1';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js';
@@ -7,7 +9,7 @@ import {
   serverTimestamp, set, update
 } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js';
 import { firebaseConfig } from './firebase-config.js';
-import { beginRound, saveSample } from './account-service.js?v=8';
+import { beginRound, saveSample } from './account-service.js?v=9';
 
 const parameters = new URLSearchParams(location.search);
 const multiplayerMode = parameters.get('multiplayer') === '1';
@@ -21,6 +23,7 @@ if (multiplayerMode) {
   const ERROR_COLOURS = ['#ff8587', '#86c5f4', '#92dc8f', '#d29ddd', '#ffc06a', '#70dada', '#ffc0df', '#b99a78'];
   const resultsPanel = document.getElementById('globeMultiplayerResults');
   const rankingList = document.getElementById('globeRoundRanking');
+  const privateLineStatus=document.getElementById('privateRoomStatus');
   const nextRoundButton = document.getElementById('globeNextRoundBtn');
   const roomBadge = document.getElementById('globeRoomBadge');
   const roomProgress = document.getElementById('globeRoomProgress');
@@ -30,6 +33,7 @@ if (multiplayerMode) {
   const summaryStatus = document.getElementById('globeSummaryStatus');
   const summaryFrame = document.getElementById('matchSummaryFrame');
   let matchReport = null;
+  let privateChannel=null,visibleEntries=null,privateChannelError='';
   let resultsReady = false;
   let advancingRound = false;
   let accountRound = Promise.resolve(null);
@@ -151,6 +155,16 @@ if (multiplayerMode) {
     }
   }
 
+  function renderPrivateLines(lines,round){
+    if(leaving||roomMeta?.visibility!=='private'||roomMeta.phase!=='revealed'||roomMeta.round!==round||!visibleEntries)return;
+    const entries=visibleEntries.map(entry=>({...entry,submission:entry.uid===user.uid?entry.submission:lines[entry.uid]||null}));
+    window.BussoleGlobe.revealMultiplayer(entries,target,settings.mode||'medium');
+    const expected=visibleEntries.filter(entry=>entry.uid!==user.uid&&entry.publicResult).length;
+    const received=Object.keys(lines).length;
+    if(received>=expected)privateChannelError='';
+    privateLineStatus.textContent=privateChannelError||`Private room · ${received}/${expected} other players’ lines received.`;
+  }
+
   async function showResults() {
     if (!roomMeta || shownRound === roomMeta.round || !target || !settings) return;
     if (!window.BussoleGlobe.isReady()) {
@@ -160,7 +174,6 @@ if (multiplayerMode) {
     shownRound = roomMeta.round;
     clearTimeout(timerHandle);
     countdown.stop();
-    const publicRoom = true; // Every room keeps guesses on the player's device.
     const resultPath = 'publicResults';
     const snapshot = await get(ref(db, roomPath(`${resultPath}/${roomMeta.round}`)));
     const submissions = snapshot.val() || {};
@@ -176,7 +189,10 @@ if (multiplayerMode) {
         publicResult: submissions[uid] || null
       }));
     const round = roomMeta.round;
+    visibleEntries=entries;
+    privateChannel?.reveal({round,players,submission:ownSubmission});
     const results = window.BussoleGlobe.revealMultiplayer(entries, target, settings.mode || 'medium');
+    privateLineStatus.textContent=roomMeta.visibility==='private'?(privateChannelError||'Waiting for private lines…'):'';
     const ranking = window.BussoleScoring.rank(results, players, round);
     const personal = entries.find(entry => entry.uid === user.uid)?.submission;
     if (personal) {
@@ -189,8 +205,8 @@ if (multiplayerMode) {
         const sample = window.BussoleAccountStatistics.sample(measured, personal, personalMode, 'multiplayer');
         return saveSample(context, sample, recordKey, {submission:personal,target:personalTarget});
       })
-        .then(saved => { if(saved)document.getElementById('accountSaveStatus').textContent = 'Statistics saved.'; })
-        .catch(() => { document.getElementById('accountSaveStatus').textContent = 'Statistics could not be saved. Check your connection.'; });
+        .then(saved => { if(saved)document.getElementById('accountSaveStatus').textContent = 'Statistics saved on this device.'; })
+        .catch(error => { document.getElementById('accountSaveStatus').textContent = error.message || 'Statistics could not be saved on this device.'; });
     }
     await Promise.all(ranking.filter(result => isHost() || result.uid === user.uid).map(result =>
       runTransaction(ref(db, roomPath(`players/${result.uid}`)), player =>
@@ -249,7 +265,7 @@ if (multiplayerMode) {
           readOwnGuess: round => guess(user.uid, roomCode, roomMeta.createdAt, round)
         });
         window.BussoleMatchReport.save(matchReport, displayCode(roomCode));
-        summaryStatus.textContent = 'Your guesses stay on this device. Other players share scores only.';
+        summaryStatus.textContent = roomMeta.visibility==='private'?'Summary contains your guesses only. Other players’ lines are temporary.':'Your guesses stay on this device. Other players share scores only.';
       } catch (error) {
         console.warn('Match summary unavailable.', error.code || error.message);
         summaryStatus.textContent = 'Summary unavailable. Tap Summary to retry.';
@@ -299,6 +315,9 @@ if (multiplayerMode) {
   async function leaveRoom() {
     if (leaving) return;
     leaving = true;
+    privateChannel?.stop();
+    forgetRoomKey(user.uid,roomCode,roomMeta.createdAt);
+    visibleEntries=null;
     countdown.stop();
     clearTimeout(timerHandle);
     clearTimeout(hostTransferTimer);
@@ -346,6 +365,15 @@ if (multiplayerMode) {
       if (!roomMeta || roomMeta.schemaVersion !== 2 || roomMeta.expiresAt <= Date.now()+serverTimeOffset || roomMeta.phase === 'closed' || !players[user.uid]) return goHome();
       if (!target) return goHome();
       if (roomMeta.phase === 'aiming') accountRound = beginRound();
+      let privateLineError='';
+      if(roomMeta.visibility==='private'){
+        try{
+          privateChannel=await privateRoomChannel({db,uid:user.uid,room:roomCode,meta:roomMeta,
+            onStatus:message=>{privateChannelError=message;privateLineStatus.textContent=message;},
+            onLines:renderPrivateLines
+          });
+        }catch{privateLineError='Private lines unavailable in this tab. Scores are still available.';privateChannelError=privateLineError;privateLineStatus.textContent=privateLineError;}
+      }
 
       window.BussoleGlobe.registerMultiplayer({ isActive: () => true, submitLine, dismissResults });
       updateNextRoundState();
@@ -358,7 +386,7 @@ if (multiplayerMode) {
       }));
       await refreshPresence();
       updateProgress();
-      window.BussoleGlobe.setStatus(`Room ${displayCode(roomCode)} · Aim, then press Go!`);
+      window.BussoleGlobe.setStatus(privateLineError||`Room ${displayCode(roomCode)} · Aim, then press Go!`);
 
       unsubscribers.push(onValue(ref(db, roomPath('players')), playerSnapshot => {
         players = playerSnapshot.val() || {};

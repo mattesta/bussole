@@ -9,7 +9,7 @@ const {ref,get,set,update,runTransaction,serverTimestamp}=require('firebase/data
   const other=env.authenticatedContext('daily-other',{email_verified:true,firebase:{sign_in_provider:'password'}}).database();
   const pending=env.authenticatedContext('pending',{email_verified:false,firebase:{sign_in_provider:'password'}}).database(),guest=env.unauthenticatedContext().database();
   const day=Math.floor(Date.now()/86400000),p='accountData/daily-owner',key='12345678-1234-1234-1234-123456789012',generation='aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
-  const profile={username:'',useInRooms:false,communityConsent:false,consentVersion:1,generation};
+  const profile={username:'',useInRooms:false,generation};
   await ok(set(ref(owner,`${p}/profile`),profile));
   const attempt={entryKey:key,generation,startedAt:serverTimestamp(),version:1},a=`${p}/dailyAttempts/${day}`,score=`dailyScores/${day}/${key}`;
   await no(set(ref(pending,`accountData/pending/dailyAttempts/${day}`),attempt));await no(set(ref(other,a),attempt));

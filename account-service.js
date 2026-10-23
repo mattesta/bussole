@@ -1,3 +1,5 @@
+import {forgetRoomKeys} from './private-room-crypto.js?v=1';
+import {saveLocalSamples,loadLocalSamples,clearLocalSamples} from './local-statistics.js?v=1';
 import {saveHighlight, clearGeometry} from './private-geometry.js?v=1';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js';
 import {
@@ -13,7 +15,7 @@ const app=initializeApp(firebaseConfig);
 export const auth=getAuth(app);
 export const db=getDatabase(app);
 export { ref, get, update, runTransaction, set, onValue, serverTimestamp, onAuthStateChanged };
-export const defaultProfile={username:'',useInRooms:false,communityConsent:false,consentVersion:1,leaderboardOptIn:false,socialEnabled:false};
+export const defaultProfile={username:'',useInRooms:false,leaderboardOptIn:false,socialEnabled:false};
 const account=user=>Boolean(user&&!user.isAnonymous&&user.email);
 const verified=user=>account(user)&&user.emailVerified;
 const current=()=>{if(!account(auth.currentUser))throw new Error('Sign in to your account first.');return auth.currentUser;};
@@ -37,42 +39,52 @@ export async function google(){
 }
 let syncTask;
 export function scheduleSocialSync(){
- if(!syncTask)syncTask=Promise.allSettled([import('./social-service.js?v=5').then(s=>s.syncOwn()),import('./daily-reminder-service.js?v=2').then(s=>s.syncIfEnrolled())]).finally(()=>{syncTask=null;});
+ if(!syncTask)syncTask=Promise.allSettled([import('./social-service.js?v=6').then(s=>s.syncOwn()),import('./daily-reminder-service.js?v=3').then(s=>s.syncIfEnrolled())]).finally(()=>{syncTask=null;});
  return syncTask;
 }
-export const logout=async()=>{try{sessionStorage.removeItem('bussoleMatchReport');}catch{};await import('./daily-reminder-service.js?v=2').then(m=>m.disable()).catch(()=>{});return signOut(auth);};
+export const logout=async()=>{const uid=auth.currentUser?.uid;try{sessionStorage.removeItem('bussoleMatchReport');}catch{};await import('./daily-reminder-service.js?v=3').then(m=>m.disable()).catch(()=>{});if(uid)forgetRoomKeys(uid);return signOut(auth);};
 export const resetPassword=email=>sendPasswordResetEmail(auth,email.trim());
 export const resendVerification=()=>sendEmailVerification(current());
 export async function refreshVerification(){const user=current();await reload(user);await user.getIdToken(true);return user.emailVerified;}
+function minimalProfile(value){
+ return {username:value?.username||'',useInRooms:Boolean(value?.useInRooms),leaderboardOptIn:Boolean(value?.leaderboardOptIn),socialEnabled:Boolean(value?.socialEnabled),generation:value?.generation||crypto.randomUUID()};
+}
+function minimalShot(row,generation){
+ if(!row||row.generation!==generation||!Number.isInteger(row.points)||row.points<0||row.points>1000||typeof row.sampleId!=='string'||!/^[a-zA-Z0-9-]{20,64}$/.test(row.sampleId))return null;
+ const destination=row.destination||row.target?.label||'Destination not saved';
+ return {sampleId:row.sampleId,points:row.points,destination,generation};
+}
 export async function loadProfile(){
-  const user=current(),profileRef=ref(db,`${path(user.uid)}/profile`);
-  let profile=(await get(profileRef)).val();
-  if(!profile){
-    const result=await runTransaction(profileRef,value=>value||{...defaultProfile,generation:crypto.randomUUID()});
-    profile=result.snapshot.val();
-  }
-  return profile;
+ const user=current(),profileRef=ref(db,`${path(user.uid)}/profile`),profile=(await get(profileRef)).val();
+ if(profile&&!Object.keys(profile).some(key=>!Object.hasOwn(minimalProfile(profile),key)))return profile;
+ const result=await runTransaction(profileRef,value=>minimalProfile(value||profile));
+ return result.snapshot.val();
 }
 export async function loadData(){
-  const user=current();const data=(await get(ref(db,path(user.uid)))).val()||{};
-  if(!data.profile)data.profile=await loadProfile();
-  // Migrate only this owner's legacy highlights. Never re-upload geometry.
-  let migrated=false;
-  for(const [slot,shot] of Object.entries(data.proShots||{})){
-    if(!shot.submission&&!shot.target)continue;
-    const geometry=window.BussoleAccountStatistics?.shotGeometry(shot);
-    if(geometry&&shot.generation===data.profile?.generation)saveHighlight(user.uid,shot.generation,shot);
-    const result=await runTransaction(ref(db,`${path(user.uid)}/proShots/${slot}`),current=>{
-      if(!current)return null;
-      if(!current.submission&&!current.target)return;
-      const {submission,target,...metadata}=current;
-      return {...metadata,destination:current.destination||target?.label||'Destination not saved'};
-    });
-    if(result.snapshot.exists())data.proShots[slot]=result.snapshot.val();else delete data.proShots[slot];
-    migrated=true;
-  }
-  if(migrated)scheduleSocialSync();
-  return data;
+ const user=current(),data=(await get(ref(db,path(user.uid)))).val()||{};
+ data.profile=await loadProfile();
+ const generation=data.profile.generation,legacySamples=data.samples||{},changes={};
+ try{
+  // Commit device storage before removing any legacy cloud sample.
+  if(Object.keys(legacySamples).length)await saveLocalSamples(user.uid,generation,legacySamples);
+  data.samples=await loadLocalSamples(user.uid,generation);
+  if(Object.keys(legacySamples).length)changes[`${path(user.uid)}/samples`]=null;
+ }catch(error){data.samples={};data.localStatisticsError=error.message;}
+ const oldShots=data.proShots||{},newShots={};let legacyShots=false;
+ for(const [slot,shot] of Object.entries(oldShots)){
+  const metadata=minimalShot(shot,generation);if(!metadata){legacyShots=true;continue;}
+  if(shot.submission&&window.BussoleAccountStatistics?.shotGeometry(shot))saveHighlight(user.uid,generation,shot);
+  if(Object.keys(shot).some(key=>!['sampleId','points','destination','generation'].includes(key)))legacyShots=true;
+  newShots[slot]=metadata;
+ }
+ if(legacyShots)changes[`${path(user.uid)}/proShots`]=Object.keys(newShots).length?newShots:null;
+ data.proShots=newShots;
+ // Removing this field revokes legacy friend snapshots under the new rules.
+ const legacyShare=(await get(ref(db,`friendShares/${user.uid}`))).val();
+ if(legacyShare?.samples)changes[`friendShares/${user.uid}`]=null;
+ if(auth.currentUser?.uid!==user.uid)throw Error('Your account changed. Please retry.');
+ if(Object.keys(changes).length)await update(ref(db),changes);
+ return data;
 }
 export async function usernameOwner(username){
  const key=String(username||'').trim().toLowerCase();if(!/^[a-z0-9_]{3,20}$/.test(key))return null;
@@ -83,12 +95,11 @@ export async function saveProfile(profile){
   const username=String(profile.username||'').trim();
   if(username&&!/^[a-zA-Z0-9_]{3,20}$/.test(username))throw new Error('Use 3–20 letters, numbers or underscores.');
   if(profile.leaderboardOptIn&&!username)throw Error('Choose a username before joining the global leaderboard.');
-  if(profile.communityConsent&&!verified(user))throw new Error('Verify your email before contributing.');
   const existingProfile=await loadProfile();
   if(username&&!verified(user))throw Error('Verify your email before reserving a username.');
   const key=username.toLowerCase(),oldKey=String(existingProfile.username||'').toLowerCase();
   if(key){const owner=await usernameOwner(key);if(owner&&owner!==user.uid)throw Error('This username is taken. Choose a different one.');}
-  const fields={username,useInRooms:Boolean(username&&profile.useInRooms),communityConsent:Boolean(profile.communityConsent),consentVersion:1,leaderboardOptIn:Boolean(profile.leaderboardOptIn)};
+  const fields={username,useInRooms:Boolean(username&&profile.useInRooms),leaderboardOptIn:Boolean(profile.leaderboardOptIn)};
   const changes=Object.fromEntries(Object.entries(fields).map(([key,value])=>[`${path(user.uid)}/profile/${key}`,value]));
   if(key){changes[`usernames/${key}`]=user.uid;changes[`${path(user.uid)}/profile/socialEnabled`]=true;}
   if(oldKey&&oldKey!==key&&await usernameOwner(oldKey)===user.uid)changes[`usernames/${oldKey}`]=null;
@@ -115,16 +126,17 @@ export async function saveSample(context,sample,key,detail){
   const id=key?Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(`${user.uid}:${key}`))),b=>b.toString(16).padStart(2,'0')).join(''):context.id;
   const clean=window.BussoleAccountStatistics.clean(sample);
   if(!clean)return false;
-  await set(ref(db,`${path(user.uid)}/samples/${id}`),{...clean,generation:context.generation});
+  const profile=await loadProfile();
+  if(profile.generation!==context.generation)throw Error('These statistics were reset. Start a new game.');
+  await saveLocalSamples(user.uid,context.generation,{[id]:{...clean,generation:context.generation}});
   const geometry=clean.mode==='hard'?window.BussoleAccountStatistics.shotGeometry(detail):null;
   if(geometry){
-    const privateShot={...clean,...geometry,sampleId:id,generation:context.generation};
-    saveHighlight(user.uid,context.generation,privateShot);
-    const candidate={...clean,destination:geometry.target.label,sampleId:id,generation:context.generation};
+    saveHighlight(user.uid,context.generation,{...clean,...geometry,sampleId:id,generation:context.generation});
+    const candidate={points:clean.points,destination:geometry.target.label,sampleId:id,generation:context.generation};
     await runTransaction(ref(db,`${path(user.uid)}/proShots`),previous=>{
-      const rows=Object.values(previous||{}).filter(row=>row.generation===context.generation&&window.BussoleAccountStatistics.clean(row)).map(row=>{const {submission,target,...metadata}=row;return [row.sampleId,{...metadata,destination:row.destination||target?.label||'Destination not saved'}];});
-      const records=Object.fromEntries(rows);records[id]=candidate;
-      return Object.fromEntries(window.BussoleAccountStatistics.bestShotEntries(records).map((row,index)=>[index,records[row.id]]));
+      const records=Object.fromEntries(Object.values(previous||{}).map(row=>minimalShot(row,context.generation)).filter(Boolean).map(row=>[row.sampleId,row]));
+      records[id]=candidate;
+      return Object.fromEntries(Object.values(records).sort((a,b)=>b.points-a.points||a.sampleId.localeCompare(b.sampleId)).slice(0,3).map((row,index)=>[index,row]));
     });
   }
   scheduleSocialSync();
@@ -151,9 +163,10 @@ export async function deleteStatistics(){
   const data=await loadData(), changes=dailyRemovals(data.dailyAttempts),nextGeneration=crypto.randomUUID();
   const reminderActive=await get(ref(db,`dailyReminderDevices/${user.uid}`)).then(row=>row.exists()).catch(()=>false);
   if(reminderActive)changes[`dailyReminderJourneys/${user.uid}`]={generation:nextGeneration,asOfDay:Math.floor(Date.now()/86400000),tenths:0,lastDay:-1};
-  Object.assign(changes,{[`${path(user.uid)}/samples`]:null,[`${path(user.uid)}/proShots`]:null,[`${path(user.uid)}/soloBests`]:null,[`${path(user.uid)}/dailyAttempts`]:null,[`${path(user.uid)}/profile/communityConsent`]:false,[`${path(user.uid)}/profile/leaderboardOptIn`]:false,[`${path(user.uid)}/profile/consentVersion`]:1,[`${path(user.uid)}/profile/generation`]:nextGeneration,[`friendShares/${user.uid}`]:null,[`journeyLeaderboard/${user.uid}`]:null});
+  Object.assign(changes,{[`${path(user.uid)}/samples`]:null,[`${path(user.uid)}/proShots`]:null,[`${path(user.uid)}/soloBests`]:null,[`${path(user.uid)}/dailyAttempts`]:null,[`${path(user.uid)}/profile/leaderboardOptIn`]:false,[`${path(user.uid)}/profile/generation`]:nextGeneration,[`friendShares/${user.uid}`]:null,[`journeyLeaderboard/${user.uid}`]:null});
   if(!data.profile?.socialEnabled)changes[`publicProfiles/${user.uid}`]=null;
   await update(ref(db),changes);
+  await clearLocalSamples(user.uid);
   clearGeometry(user.uid);
 }
 async function reauthenticate(password){
@@ -170,12 +183,10 @@ export async function deleteAccount(password){
   const username=data.profile?.username;if(username&&await usernameOwner(username)===user.uid)changes[`usernames/${username.toLowerCase()}`]=null;
   for(const other of Object.keys(links)){changes[`connections/${other}/${user.uid}`]=null;changes[`connections/${user.uid}/${other}`]=null;}
   await update(ref(db),changes);
+  await clearLocalSamples(user.uid);
   clearGeometry(user.uid);
+  forgetRoomKeys(user.uid);
   await deleteUser(user);
-}
-export async function community(mode='all'){
-  const user=current();if(!verified(user))return null;
-  return (await get(ref(db,`communityStatistics/${mode}`))).val();
 }
 export function friendlyError(error){
   const messages={

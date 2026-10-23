@@ -1,15 +1,15 @@
 import {highlights} from './private-geometry.js?v=1';
-import './daily-reminder-ui.js?v=2';
-import * as accounts from './account-service.js?v=8';
-import { today } from './daily-service.js?v=6';
-import * as social from './social-service.js?v=5';
+import './daily-reminder-ui.js?v=3';
+import * as accounts from './account-service.js?v=9';
+import { today } from './daily-service.js?v=7';
+import * as social from './social-service.js?v=6';
 const byId=id=>document.getElementById(id),show=(id,visible)=>byId(id).classList.toggle('hidden',!visible);
-let loadedOwner=null,registration=false,data={},mode='all',days=0,busy=false,requestId=0,travelDay=null,stopConnections=null,socialScope='friends',selectedFriend=null,currentConnections={},friendRenderVersion=0;
+let loadedOwner=null,registration=false,data={},mode='all',days=0,busy=false,travelDay=null,stopConnections=null,socialScope='friends',selectedFriend=null,currentConnections={},friendRenderVersion=0;
 function message(text,error=false){byId('accountStatus').textContent=text;byId('accountStatus').classList.toggle('error',error);}
 async function action(work){
   if(busy)return;busy=true;document.querySelectorAll('button').forEach(button=>button.disabled=true);
   try{await work();}catch(error){message(accounts.friendlyError(error),true);}
-  finally{busy=false;document.querySelectorAll('button').forEach(button=>button.disabled=false);if(accounts.auth.currentUser&&!accounts.auth.currentUser.emailVerified){byId('communityConsent').disabled=true;byId('leaderboardOptIn').disabled=true;}byId('connectGoogle').disabled=accounts.hasGoogle();window.dispatchEvent(new Event('bussole-account-refresh'));}
+  finally{busy=false;document.querySelectorAll('button').forEach(button=>button.disabled=false);if(accounts.auth.currentUser&&!accounts.auth.currentUser.emailVerified){byId('leaderboardOptIn').disabled=true;}byId('connectGoogle').disabled=accounts.hasGoogle();window.dispatchEvent(new Event('bussole-account-refresh'));}
 }
 async function refresh(){
   const user=await accounts.ready();show('accountAuth',!user);show('accountDetails',Boolean(user));
@@ -20,11 +20,10 @@ async function refresh(){
   data=await accounts.loadData();loadedOwner=user.uid;const profile={...accounts.defaultProfile,...data.profile};
   byId('accountUsername').value=profile.username;byId('useUsernameInRooms').checked=profile.useInRooms;
   byId('leaderboardOptIn').checked=Boolean(profile.leaderboardOptIn);byId('leaderboardOptIn').disabled=!user.emailVerified;
-  byId('communityConsent').checked=profile.communityConsent;byId('communityConsent').disabled=!user.emailVerified;
   await renderJourney();renderBests();renderBestShots();renderStatistics();
   const claimed=profile.username?await accounts.usernameOwner(profile.username).catch(()=>null):null;
   byId('usernameStatus').textContent=profile.username&&claimed!==user.uid?'Save preferences to reserve your existing username. If it is taken, choose a different one.':'';
-  await refreshSocial();message(user.emailVerified?'Your account is ready.':'Verify your email to start saving statistics.');
+  await refreshSocial();message(data.localStatisticsError|| (user.emailVerified?'Your account is ready.':'Verify your email to start saving statistics.'),Boolean(data.localStatisticsError));
 }
 async function renderJourney(){
  const element=byId('dailyTravel'),status=byId('dailyTravelStatus');travelDay=null;
@@ -64,12 +63,11 @@ window.addEventListener('message',event=>{if(event.origin===location.origin&&eve
 byId('privateShotDialog').addEventListener('close',()=>{byId('privateShotFrame').onload=null;byId('privateShotFrame').src='about:blank';});
 function renderBestShots(){
  const list=byId('proBestShotList');list.replaceChildren();
- const current=Object.fromEntries(Object.entries(data.samples||{}).filter(([,row])=>row.generation===data.profile?.generation));
- const shots=window.BussoleAccountStatistics.bestShotEntries(current);
+ const shots=Object.values(data.proShots||{}).sort((a,b)=>b.points-a.points);
  for(const shot of shots){
-  const item=document.createElement('li'),saved=Object.values(data.proShots||{}).find(row=>row.sampleId===shot.id);
-  item.textContent=`${shot.points} / 1,000 points · ${saved?.destination||'Destination not saved'} · ${new Date(shot.day*86400000).toISOString().slice(0,10)}`;
-  if(highlights(loadedOwner,data.profile?.generation)[shot.id]){const button=document.createElement('button');button.type='button';button.textContent='View on globe · this device';button.onclick=()=>openShotGlobe(shot.id);item.append(button);}
+  const item=document.createElement('li');
+  item.textContent=`${shot.points} / 1,000 points · ${shot.destination||'Destination not saved'}`;
+  if(highlights(loadedOwner,data.profile?.generation)[shot.sampleId]){const button=document.createElement('button');button.type='button';button.textContent='View on globe · this device';button.onclick=()=>openShotGlobe(shot.sampleId);item.append(button);}
   else{const note=document.createElement('small');note.textContent='Globe replay is stored only on the device where you made this shot.';item.append(note);}
   list.append(item);
  }
@@ -94,21 +92,6 @@ function renderStatistics(){
     metric(list,'Mean absolute distance error · Pro',stats.absoluteDistance,'%');
     metric(list,'Distance bias · Pro',stats.distanceBias,'%',true,'Positive: too long. Negative: too short.',window.BussoleSummaryCharts.distance(stats.distanceSamples,stats.distanceBias));
   }
-  refreshCommunity();
-}
-async function refreshCommunity(){
-  const id=++requestId,list=byId('communityMetrics');list.replaceChildren();
-  const status=byId('communityStatus');
-  if(!accounts.auth.currentUser?.emailVerified){status.textContent='Verify your email to see community comparisons.';return;}
-  status.textContent='Loading pooled statistics…';
-  try{
-    const value=await accounts.community(mode);if(id!==requestId)return;
-    if(!value?.available){status.textContent='Community statistics need at least 5 contributing players in this difficulty. They will appear here when available.';return;}
-    const p=value.contributors===1?'player':'players';
-    status.textContent=`${value.contributors} contributing ${p} · ${value.count} guesses · all time. These are pooled results, not individual profiles.`;
-    metric(list,'Community mean relative error',value.relativeError,'%');metric(list,'Community mean absolute angle error',value.absoluteAngle,'°');
-    if(mode==='hard'||mode==='all')metric(list,'Community mean absolute distance error · Pro',value.absoluteDistance,'%');
-  }catch{if(id===requestId)status.textContent='Community comparison is being prepared. Your personal statistics work independently.';}
 }
 function setRegistration(value){
   registration=value;byId('showLogin').classList.toggle('selected',!value);byId('showRegister').classList.toggle('selected',value);
@@ -127,9 +110,8 @@ byId('resetPassword').onclick=()=>action(async()=>{const input=byId('accountEmai
 byId('resendVerification').onclick=()=>action(async()=>{await accounts.resendVerification();message('Verification email sent. Check your inbox and spam folder.');});
 byId('checkVerification').onclick=()=>action(async()=>{const verified=await accounts.refreshVerification();await refresh();if(!verified)message('The email is not verified yet. Open the link in your email, then retry.');});
 byId('profileForm').onsubmit=event=>{event.preventDefault();action(async()=>{
-  const previous=Boolean(data.profile?.communityConsent),consent=byId('communityConsent').checked;
-  await accounts.saveProfile({username:byId('accountUsername').value,useInRooms:byId('useUsernameInRooms').checked,communityConsent:consent,leaderboardOptIn:byId('leaderboardOptIn').checked});
-  await refresh();message(previous&&!consent?'Preferences saved. Your past community contributions will be removed when the pool refreshes.':'Preferences saved.');
+  await accounts.saveProfile({username:byId('accountUsername').value,useInRooms:byId('useUsernameInRooms').checked,leaderboardOptIn:byId('leaderboardOptIn').checked});
+  await refresh();message('Preferences saved.');
 });};
 for(const id of ['modeFilters','dateFilters'])byId(id).onclick=event=>{
   const button=event.target.closest('button');if(!button)return;
@@ -147,12 +129,12 @@ byId('exportAccount').onclick=()=>action(async()=>{
   link.href=url;link.download='bussole-my-data.json';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);message('Your data export is ready.');
 });
 byId('deleteStatistics').onclick=()=>action(async()=>{
-  if(!confirm('Delete all your saved statistics, personal bests and daily scores, and remove your community contributions? This cannot be undone.'))return;
-  await accounts.deleteStatistics();await refresh();message('Your statistics have been deleted. Community contributions are being removed.');
+  if(!confirm('Delete device statistics, personal bests and daily scores? This cannot be undone.'))return;
+  await accounts.deleteStatistics();await refresh();message('Your statistics have been deleted from this device and your cloud records have been reset.');
 });
 byId('deleteAccount').onclick=()=>action(async()=>{
   const currentPassword=password();if(!confirm('Delete your account and all personal statistics? This cannot be undone.'))return;
-  await accounts.deleteAccount(currentPassword);byId('securityForm').reset();await refresh();message('Your account and personal statistics have been deleted. Community contributions are being removed.');
+  await accounts.deleteAccount(currentPassword);byId('securityForm').reset();await refresh();message('Your account and personal statistics have been deleted. Device copies elsewhere cannot be erased remotely.');
 });
 byId('signOut').onclick=()=>action(async()=>{await accounts.logout();byId('securityForm').reset();await refresh();});
 
@@ -167,9 +149,9 @@ async function renderFriends(links){
   const profile=await social.publicProfile(uid).catch(()=>null);if(version!==friendRenderVersion)return;if(!profile)continue;
   const item=element('li'),name=element('strong',profile.name||'Explorer');item.append(name);
   if(entry.state==='accepted'){
-   item.append(element('span','Friend'),socialButton('Statistics',()=>viewFriend(uid)),socialButton('Remove',async()=>{if(confirm('Remove this friendship and stop sharing statistics?'))await social.remove(uid);}));
+   item.append(element('span','Friend'),socialButton('Records',()=>viewFriend(uid)),socialButton('Remove',async()=>{if(confirm('Remove this friendship and stop sharing statistics?'))await social.remove(uid);}));
   }else if(entry.requestedBy===accounts.auth.currentUser?.uid)item.append(element('span','Request sent'),socialButton('Cancel',()=>social.remove(uid)));
-  else item.append(element('span','Wants to be friends'),socialButton('Accept',async()=>{if(confirm('Accept this friend and share your error statistics, personal bests and Daily journey with each other?'))await social.accept(uid);}),socialButton('Decline',()=>social.remove(uid)));
+  else item.append(element('span','Wants to be friends'),socialButton('Accept',async()=>{if(confirm('Accept this friend and share your personal bests and Daily journey with each other?'))await social.accept(uid);}),socialButton('Decline',()=>social.remove(uid)));
   list.append(item);
  }
  if(!list.children.length)list.append(element('li','No friends or requests yet. Share your link to get started.'));
@@ -177,18 +159,14 @@ async function renderFriends(links){
 async function refreshSocial(){
  if(!accounts.auth.currentUser?.emailVerified){byId('socialStatus').textContent='Verify your email to use friends and rankings.';return;}
  try{
-  await social.syncOwn();byId('socialStatus').textContent='Friends see statistics only after you both accept.';
+  await social.syncOwn();byId('socialStatus').textContent='Friends see records and Daily progress after you both accept. Detailed errors stay on your device.';
   stopConnections=social.watchConnections(links=>renderFriends(links).catch(()=>{}),()=>{byId('socialStatus').textContent='Friend access is temporarily unavailable.';});
   const invite=new URLSearchParams(location.search).get('friend');if(invite)byId('friendInvite').value=new URL(location.href).href;
  }catch{byId('socialStatus').textContent='Friends and rankings are being prepared. Updated Firebase rules are required; your personal statistics still work.';}
 }
 async function viewFriend(uid){
  const owner=accounts.auth.currentUser?.uid,value=await social.friend(uid);if(accounts.auth.currentUser?.uid!==owner||currentConnections[uid]?.state!=='accepted')throw Error('This friendship is no longer active.');selectedFriend=uid;show('friendStatistics',true);
- byId('friendStatisticsName').textContent=value.profile?.name||'Explorer';const share=value.share||{},rows=window.BussoleAccountStatistics.select(share.samples),stats=window.BussoleAccountStatistics.summarize(rows),list=byId('friendMetrics');list.replaceChildren();
- byId('friendStatisticsCount').textContent=`${stats.count} completed guesses · last synced by this player`;
- metric(list,'Mean relative error',stats.relativeError,'%');metric(list,'Mean absolute angle error',stats.absoluteAngle,'°');
- metric(list,'Directional bias',stats.angleBias,'°',true,'Positive: right. Negative: left.',window.BussoleSummaryCharts.angle(stats.angleSamples,stats.angleBias));
- metric(list,'Mean absolute distance error · Pro',stats.absoluteDistance,'%');metric(list,'Distance bias · Pro',stats.distanceBias,'%',true,'Positive: too long. Negative: too short.',window.BussoleSummaryCharts.distance(stats.distanceSamples,stats.distanceBias));
+ byId('friendStatisticsName').textContent=value.profile?.name||'Explorer';const share=value.share||{};
  const currentDay=await today(),balance=window.BussoleSocialModel.balance(share.journey,currentDay);
  window.BussoleDailyProgress.render(byId('friendJourney'),balance?{...balance,started:true}:null);
  byId('friendBests').replaceChildren();for(const best of Object.values(share.bests||{}))byId('friendBests').append(element('li',`${{easy:'Easy',medium:'Normal',hard:'Pro'}[best.mode]} · ${best.timerSeconds?best.timerSeconds+' s':'No timer'} · Blur ${best.blurEnabled?'on':'off'} — ${best.score} / 5000`));
@@ -205,7 +183,7 @@ async function renderLeaderboard(){
 for(const [id,scope] of [['friendsTab','friends'],['friendsBoardTab','friends-board'],['globalBoardTab','global']])byId(id).onclick=()=>action(async()=>{
  socialScope=scope;show('friendsView',scope==='friends');show('leaderboardView',scope!=='friends');
  for(const tab of ['friendsTab','friendsBoardTab','globalBoardTab'])byId(tab).classList.toggle('selected',tab===id);
- if(scope!=='friends')await renderLeaderboard();else byId('socialStatus').textContent='Friends see statistics only after you both accept.';
+ if(scope!=='friends')await renderLeaderboard();else byId('socialStatus').textContent='Friends see records and Daily progress after you both accept. Detailed errors stay on your device.';
 });
 byId('refreshLeaderboard').onclick=()=>action(renderLeaderboard);
 byId('closeFriendStatistics').onclick=()=>{show('friendStatistics',false);selectedFriend=null;};

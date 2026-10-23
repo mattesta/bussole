@@ -1,3 +1,4 @@
+import {forgetRoomKey} from './private-room-crypto.js?v=1';
 import {deleteEmptyRoom} from './room-cleanup.js?v=1';
 import {saveGuess, guess, clearMatch} from './private-geometry.js?v=1';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js';
@@ -7,7 +8,7 @@ import {
   runTransaction, serverTimestamp, set, update
 } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js';
 import { firebaseConfig } from './firebase-config.js';
-import { roomName } from './account-service.js?v=8';
+import { roomName } from './account-service.js?v=9';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -447,7 +448,7 @@ function renderRoom() {
   if (roomMeta.phase !== 'lobby') window.BussoleExplorers.close();
   const host = isHost();
   renderLobbyTarget();
-  byId('roomVisibilityLabel').textContent = roomMeta.visibility === 'public' ? 'Public room · First round starts at 8 explorers' : 'Private room · Invite by code or link';
+  byId('roomVisibilityLabel').textContent = roomMeta.visibility === 'public' ? 'Public room · First round starts at 8 explorers' : 'Private room · Players share their starting locations and lines';
   byId('roomSettingsSummary').textContent = window.BussolePublicRooms.summary(roomSettings);
   host ? show(hostControls) : hide(hostControls);
   byId('nextRoundBtn').classList.toggle('hidden', !host);
@@ -788,6 +789,7 @@ async function leaveRoom() {
   const previousCode = roomCode;
   const previousCreatedAt=roomMeta?.createdAt;
   const previousUserId = user?.uid;
+  forgetRoomKey(previousUserId,previousCode,previousCreatedAt);
   const previousDisconnectHandle = disconnectHandle;
   const shouldCloseRoom = !Object.entries(players).some(([uid, player]) =>
     uid !== previousUserId && isPlayerOnline(player)

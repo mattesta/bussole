@@ -20,6 +20,13 @@ try{
  const raw={lat:48,lon:11,heading:180,distanceMeters:123456};
  await ok(set(ref(b,'rooms/ABCDEF/players/friend'),player('Friend')));
  await ok(update(ref(a,'rooms/ABCDEF/meta'),{phase:'aiming',round:1}));
+ const publicKey='B'.repeat(87)+'=',packet={version:1,iv:'A'.repeat(16),data:'A'.repeat(32)};
+ await ok(set(ref(a,'rooms/ABCDEF/lineKeys/1/host'),publicKey));await ok(set(ref(b,'rooms/ABCDEF/lineKeys/1/friend'),publicKey));
+ await no(set(ref(b,'rooms/ABCDEF/lineKeys/1/host'),'C'.repeat(87)+'='));
+ await no(set(ref(a,'rooms/ABCDEF/lineKeys/1/host'),'C'.repeat(87)+'='));
+ await no(get(ref(c,'rooms/ABCDEF/lineKeys/1')));
+ await ok(update(ref(a,'rooms/ABCDEF/meta'),{phase:'aiming',round:1}));
+ await no(set(ref(a,'rooms/ABCDEF/sealedLines/1/host/friend'),packet));
  for(const d of [a,b])await no(set(ref(d,`rooms/ABCDEF/submissions/1/${d===a?'host':'friend'}`),raw));
  for(const extra of [{submission:raw},{route:[[1,2],[3,4]]},{lat:48},{heading:90},{errorArc:[[1,2],[3,4]]}])await no(set(ref(a,'rooms/ABCDEF/publicResults/1/host'),{version:1,points:900,...extra}));
  await ok(set(ref(a,'rooms/ABCDEF/publicResults/1/host'),{version:1,points:900}));
@@ -27,6 +34,18 @@ try{
  await no(get(ref(b,'rooms/ABCDEF/publicResults/1')));await no(set(ref(a,'rooms/ABCDEF/publicResults/0/host'),{version:1,points:1000}));
  await ok(update(ref(a,'rooms/ABCDEF/meta'),{phase:'revealed'}));assert.equal((await ok(get(ref(b,'rooms/ABCDEF/publicResults/1')))).val().host.points,900);
  await no(get(ref(c,'rooms/ABCDEF/publicResults/1')));
+ await ok(set(ref(a,'rooms/ABCDEF/sealedLines/1/host/friend'),packet));await ok(get(ref(b,'rooms/ABCDEF/sealedLines/1')));
+ await no(get(ref(c,'rooms/ABCDEF/sealedLines/1')));
+ await no(set(ref(b,'rooms/ABCDEF/sealedLines/1/host/friend'),packet));
+ await no(set(ref(a,'rooms/ABCDEF/sealedLines/0/host/friend'),packet));
+ await no(set(ref(a,'rooms/ABCDEF/sealedLines/1/host/stranger'),packet));
+ await no(set(ref(a,'rooms/ABCDEF/sealedLines/1/host/friend'),{...packet,submission:raw}));
+ await no(set(ref(a,'rooms/ABCDEF/sealedLines/1/host/friend'),{...packet,data:'not ciphertext!'}));
+ await admin(d=>set(ref(d,'rooms/ABCDEF/meta/visibility'),'public'));
+ await no(get(ref(b,'rooms/ABCDEF/lineKeys/1')));await no(get(ref(b,'rooms/ABCDEF/sealedLines/1')));
+ await no(set(ref(a,'rooms/ABCDEF/sealedLines/1/host/friend'),packet));
+ await admin(d=>set(ref(d,'rooms/ABCDEF/meta/visibility'),'private'));
+ await ok(remove(ref(a,'rooms/ABCDEF/sealedLines')));
  for(const field of ['meta/position','settings/position','players/host/position','secret'])await no(set(ref(a,`rooms/ABCDEF/${field}`),raw));
  await no(update(ref(a,'rooms/ABCDEF/meta'),{roundHistory:{1:{round:1,matchStartRound:0,mode:'hard',target:{lat:20,lon:30,label:'Target'},players:{host:{name:'Host',colorIndex:0}},submission:raw}}}));
  await ok(update(ref(a,'rooms/ABCDEF/meta'),{roundHistory:{1:{round:1,matchStartRound:0,mode:'hard',target:{lat:20,lon:30,label:'Target'},players:{host:{name:'Host',colorIndex:0}}}}}));
@@ -52,5 +71,5 @@ try{
  // Root-level creation cannot smuggle raw geometry around nested rules.
  for(const field of ['submissions','secret']){const bad=makeRoom();bad[field]={1:{host:raw}};await no(create('BADBAD',bad));}
  const legacy=makeRoom();delete legacy.meta.schemaVersion;await no(create('OLDOLD',legacy));
- console.log('Room privacy: atomic schema/index creation, no raw uploads, strict payloads, member-only scores, reset, last-player deletion, expiry and deletion-only maintenance identity passed.');
+ console.log('Room privacy: atomic schema/index creation, no raw uploads, private-only immutable public keys/ciphertext, reveal-time and sender/recipient binding, strict payloads, member-only scores, reset, last-player deletion, expiry and deletion-only maintenance identity passed.');
 }finally{await env.cleanup();}})().catch(e=>{console.error(e);process.exitCode=1});
