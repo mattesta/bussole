@@ -1,3 +1,4 @@
+import {prepareBackup,restoreBackup,MAX_BACKUP_BYTES} from './statistics-backup.js?v=1';
 import {highlights} from './private-geometry.js?v=1';
 import './daily-reminder-ui.js?v=3';
 import * as accounts from './account-service.js?v=9';
@@ -63,7 +64,9 @@ window.addEventListener('message',event=>{if(event.origin===location.origin&&eve
 byId('privateShotDialog').addEventListener('close',()=>{byId('privateShotFrame').onload=null;byId('privateShotFrame').src='about:blank';});
 function renderBestShots(){
  const list=byId('proBestShotList');list.replaceChildren();
- const shots=Object.values(data.proShots||{}).sort((a,b)=>b.points-a.points);
+ const rows=new Map(Object.values(data.proShots||{}).map(row=>[row.sampleId,row]));
+ for(const shot of Object.values(highlights(loadedOwner,data.profile?.generation)))rows.set(shot.sampleId,{sampleId:shot.sampleId,points:shot.points,destination:shot.target.label});
+ const shots=[...rows.values()].sort((a,b)=>b.points-a.points||a.sampleId.localeCompare(b.sampleId)).slice(0,3);
  for(const shot of shots){
   const item=document.createElement('li');
   item.textContent=`${shot.points} / 1,000 points · ${shot.destination||'Destination not saved'}`;
@@ -123,10 +126,43 @@ byId('changePassword').onclick=()=>action(async()=>{const next=byId('newPassword
 byId('changeEmail').onclick=()=>action(async()=>{const input=byId('newEmail');if(!input.value||!input.reportValidity())throw new Error('Enter your new email address.');await accounts.changeEmail(password(),input.value);byId('securityForm').reset();message('Open the verification link sent to your new email to finish changing it.');});
 byId('exportAccount').onclick=()=>action(async()=>{
   const values=await accounts.loadData();
-  const exported={version:1,dailyReminderDevices:await accounts.get(accounts.ref(accounts.db,`dailyReminderDevices/${accounts.auth.currentUser.uid}`)).then(row=>row.val()||{}).catch(()=>({})),privateProShots:Object.values(highlights(loadedOwner,values.profile?.generation)).map(({generation,sampleId,...shot})=>shot),connections:await social.connections().catch(()=>null),dailyJourney:travelDay===null?null:window.BussoleDailyProgress.calculate(values.dailyAttempts,travelDay,values.profile?.generation),email:accounts.auth.currentUser.email,profile:values.profile||{},samples:window.BussoleAccountStatistics.select(values.samples),soloBests:Object.values(values.soloBests||{}).map(({generation,...record})=>record),dailyAttempts:Object.entries(values.dailyAttempts||{}).map(([day,record])=>({day:Number(day),status:record.score===undefined?'started':'completed',...(record.score===undefined?{}:{score:record.score})}))};
+  if(values.localStatisticsError)throw Error(values.localStatisticsError);
+  const exported={app:'bussole',version:2,accountId:accounts.auth.currentUser.uid,dailyReminderDevices:await accounts.get(accounts.ref(accounts.db,`dailyReminderDevices/${accounts.auth.currentUser.uid}`)).then(row=>row.val()||{}).catch(()=>({})),privateProShots:Object.values(highlights(loadedOwner,values.profile?.generation)).map(({generation,...shot})=>shot),connections:await social.connections().catch(()=>null),dailyJourney:travelDay===null?null:window.BussoleDailyProgress.calculate(values.dailyAttempts,travelDay,values.profile?.generation),email:accounts.auth.currentUser.email,profile:values.profile||{},samples:Object.entries(values.samples||{}).map(([id,row])=>({id,...window.BussoleAccountStatistics.clean(row)})),soloBests:Object.values(values.soloBests||{}).map(({generation,...record})=>record),dailyAttempts:Object.entries(values.dailyAttempts||{}).map(([day,record])=>({day:Number(day),status:record.score===undefined?'started':'completed',...(record.score===undefined?{}:{score:record.score})}))};
   delete exported.profile.generation;
   const url=URL.createObjectURL(new Blob([JSON.stringify(exported,null,2)],{type:'application/json'})),link=document.createElement('a');
   link.href=url;link.download='bussole-my-data.json';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);message('Your data export is ready.');
+});
+let pendingBackup=null;
+function dismissBackup(){pendingBackup=null;byId('importBackupDialog').close();byId('importBackupFile').value='';}
+byId('cancelImportBackup').onclick=dismissBackup;
+byId('importBackupDialog').addEventListener('close',()=>{pendingBackup=null;byId('importBackupFile').value='';});
+byId('importAccount').onclick=()=>{if(!busy)byId('importBackupFile').click();};
+byId('importBackupFile').onchange=()=>action(async()=>{
+  pendingBackup=null;const file=byId('importBackupFile').files[0];if(!file)return;
+  try{
+    if(file.size>MAX_BACKUP_BYTES)throw Error('Choose a JSON export smaller than 10 MB.');
+    const user=await accounts.ready();if(!user||user.uid!==loadedOwner)throw Error('Sign in to the original account first.');
+    const values=await accounts.loadData();if(values.localStatisticsError)throw Error(values.localStatisticsError);
+    const plan=await prepareBackup(await file.text(),{uid:user.uid,email:user.email,generation:values.profile.generation,existing:values.samples,cloudShots:values.proShots});
+    if(accounts.auth.currentUser?.uid!==user.uid)throw Error('Your account changed. Choose the file again.');
+    pendingBackup=plan;
+    byId('importBackupPreview').textContent=`${plan.added} new guesses, ${plan.duplicates} already present, ${plan.shots.length} available Pro replays. Nothing has been changed yet.`;
+    byId('importBackupDialog').showModal();
+  }finally{byId('importBackupFile').value='';}
+});
+byId('confirmImportBackup').onclick=()=>action(async()=>{
+  const plan=pendingBackup;if(!plan)return;
+  const user=await accounts.ready(),profile=user?await accounts.loadProfile():null;
+  if(user?.uid!==plan.uid||profile?.generation!==plan.generation){dismissBackup();throw Error('Your account or statistics changed. Choose the file again.');}
+  // Re-read local data so repeated imports or games saved while previewing cannot overwrite records.
+  const values=await accounts.loadData();if(values.localStatisticsError)throw Error(values.localStatisticsError);
+  for(const [id,row] of Object.entries(plan.samples))if(values.samples[id]){
+    if(JSON.stringify(window.BussoleAccountStatistics.clean(values.samples[id]))!==JSON.stringify(window.BussoleAccountStatistics.clean(row)))throw Error('A record changed. Choose the backup again.');
+    delete plan.samples[id];
+  }
+  plan.added=Object.keys(plan.samples).length;
+  const result=await restoreBackup(plan);dismissBackup();await refresh();
+  message(result.replayStorageFailed?`${result.added} guesses imported. Replay storage is full or blocked; imported replays may disappear when you close this page.`:`${result.added} guesses imported on this device. Cloud records were not changed.`,result.replayStorageFailed);
 });
 byId('deleteStatistics').onclick=()=>action(async()=>{
   if(!confirm('Delete device statistics, personal bests and daily scores? This cannot be undone.'))return;

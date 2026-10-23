@@ -1,0 +1,21 @@
+const fs=require('node:fs'),assert=require('node:assert/strict');
+(async()=>{
+ global.window={BussoleAccountStatistics:require('../account-statistics.js')};
+ const source=fs.readFileSync('statistics-backup.js','utf8').replace(/^import .*;\n/gm,'');
+ const {prepareBackup,MAX_BACKUP_BYTES}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+ const row={day:20000,mode:'hard',kind:'solo',points:800,angleError:-20,relativeError:10,distanceError:-30},env={uid:'owner',email:'owner@example.test',generation:'new',existing:{}};
+ const backup={app:'bussole',version:2,accountId:'owner',samples:[{id:'a',...row},{id:'b',...row}],privateProShots:[]};
+ const plan=await prepareBackup(JSON.stringify(backup),env);assert.equal(plan.added,2);assert.equal(plan.samples.a.generation,'new');
+ assert.equal((await prepareBackup(JSON.stringify(backup),{...env,existing:plan.samples})).added,0);
+ const legacy={version:1,email:env.email,samples:[row,row],privateProShots:[]};
+ const l=await prepareBackup(JSON.stringify(legacy),{...env,existing:{a:{...row,generation:'new'}}});assert.equal(l.added,1);
+ const existing={a:{...row,generation:'new'},...l.samples};assert.equal((await prepareBackup(JSON.stringify(legacy),{...env,existing})).added,0);
+ assert.equal((await prepareBackup(JSON.stringify(backup),{...env,existing})).added,0);
+ const shot={...row,submission:{lat:48,lon:11,heading:120,distanceMeters:500000},target:{lat:46,lon:12,label:'Venice'}};
+ const restored=await prepareBackup(JSON.stringify({...legacy,privateProShots:[shot]}),{...env,cloudShots:{0:{sampleId:'matching-cloud-record',points:800,destination:'Venice'}}});assert.equal(restored.shots[0].sampleId,'matching-cloud-record');assert.equal(restored.shots[0].generation,'new');
+ assert.equal((await prepareBackup(JSON.stringify({...backup,privateProShots:[{...shot,sampleId:'a'}]}),env)).shots[0].sampleId,'a');
+ for(const invalid of [{...backup,accountId:'other'},{...backup,version:3},{...backup,samples:[{...row,id:'a',angleError:999}]},{...backup,samples:[{...row,id:'__proto__'}]},{...backup,samples:[{...row,id:'a'},{...row,id:'a'}]},{...backup,privateProShots:[{...shot,sampleId:'a',submission:{...shot.submission,lat:91}}]},{...legacy,email:'other@example.test'}])await assert.rejects(prepareBackup(JSON.stringify(invalid),env));
+ await assert.rejects(prepareBackup('{broken',env));await assert.rejects(prepareBackup(' '.repeat(MAX_BACKUP_BYTES+1),env));
+ await assert.rejects(prepareBackup(JSON.stringify(backup),{...env,existing:{a:{...row,points:900}}}));
+ console.log('Statistics backups: v1/v2 validation, account binding, stable IDs, multiset legacy deduplication, replay recovery, invalid/conflicting/oversized rejection passed.');
+})().catch(e=>{console.error(e);process.exitCode=1});

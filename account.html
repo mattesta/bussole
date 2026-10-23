@@ -4,7 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>Bussole — My account</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=1"><link rel="icon" type="image/svg+xml" href="icon.svg?v=1">
-  <link rel="stylesheet" href="style.css?v=31"><link rel="stylesheet" href="match-summary.css?v=9"><link rel="stylesheet" href="account.css?v=5">
+  <link rel="stylesheet" href="style.css?v=31"><link rel="stylesheet" href="match-summary.css?v=9"><link rel="stylesheet" href="account.css?v=6">
   <link rel="stylesheet" href="daily-progress.css?v=1">
 <link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#080e18">
 </head>
@@ -82,13 +82,15 @@
       </section>
       <section>
         <h2>Your data</h2>
-        <div class="account-data-actions"><button id="exportAccount" type="button">Export my data</button><button id="deleteStatistics" class="danger" type="button">Delete my statistics</button><button id="deleteAccount" class="danger" type="button">Delete account and all data</button><button id="signOut" type="button">Sign out</button></div>
-        <p class="muted">Deleting statistics also removes personal bests and shared daily scores, . Published pooled statistics refresh after removal. Existing room results already shared with other players are separate from your personal account history.</p>
+        <div class="account-data-actions"><button id="exportAccount" type="button">Export my data</button><button id="importAccount" type="button">Import my data</button><input id="importBackupFile" type="file" accept=".json,application/json" hidden><button id="deleteStatistics" class="danger" type="button">Delete my statistics</button><button id="deleteAccount" class="danger" type="button">Delete account and all data</button><button id="signOut" type="button">Sign out</button></div>
+        <p class="muted">Deleting statistics also removes personal bests and shared Daily scores. Existing room results already shared with other players are separate from your personal account history.</p>
+<p class="muted">Changing phone? Export on the old device, then sign in to the same account and import the JSON on the new one. Import adds local statistics and available Pro replays; cloud records and Daily progress stay as they are. The file can contain private locations: keep it somewhere safe.</p>
       </section>
     </section>
     <footer><a href="account-privacy.html">Account privacy</a></footer>
   </main>
+  <dialog id="importBackupDialog" aria-labelledby="importBackupTitle"><h2 id="importBackupTitle">Restore on this device</h2><p id="importBackupPreview"></p><p>Existing statistics are kept. Imported details stay on this device. Official records, rankings and Daily progress are not restored from this file.</p><button id="confirmImportBackup" type="button">Restore on this device</button><button id="cancelImportBackup" type="button">Cancel</button></dialog>
   <dialog id="privateShotDialog" aria-label="Private Pro shot globe"><button id="closePrivateShot" type="button">Close globe</button><iframe id="privateShotFrame" title="Your private Pro shot" src="about:blank"></iframe></dialog>
-  <script src="daily-challenge.js?v=2"></script><script src="daily-progress.js?v=2"></script><script src="social-model.js?v=5"></script><script src="solo-game.js?v=1"></script><script src="account-statistics.js?v=3"></script><script src="summary-charts.js?v=4"></script><script type="module" src="account.js?v=10"></script>
+  <script src="daily-challenge.js?v=2"></script><script src="daily-progress.js?v=2"></script><script src="social-model.js?v=5"></script><script src="solo-game.js?v=1"></script><script src="account-statistics.js?v=3"></script><script src="summary-charts.js?v=4"></script><script type="module" src="account.js?v=11"></script>
 </body>
 </html>
