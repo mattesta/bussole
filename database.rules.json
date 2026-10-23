@@ -48,7 +48,7 @@
           },
           "explorerOrder": {
             "$slot": {
-              ".validate": "$slot.matches(/^[0-7]$/) && newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() < 8"
+              ".validate": "$slot.matches(/^([0-9]|[12][0-9])$/) && newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() < 30"
             }
           },
           "roundHistory": {

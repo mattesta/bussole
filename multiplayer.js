@@ -297,7 +297,8 @@ async function createRoom(visibility = 'private') {
       const newPlayer = playerTemplate(randomIndex(MAX_PLAYERS), 1, explorerOrder);
       if (visibility === 'public') newPlayer.slotId = String(newPlayer.colorIndex);
       if (!existing.exists()) {
-        const createdAt=serverNow(),expiresAt=createdAt+86400000;
+        // Leave headroom for small errors in the client/server clock estimate.
+        const createdAt=serverNow(),expiresAt=createdAt+86400000-60000;
         const newRoom={
           meta: { schemaVersion: 2, hostId: user.uid, visibility, explorerOrder, phase: 'lobby', round: 0, createdAt, expiresAt, lastActiveAt: createdAt },
           settings: { mode: 'medium', mapStyle: initialMapStyle, timerEnabled: false, timerDuration: 60, scoreGoal: 5000, blurEnabled: false },
@@ -855,7 +856,7 @@ async function leaveRoom() {
 function friendlyError(error) {
   console.error(error);
   if (error?.code === 'auth/operation-not-allowed') return 'Anonymous access is not enabled yet.';
-  if (error?.code === 'PERMISSION_DENIED') return 'Firebase security rules are not installed yet.';
+  if (['PERMISSION_DENIED','database/permission-denied'].includes(error?.code)) return 'Firebase refused access to the room. Refresh Bussole and try again.';
   return error?.message || 'Something went wrong.';
 }
 

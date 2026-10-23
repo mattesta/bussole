@@ -3,9 +3,11 @@ const fs=require('fs'),assert=require('node:assert/strict');
 const {initializeTestEnvironment,assertSucceeds:ok,assertFails:no}=require('@firebase/rules-unit-testing');
 const {ref,get,set,update,remove,runTransaction}=require('firebase/database');
 async function helper(){const result=await require('esbuild').build({entryPoints:['room-cleanup.js'],bundle:true,write:false,platform:'node',format:'cjs',plugins:[{name:'sdk',setup(build){build.onResolve({filter:/^https:/},()=>({path:require.resolve('firebase/database'),external:true}))}}]});const Module=require('node:module'),m=new Module(__filename);m.paths=module.paths;m._compile(result.outputFiles[0].text,__filename);return m.exports.deleteEmptyRoom;}
+const vm=require('node:vm'),explorerContext=vm.createContext({window:{}});vm.runInContext(fs.readFileSync('explorers.js','utf8'),explorerContext);
+const explorerOrder=Array.from(explorerContext.window.BussoleExplorers.createOrder(n=>n-1));
 const now=Date.now();
 const player=(name)=>({name,colorIndex:0,connected:true,joinedAt:now,ready:false,locked:false,wins:0,eligibleRound:1});
-const makeRoom=()=>({meta:{schemaVersion:2,hostId:'host',visibility:'private',phase:'lobby',round:0,createdAt:now,expiresAt:now+86400000-60000},settings:{mode:'hard',timerEnabled:false,timerDuration:60},players:{host:player('Host')}});
+const makeRoom=()=>({meta:{schemaVersion:2,hostId:'host',visibility:'private',explorerOrder,phase:'lobby',round:0,createdAt:now,expiresAt:now+86400000-60000},settings:{mode:'hard',timerEnabled:false,timerDuration:60},players:{host:player('Host')}});
 (async()=>{const env=await initializeTestEnvironment({projectId:'demo-bussole',database:{host:'127.0.0.1',port:9000,rules:fs.readFileSync('database.rules.json','utf8')}});
 try{
  const db=uid=>env.authenticatedContext(uid,{firebase:{sign_in_provider:'password'}}).database(),a=db('host'),b=db('friend'),c=db('stranger'),cleaner=db('cleaner');
@@ -13,6 +15,14 @@ try{
  await admin(d=>set(ref(d,'roomMaintenanceConfig'),{uid:'cleaner'}));
  async function create(code,room){return update(ref(a),{[`rooms/${code}`]:room,[`roomExpirations/${code}`]:{createdAt:room.meta.createdAt,expiresAt:room.meta.expiresAt}})}
  const deleteEmptyRoom=await helper();
+ // Estimated server time may be slightly ahead. Creation must reserve expiry headroom.
+ const skewed=makeRoom();skewed.meta.createdAt=Date.now()+2000;skewed.meta.expiresAt=skewed.meta.createdAt+86400000;
+ await no(create('SKEWED',skewed));
+ skewed.meta.expiresAt=skewed.meta.createdAt+86400000-60000;
+ await ok(create('SKEWED',skewed));await ok(remove(ref(a,'rooms/SKEWED')));await ok(remove(ref(a,'roomExpirations/SKEWED')));
+ assert.equal(explorerOrder.length,30);
+ const badOrder=makeRoom();badOrder.meta.explorerOrder=[...explorerOrder,0];await no(create('BADORD',badOrder));
+ const badId=makeRoom();badId.meta.explorerOrder=[...explorerOrder];badId.meta.explorerOrder[0]=30;await no(create('BADIDS',badId));
  const room=makeRoom();await ok(create('ABCDEF',room));
  await no(get(ref(c,'rooms/ABCDEF')));await no(get(ref(a,'rooms/ABCDEF')));await no(get(ref(c,'roomExpirations')));
  await no(get(ref(cleaner,'rooms/ABCDEF')));await ok(get(ref(cleaner,'roomExpirations')));await no(get(ref(cleaner,'accountData/host')));

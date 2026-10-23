@@ -14,17 +14,28 @@ function controller(uid, state) {
   const context = vm.createContext({console:{...console,error(){}},Date,URLSearchParams,setTimeout,clearTimeout,setInterval,clearInterval,crypto:webcrypto,
     location:{search:''},document:{getElementById(id){if(!elements.has(id))elements.set(id,el());return elements.get(id)},createElement:el,addEventListener(){}},
     firebaseConfig:{},async roomName(){return null},initializeApp(){},getDatabase(){},getAuth(){return{currentUser:{uid},async authStateReady(){}}},onAuthStateChanged(){},ref(db,path){return path},serverTimestamp(){return Date.now()},
-    onValue(path,callback,error,options){assert.equal(path,'.info/serverTimeOffset');assert.equal(options.onlyOnce,true);callback({val(){return 0}});return()=>{}},
+    onValue(path,callback,error,options){assert.equal(path,'.info/serverTimeOffset');assert.equal(options.onlyOnce,true);callback({val(){return state.offset||0}});return()=>{}},
     async get(path){if(path.startsWith('.info/'))throw Error('invalid token in path');if(path==='publicRooms'&&state.denied)throw Object.assign(Error('Denied'),{code:'PERMISSION_DENIED'});const value=structuredClone(read(path));return{val(){return value},exists(){return value!=null}}},
-    async set(path,value){write(path,value)},async runTransaction(path,fn){const value=fn(structuredClone(read(path)));if(value===undefined)return{committed:false};write(path,value);return{committed:true}},
+    async set(path,value){write(path,value)},async update(path,changes){for(const [key,value] of Object.entries(changes))write(path?path+'/'+key:key,value)},async runTransaction(path,fn){const value=fn(structuredClone(read(path)));if(value===undefined)return{committed:false};write(path,value);return{committed:true}},
     window:{addEventListener(){},BussoleGame:{registerMultiplayer(){}}}
   });
   for(const file of ['round-timer.js','scoring.js','public-rooms.js','explorers.js'])vm.runInContext(fs.readFileSync(file,'utf8'),context);
   let source=fs.readFileSync('multiplayer.js','utf8').replace(/^import[\s\S]*?;\s*/gm,'');
-  source+=`enterRoom=async(code)=>{globalThis.entered=code;roomCode=code};createRoom=async(visibility)=>{globalThis.created=visibility};globalThis.test={joinPublicRoom,reservePublicSeat,maybeAutoStart,setup(actor,meta,p){user={uid:actor};roomMeta=meta;players=p;settingsReady=true},auto(){selectedTarget=null;selectRandomTarget=async()=>{globalThis.randoms=(globalThis.randoms||0)+1;selectedTarget={}};startRound=async()=>{globalThis.starts=(globalThis.starts||0)+1}}};`;
+  source+=`const actualCreateRoom=createRoom;enterRoom=async(code)=>{globalThis.entered=code;roomCode=code};createRoom=async(visibility)=>{globalThis.created=visibility};globalThis.test={actualCreateRoom,friendlyError,joinPublicRoom,reservePublicSeat,maybeAutoStart,setup(actor,meta,p){user={uid:actor};roomMeta=meta;players=p;settingsReady=true},auto(){selectedTarget=null;selectRandomTarget=async()=>{globalThis.randoms=(globalThis.randoms||0)+1;selectedTarget={}};startRound=async()=>{globalThis.starts=(globalThis.starts||0)+1}}};`;
   vm.runInContext(source,context);return context;
 }
 (async()=>{
+  for(const visibility of ['private','public']){
+    const creation={publicRooms:{},rooms:{},offset:2000},maker=controller('maker',creation);
+    await maker.test.actualCreateRoom(visibility);
+    assert.ok(maker.entered,'actual controller must create a room');
+    const room=creation.rooms[maker.entered];
+    assert.equal(room.meta.visibility,visibility);assert.equal(room.meta.explorerOrder.length,30);
+    assert.equal(new Set(room.meta.explorerOrder).size,30);
+    assert.equal(room.meta.expiresAt-room.meta.createdAt,86400000-60000);
+    assert.equal(creation.roomExpirations[maker.entered].expiresAt,room.meta.expiresAt);
+    assert.doesNotMatch(maker.test.friendlyError({code:'PERMISSION_DENIED'}),/not installed/);
+  }
   const state=fixture(), c=controller('visitor',state);
   await c.test.joinPublicRoom();assert.equal(c.entered,'BBBBBB');assert.equal(state.rooms.BBBBBB.players.visitor.slotId,'7');
   const race=fixture(), a=controller('a',race), b=controller('b',race);
