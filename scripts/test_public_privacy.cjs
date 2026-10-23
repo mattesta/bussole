@@ -25,35 +25,17 @@ for (const globe of [false,true]) {
   const s={lat:0,lon:0,heading:90,distanceMeters:20000000};
   const distant={lat:4,lon:35};
   const shared=publish(s,distant);
-  assert.ok(shared.points>=200 && shared.route && shared.errorArc);
-  assert.deepEqual(Object.keys(shared).sort(),['errorArc','points','route','version']);
-  assert.equal(shared.route.length,61);
-  assert.ok(Math.abs(c.geo.distance(shared.route[0],shared.route.at(-1))-600000)<1);
-  assert.ok(c.geo.nearest([0,0],shared.route).distance>=500000);
-  assert.ok(c.geo.nearest([0,0],shared.errorArc).distance>=500000);
-  // Correct, nearby guesses are still hidden; score is not the safety test.
+  assert.ok(shared.points>=200);
+  assert.deepEqual(Object.keys(shared).sort(),['points','version']);
   const near=publish(s,{lat:0,lon:2});
-  assert.equal(near.points,1000);assert.equal(near.route,undefined);
-  const margin=publish(s,{lat:0,lon:6});
-  assert.equal(margin.points,1000);assert.equal(margin.route,undefined);
-  const wrong=publish(s,{lat:0,lon:-20});
-  assert.ok(wrong.points<200);assert.equal(wrong.route,undefined);
-  const hard=publish({...s,distanceMeters:3000000},{lat:2,lon:27},'hard');
-  assert.ok(hard.route && hard.errorArc);
-  const unsafeError=publish({...s,distanceMeters:850000},{lat:0,lon:490000/6378137*180/Math.PI},'hard');
-  assert.ok(unsafeError.points>=200);assert.equal(unsafeError.route,undefined);
-  assert.equal(c.window.BussolePublicPrivacy.hasGeometry(shared),true);
-  assert.equal(c.window.BussolePublicPrivacy.hasGeometry({...shared,route:{0:[0,0],60:[0,1]}}),false);
-  const polar=publish({lat:40,lon:12,heading:0,distanceMeters:20000000},{lat:85,lon:40});
-  assert.ok(polar.route && polar.route.every(p=>p.every(Number.isFinite)));
-  const long=publish({...s,distanceMeters:2*Math.PI*6378137+3000000},{lat:0,lon:27},'hard');
-  assert.ok(long.route);
-  const parts=c.window.BussolePublicPrivacy.fadeParts(shared.route);
-  assert.equal(parts.length,12);
-  assert.ok(parts[0].opacity < parts[5].opacity);
-  assert.ok(Math.abs(parts[0].opacity-parts.at(-1).opacity)<1e-10);
-  const unwrapped=c.window.BussolePublicPrivacy.unwrap([[0,179],[0,-179]]);
-  assert.equal(unwrapped[1][1],181);
+  assert.equal(near.points,1000);
+  for(const [origin,target,mode] of [
+    [s,distant,'medium'],[s,{lat:0,lon:2},'easy'],
+    [{...s,distanceMeters:3000000},{lat:2,lon:27},'hard'],
+    [{lat:40,lon:12,heading:0,distanceMeters:20000000},{lat:85,lon:40},'medium'],
+    [{...s,distanceMeters:2*Math.PI*6378137+3000000},{lat:0,lon:27},'hard']
+  ])assert.deepEqual(Object.keys(publish(origin,target,mode)).sort(),['points','version']);
+  assert.equal(c.window.BussolePublicPrivacy.hasGeometry(shared),false);
 
   // Exercise the actual renderer with a full own route, reduced rival route,
   // hidden rival result, and DNF. Hidden rivals add no layers or camera points.
@@ -81,9 +63,9 @@ for (const globe of [false,true]) {
   assert.equal(results.find(r=>r.uid==='hidden').errorMeters,undefined);
   assert.equal(results.find(r=>r.uid==='dnf').errorMeters,null);
   assert.equal(results.find(r=>r.uid==='own').points,shared.points);
-  assert.equal(lines.length,15); // two own lines + twelve faded parts + rival error
+  assert.equal(lines.length,2); // Own lines only; rivals share points.
   assert.ok(results.find(r=>r.uid==='own').errorMeters>0);
   assert.ok(!lines.slice(2).some(line=>line.points.some(p=>p[0]===0 && p[1]===0)));
   if(globe){assert.equal(blurred,true);assert.equal(distanceHidden,true);assert.equal(targetStyle.background,'#92dc8f')}
-  console.log(`${globe?'3D':'2D'}: reduced payload, low-score/near-origin safety, poles, revolutions, fading, own route and hidden rivals passed.`);
+  console.log(`${globe?'3D':'2D'}: points-only payloads at poles/long routes, own geometry rendering and no rival geometry passed.`);
 }

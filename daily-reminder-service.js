@@ -1,5 +1,5 @@
-import {auth,db,ready,loadProfile,ref,get,set,update,serverTimestamp} from './account-service.js?v=7';
-import {journey} from './daily-service.js?v=5';
+import {auth,db,ready,loadProfile,ref,get,set,update,serverTimestamp} from './account-service.js?v=8';
+import {journey} from './daily-service.js?v=6';
 const localKey='bussole.dailyReminderDevice.v1';
 const verified=()=>Boolean(auth.currentUser?.emailVerified&&auth.currentUser?.email);
 const base=new URL('./',import.meta.url);

@@ -8,7 +8,7 @@ function fixture({resume=false,known=true,roster,closed=false}={}){
   document:{getElementById(id){if(!elements.has(id))elements.set(id,el());return elements.get(id)},addEventListener(){}},
   async roomName(){return null},initializeApp(){},firebaseConfig:{},getAuth(){return auth},getDatabase(){},onAuthStateChanged(){},ref(db,p){return p},
   async signInAnonymously(){signins++;await new Promise(r=>release=r);auth.currentUser=actor;return{user:actor}},
-  async get(path){const value=path.endsWith('/meta')?{phase:closed?'closed':'lobby',visibility:'private',hostId:'existing',round:2}:(roster||{existing:{name:'Magellan',colorIndex:0,connected:true}});return{exists:()=>true,val:()=>value}},
+  async get(path){const value=path.endsWith('/meta')?{schemaVersion:2,expiresAt:Date.now()+86400000,phase:closed?'closed':'lobby',visibility:'private',hostId:'existing',round:2}:(roster||{existing:{name:'Magellan',colorIndex:0,connected:true}});return{exists:()=>true,val:()=>value}},
   async set(path,value){writes.push({path,value})},
   window:{addEventListener(){},BussoleGame:{registerMultiplayer(){}},BussoleExplorers:{catalogue:[{name:'Magellan'}]},BussoleRoundTimer:{create(){return{}}}}
  });

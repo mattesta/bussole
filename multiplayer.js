@@ -1,3 +1,5 @@
+import {deleteEmptyRoom} from './room-cleanup.js?v=1';
+import {saveGuess, guess, clearMatch} from './private-geometry.js?v=1';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInAnonymously } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js';
 import {
@@ -5,7 +7,7 @@ import {
   runTransaction, serverTimestamp, set, update
 } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js';
 import { firebaseConfig } from './firebase-config.js';
-import { roomName } from './account-service.js?v=7';
+import { roomName } from './account-service.js?v=8';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -278,15 +280,15 @@ function playerTemplate(index, eligibleRound = 1, explorerOrder) {
 async function createRoom(visibility = 'private') {
   try {
     user = await ensureUser();
+    serverTimeOffset=await new Promise((resolve,reject)=>onValue(ref(db,'.info/serverTimeOffset'),snapshot=>resolve(Number(snapshot.val())||0),reject,{onlyOnce:true}));
     visibility = visibility === 'public' ? 'public' : 'private';
     if (visibility === 'public') await requirePublicDirectory();
     const initialMapStyle = '3d';
     let code;
     for (let attempt = 0; attempt < 8; attempt++) {
       code = makeCode();
-      const roomRef = ref(db, `rooms/${code}`);
       const existing = await get(ref(db, `rooms/${code}/meta`));
-      if (existing.exists() && (visibility === 'public' || existing.val().visibility === 'public')) { code = null; continue; }
+      if (existing.exists()) { code = null; continue; }
       // A room-specific shuffle makes names independent of the eight colours.
       // Shared slot assignments also prevent duplicate defaults on concurrent
       // public joins, whose colour slots are already reserved atomically.
@@ -294,41 +296,14 @@ async function createRoom(visibility = 'private') {
       const newPlayer = playerTemplate(randomIndex(MAX_PLAYERS), 1, explorerOrder);
       if (visibility === 'public') newPlayer.slotId = String(newPlayer.colorIndex);
       if (!existing.exists()) {
-        await set(roomRef, {
-          meta: { hostId: user.uid, visibility, explorerOrder, phase: 'lobby', round: 0, createdAt: Date.now(), lastActiveAt: Date.now() },
+        const createdAt=serverNow(),expiresAt=createdAt+86400000;
+        const newRoom={
+          meta: { schemaVersion: 2, hostId: user.uid, visibility, explorerOrder, phase: 'lobby', round: 0, createdAt, expiresAt, lastActiveAt: createdAt },
           settings: { mode: 'medium', mapStyle: initialMapStyle, timerEnabled: false, timerDuration: 60, scoreGoal: 5000, blurEnabled: false },
           players: { [user.uid]: newPlayer },
           ...(visibility === 'public' ? { seats: { [newPlayer.colorIndex]: { uid: user.uid, claimedAt: serverTimestamp() } } } : {})
-        });
-      } else {
-        const stalePlayersSnapshot = await get(ref(db, `rooms/${code}/players`));
-        const stalePlayers = stalePlayersSnapshot.val() || {};
-        if (Object.values(stalePlayers).some(isPlayerOnline)) { code = null; continue; }
-
-        // Reclaim an abandoned code as a completely fresh room. Adding our
-        // player first lets the existing Firebase rules safely transfer host.
-        await set(ref(db, `rooms/${code}/players/${user.uid}`), newPlayer);
-        await update(ref(db, `rooms/${code}/meta`), {
-          hostId: user.uid,
-          visibility,
-          phase: 'lobby',
-          round: 0,
-          createdAt: Date.now(),
-          lastActiveAt: Date.now(),
-          deadline: null,
-          matchStartRound: 0,
-          explorerOrder
-        });
-        await set(ref(db, `rooms/${code}/settings`), {
-          mode: 'medium', mapStyle: initialMapStyle, timerEnabled: false, timerDuration: 60, scoreGoal: 5000, blurEnabled: false
-        });
-        await Promise.all([
-          remove(ref(db, `rooms/${code}/target`)),
-          remove(ref(db, `rooms/${code}/submissions`)),
-          ...Object.keys(stalePlayers)
-            .filter(uid => uid !== user.uid)
-            .map(uid => remove(ref(db, `rooms/${code}/players/${uid}`)))
-        ]);
+        };
+        await update(ref(db),{[`rooms/${code}`]:newRoom,[`roomExpirations/${code}`]:{createdAt,expiresAt}});
       }
       break;
     }
@@ -361,6 +336,7 @@ async function joinRoom() {
     const canResumeOwnSeat = ownSeat && (isPlayerOnline(ownSeat) || (
       Number(ownSeat.lastSeenAt) > 0 && serverNow() - Number(ownSeat.lastSeenAt) < 120000
     ));
+    if (joinedMeta.schemaVersion !== 2 || joinedMeta.expiresAt <= serverNow()) throw new Error('This room has expired. Ask the host to create a new room.');
     if (joinedMeta.phase === 'closed' || (!hasConnectedPlayer && !canResumeOwnSeat)) {
       throw new Error('This room is no longer active. Ask the host to create a new room.');
     }
@@ -410,7 +386,7 @@ async function enterRoom(code) {
 
   subscriptions.push(onValue(ref(db, roomPath('meta')), snapshot => {
     roomMeta = snapshot.val();
-    if (!roomMeta) return leaveRoom();
+    if (!roomMeta || roomMeta.phase==='closed' || roomMeta.expiresAt<=serverNow()) return leaveRoom();
     renderRoom();
     publishPublicLobby();
     maybeAutoStart();
@@ -643,13 +619,10 @@ async function markReady() {
 
 async function submitLine(submission) {
   if (!roomCode || roomMeta?.phase !== 'aiming' || players[user.uid]?.locked) return;
-  const changes = { [`submissions/${roomMeta.round}/${user.uid}`]: { ...submission, submittedAt: serverTimestamp() } };
-  if (roomMeta.visibility === 'public') {
-    changes[`publicResults/${roomMeta.round}/${user.uid}`] = window.BussoleGame.publicResult(submission, selectedTarget, roomSettings.mode);
-  }
-  // Atomic write: an older rule set cannot save the location without also
-  // accepting the reduced result. Public submissions are owner-readable only.
-  await update(ref(db, roomPath()), changes);
+  saveGuess(user.uid, roomCode, roomMeta.createdAt, roomMeta.round, submission);
+  const result = window.BussoleGame.publicResult(submission, selectedTarget, roomSettings.mode || 'medium');
+  // Deliberate allowlist: never send coordinates, headings, distances or routes.
+  await set(ref(db, roomPath(`publicResults/${roomMeta.round}/${user.uid}`)), {version:1,points:result.points});
   await update(ref(db, roomPath(`players/${user.uid}`)), { locked: true, ready: true });
 }
 
@@ -667,15 +640,15 @@ async function revealRound() {
 async function showResults(submissions) {
   const settings = (await get(ref(db, roomPath('settings')))).val();
   const target = (await get(ref(db, roomPath('target')))).val();
-  const publicRoom = roomMeta.visibility === 'public';
-  const ownSubmission = publicRoom ? (await get(ref(db, roomPath(`submissions/${roomMeta.round}/${user.uid}`)))).val() : null;
+  const publicRoom = true; // Every room keeps guesses on the player's device.
+  const ownSubmission = guess(user.uid, roomCode, roomMeta.createdAt, roomMeta.round);
   const entries = Object.entries(players).filter(([, player]) => (player.eligibleRound || 1) <= roomMeta.round).map(([uid, player]) => ({
     uid,
     name: player.name,
     color: COLOURS[player.colorIndex],
     errorColor: ERROR_COLOURS[player.colorIndex],
-    submission: publicRoom ? (uid === user.uid ? ownSubmission : null) : submissions[uid] || null,
-    publicResult: publicRoom ? submissions[uid] || null : null
+    submission: uid === user.uid ? ownSubmission : null,
+    publicResult: submissions[uid] || null
   }));
   const round = roomMeta.round;
   const results = window.BussoleGame.revealMultiplayer(entries, target, settings.mode);
@@ -813,6 +786,7 @@ async function leaveRoom() {
   leaving = true;
   countdown.stop();
   const previousCode = roomCode;
+  const previousCreatedAt=roomMeta?.createdAt;
   const previousUserId = user?.uid;
   const previousDisconnectHandle = disconnectHandle;
   const shouldCloseRoom = !Object.entries(players).some(([uid, player]) =>
@@ -868,13 +842,11 @@ async function leaveRoom() {
   }
   if (presenceSaved && shouldCloseRoom && previousCode) {
     await Promise.race([
-      update(ref(db, `rooms/${previousCode}/meta`), {
-        phase: 'closed',
-        lastActiveAt: serverTimestamp()
-      }).catch(() => {}),
-      new Promise(resolve => setTimeout(resolve, 500))
+      deleteEmptyRoom(db,previousCode,previousUserId,previousCreatedAt,serverNow()).catch(()=>false),
+      new Promise(resolve=>setTimeout(resolve,1000))
     ]);
   }
+  if(previousCode&&previousUserId)clearMatch(previousUserId,previousCode,previousCreatedAt);
   window.location.replace(new URL('./', window.location.href).href);
 }
 

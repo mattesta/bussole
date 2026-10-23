@@ -13,7 +13,7 @@ const build=await esbuild.build({entryPoints:[path.join(root,'account.js')],bund
  build.onResolve({filter:/\.js\?v=/},args=>({path:path.resolve(path.dirname(args.importer),args.path.split('?')[0])}));
  build.onLoad({filter:/firebase-config\.js$/},()=>({contents:"export const firebaseConfig={apiKey:'demo-key',authDomain:'demo-bussole.firebaseapp.com',projectId:'demo-bussole',databaseURL:'https://demo-bussole-default-rtdb.firebaseio.com'}",loader:'js'}));
  build.onLoad({filter:/account-service\.js$/},args=>({contents:fs.readFileSync(args.path,'utf8').replace("const db=getDatabase(app);","const db=getDatabase(app);connectAuthEmulator(auth,'http://127.0.0.1:9099',{disableWarnings:true});connectDatabaseEmulator(db,'127.0.0.1',9000);")+"\nimport { connectAuthEmulator } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js';import { connectDatabaseEmulator } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js';",loader:'js',resolveDir:root}));
- build.onLoad({filter:/\/account\.js$/},args=>({contents:fs.readFileSync(args.path,'utf8')+"\nimport * as testing from './account-service.js?v=7';window.__accounts=testing;",loader:'js',resolveDir:root}));
+ build.onLoad({filter:/\/account\.js$/},args=>({contents:fs.readFileSync(args.path,'utf8')+"\nimport * as testing from './account-service.js?v=8';window.__accounts=testing;",loader:'js',resolveDir:root}));
 }}]});
 const js=build.outputFiles[0].text;
 const browser=await chromium.launch({executablePath:process.env.BUSSOLE_TEST_CHROMIUM||chromium.executablePath(),args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--no-zygote'],headless:true});
@@ -29,6 +29,9 @@ try{
  assert.equal(await page.evaluate(()=>window.__accounts.roomName()),'Marco_Polo');
  await page.route('http://localhost/match-summary.html?embedded=1',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><body>Private replay</body><script>addEventListener("message",e=>{if(e.origin===location.origin)window.received=e.data.report})</script>'}));
  const saved=await page.evaluate(async()=>{const a=window.__accounts,c=await a.beginRound();window.__oldRound=c;const sample={day:Math.floor(Date.now()/86400000),mode:'hard',kind:'solo',points:800,relativeError:10,angleError:-20,distanceError:-30};const detail={submission:{lat:48,lon:11,heading:120,distanceMeters:500000},target:{lat:46,lon:12,label:'Venice'}};await a.saveSample(c,sample,'private-room:test:1',detail);return a.saveSample(c,sample,'private-room:test:1',detail)});assert.equal(saved,true);
+ const cloud=(await db.ref(`accountData/${uid}/proShots`).get()).val();
+ assert.doesNotMatch(JSON.stringify(cloud),/"(lat|lon|heading|distanceMeters|submission|target)":/);
+ assert.equal(Object.values(cloud)[0].destination,'Venice');
  const record=await page.evaluate(async()=>{const a=window.__accounts,owner=await a.beginRound();const config={mode:'hard',timerSeconds:0,blurEnabled:false};await a.saveSoloBest(owner,config,3500);return a.saveSoloBest(owner,config,3000)});
  assert.equal(record.best,3500);assert.equal(record.isNew,false);
  await page.reload();await page.waitForFunction(()=>document.getElementById('personalStatsCount').textContent.startsWith('1 completed'));
@@ -39,6 +42,16 @@ try{
  assert.equal(await page.locator('#proBestShotList li').count(),1);assert.match(await page.locator('#proBestShotList').textContent(),/800/);
  await page.locator('#proBestShotList button').click();await page.locator('#privateShotDialog').waitFor({state:'visible'});const globe=page.frameLocator('#privateShotFrame');await globe.locator('body').waitFor();await page.waitForFunction(()=>document.getElementById('privateShotFrame').contentWindow.received?.rounds?.[0]?.target?.label==='Venice');
  assert.equal(await page.locator('#privateShotFrame').evaluate(el=>el.contentWindow.received.rounds[0].entries[0].submission.lat),48);assert.doesNotMatch(await page.locator('#privateShotFrame').getAttribute('src'),/48|Venice/);await page.locator('#closePrivateShot').click();assert.equal(await page.locator('#privateShotFrame').getAttribute('src'),'about:blank');
+ // Clearing local geometry removes replay; the cloud keeps score/destination only.
+ const localState=await page.evaluate(()=>{const key='bussole-private-geometry-v1:'+window.__accounts.auth.currentUser.uid;const value=localStorage.getItem(key);localStorage.removeItem(key);return {key,value}});
+ await page.reload();await page.waitForFunction(()=>document.getElementById('accountStatus').textContent==='Your account is ready.');
+ assert.equal(await page.locator('#proBestShotList button').count(),0);
+ // A legacy record is copied into this owner's browser, then stripped from Firebase.
+ const legacyShot={...Object.values(cloud)[0],submission:{lat:48,lon:11,heading:120,distanceMeters:500000},target:{lat:46,lon:12,label:'Venice'}};delete legacyShot.destination;
+ await db.ref(`accountData/${uid}/proShots/0`).set(legacyShot);
+ await page.reload();await page.waitForFunction(()=>document.getElementById('accountStatus').textContent==='Your account is ready.');
+ assert.equal(await page.locator('#proBestShotList button').count(),1);
+ assert.doesNotMatch(JSON.stringify((await db.ref(`accountData/${uid}/proShots`).get()).val()),/"(lat|lon|submission|target)":/);
  const download=page.waitForEvent('download');await page.locator('#exportAccount').click();const exported=await download;const exportedPath=await exported.path();const contents=JSON.parse(fs.readFileSync(exportedPath,'utf8'));assert.equal(contents.samples.length,1);assert.equal(contents.soloBests[0].score,3500);assert.equal(contents.soloBests[0].generation,undefined);assert.equal(contents.samples[0].angleError,-20);assert.equal(contents.profile.generation,undefined);assert.equal(contents.privateProShots.length,1);assert.equal(contents.privateProShots[0].target.label,'Venice');assert.doesNotMatch(JSON.stringify(contents.samples),/"(lat|lon|target|roomCode|heading)":/);
  await page.evaluate(async()=>{window.__stale=await window.__accounts.beginRound()});
  await page.locator('#deleteStatistics').click();await page.waitForFunction(()=>document.getElementById('accountStatus').textContent.startsWith('Your statistics have been deleted'));

@@ -1,7 +1,8 @@
-import './daily-reminder-ui.js?v=1';
-import * as accounts from './account-service.js?v=7';
-import { today } from './daily-service.js?v=5';
-import * as social from './social-service.js?v=4';
+import {highlights} from './private-geometry.js?v=1';
+import './daily-reminder-ui.js?v=2';
+import * as accounts from './account-service.js?v=8';
+import { today } from './daily-service.js?v=6';
+import * as social from './social-service.js?v=5';
 const byId=id=>document.getElementById(id),show=(id,visible)=>byId(id).classList.toggle('hidden',!visible);
 let loadedOwner=null,registration=false,data={},mode='all',days=0,busy=false,requestId=0,travelDay=null,stopConnections=null,socialScope='friends',selectedFriend=null,currentConnections={},friendRenderVersion=0;
 function message(text,error=false){byId('accountStatus').textContent=text;byId('accountStatus').classList.toggle('error',error);}
@@ -52,7 +53,7 @@ function renderBests(){
 function closeShotGlobe(){const frame=byId('privateShotFrame');frame.src='about:blank';byId('privateShotDialog').close();}
 function openShotGlobe(id){
  if(accounts.auth.currentUser?.uid!==loadedOwner)return;
- const shot=Object.values(data.proShots||{}).find(row=>row.sampleId===id);if(!shot||shot.generation!==data.profile?.generation)return;
+ const shot=highlights(loadedOwner,data.profile?.generation)[id];if(!shot||shot.generation!==data.profile?.generation)return;
  const report={version:1,uid:'owner',solo:true,publicRoom:true,rounds:[{round:1,mode:'hard',target:shot.target,entries:[{uid:'owner',name:'You',color:'#e41a1c',errorColor:'#ff8587',submission:shot.submission}]}]};
  const frame=byId('privateShotFrame');frame.onload=()=>frame.contentWindow.postMessage({type:'bussole-match-report',report},location.origin);
  frame.src='match-summary.html?embedded=1';byId('privateShotDialog').showModal();
@@ -67,9 +68,9 @@ function renderBestShots(){
  const shots=window.BussoleAccountStatistics.bestShotEntries(current);
  for(const shot of shots){
   const item=document.createElement('li'),saved=Object.values(data.proShots||{}).find(row=>row.sampleId===shot.id);
-  item.textContent=`${shot.points} / 1,000 points · ${saved?.target.label||'Destination not saved'} · ${new Date(shot.day*86400000).toISOString().slice(0,10)}`;
-  if(saved?.generation===data.profile?.generation){const button=document.createElement('button');button.type='button';button.textContent='View on globe · private';button.onclick=()=>openShotGlobe(shot.id);item.append(button);}
-  else{const note=document.createElement('small');note.textContent='Globe unavailable for this earlier shot.';item.append(note);}
+  item.textContent=`${shot.points} / 1,000 points · ${saved?.destination||'Destination not saved'} · ${new Date(shot.day*86400000).toISOString().slice(0,10)}`;
+  if(highlights(loadedOwner,data.profile?.generation)[shot.id]){const button=document.createElement('button');button.type='button';button.textContent='View on globe · this device';button.onclick=()=>openShotGlobe(shot.id);item.append(button);}
+  else{const note=document.createElement('small');note.textContent='Globe replay is stored only on the device where you made this shot.';item.append(note);}
   list.append(item);
  }
  if(!shots.length){const item=document.createElement('li');item.textContent='No saved Pro guesses yet.';list.append(item);}
@@ -140,7 +141,7 @@ byId('changePassword').onclick=()=>action(async()=>{const next=byId('newPassword
 byId('changeEmail').onclick=()=>action(async()=>{const input=byId('newEmail');if(!input.value||!input.reportValidity())throw new Error('Enter your new email address.');await accounts.changeEmail(password(),input.value);byId('securityForm').reset();message('Open the verification link sent to your new email to finish changing it.');});
 byId('exportAccount').onclick=()=>action(async()=>{
   const values=await accounts.loadData();
-  const exported={version:1,dailyReminderDevices:await accounts.get(accounts.ref(accounts.db,`dailyReminderDevices/${accounts.auth.currentUser.uid}`)).then(row=>row.val()||{}).catch(()=>({})),privateProShots:Object.values(values.proShots||{}).map(({generation,sampleId,...shot})=>shot),connections:await social.connections().catch(()=>null),dailyJourney:travelDay===null?null:window.BussoleDailyProgress.calculate(values.dailyAttempts,travelDay,values.profile?.generation),email:accounts.auth.currentUser.email,profile:values.profile||{},samples:window.BussoleAccountStatistics.select(values.samples),soloBests:Object.values(values.soloBests||{}).map(({generation,...record})=>record),dailyAttempts:Object.entries(values.dailyAttempts||{}).map(([day,record])=>({day:Number(day),status:record.score===undefined?'started':'completed',...(record.score===undefined?{}:{score:record.score})}))};
+  const exported={version:1,dailyReminderDevices:await accounts.get(accounts.ref(accounts.db,`dailyReminderDevices/${accounts.auth.currentUser.uid}`)).then(row=>row.val()||{}).catch(()=>({})),privateProShots:Object.values(highlights(loadedOwner,values.profile?.generation)).map(({generation,sampleId,...shot})=>shot),connections:await social.connections().catch(()=>null),dailyJourney:travelDay===null?null:window.BussoleDailyProgress.calculate(values.dailyAttempts,travelDay,values.profile?.generation),email:accounts.auth.currentUser.email,profile:values.profile||{},samples:window.BussoleAccountStatistics.select(values.samples),soloBests:Object.values(values.soloBests||{}).map(({generation,...record})=>record),dailyAttempts:Object.entries(values.dailyAttempts||{}).map(([day,record])=>({day:Number(day),status:record.score===undefined?'started':'completed',...(record.score===undefined?{}:{score:record.score})}))};
   delete exported.profile.generation;
   const url=URL.createObjectURL(new Blob([JSON.stringify(exported,null,2)],{type:'application/json'})),link=document.createElement('a');
   link.href=url;link.download='bussole-my-data.json';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);message('Your data export is ready.');

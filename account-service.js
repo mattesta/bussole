@@ -1,3 +1,4 @@
+import {saveHighlight, clearGeometry} from './private-geometry.js?v=1';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js';
 import {
   getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
@@ -36,10 +37,10 @@ export async function google(){
 }
 let syncTask;
 export function scheduleSocialSync(){
- if(!syncTask)syncTask=Promise.allSettled([import('./social-service.js?v=4').then(s=>s.syncOwn()),import('./daily-reminder-service.js?v=1').then(s=>s.syncIfEnrolled())]).finally(()=>{syncTask=null;});
+ if(!syncTask)syncTask=Promise.allSettled([import('./social-service.js?v=5').then(s=>s.syncOwn()),import('./daily-reminder-service.js?v=2').then(s=>s.syncIfEnrolled())]).finally(()=>{syncTask=null;});
  return syncTask;
 }
-export const logout=async()=>{await import('./daily-reminder-service.js?v=1').then(m=>m.disable()).catch(()=>{});return signOut(auth);};
+export const logout=async()=>{try{sessionStorage.removeItem('bussoleMatchReport');}catch{};await import('./daily-reminder-service.js?v=2').then(m=>m.disable()).catch(()=>{});return signOut(auth);};
 export const resetPassword=email=>sendPasswordResetEmail(auth,email.trim());
 export const resendVerification=()=>sendEmailVerification(current());
 export async function refreshVerification(){const user=current();await reload(user);await user.getIdToken(true);return user.emailVerified;}
@@ -55,6 +56,22 @@ export async function loadProfile(){
 export async function loadData(){
   const user=current();const data=(await get(ref(db,path(user.uid)))).val()||{};
   if(!data.profile)data.profile=await loadProfile();
+  // Migrate only this owner's legacy highlights. Never re-upload geometry.
+  let migrated=false;
+  for(const [slot,shot] of Object.entries(data.proShots||{})){
+    if(!shot.submission&&!shot.target)continue;
+    const geometry=window.BussoleAccountStatistics?.shotGeometry(shot);
+    if(geometry&&shot.generation===data.profile?.generation)saveHighlight(user.uid,shot.generation,shot);
+    const result=await runTransaction(ref(db,`${path(user.uid)}/proShots/${slot}`),current=>{
+      if(!current)return null;
+      if(!current.submission&&!current.target)return;
+      const {submission,target,...metadata}=current;
+      return {...metadata,destination:current.destination||target?.label||'Destination not saved'};
+    });
+    if(result.snapshot.exists())data.proShots[slot]=result.snapshot.val();else delete data.proShots[slot];
+    migrated=true;
+  }
+  if(migrated)scheduleSocialSync();
   return data;
 }
 export async function usernameOwner(username){
@@ -101,9 +118,11 @@ export async function saveSample(context,sample,key,detail){
   await set(ref(db,`${path(user.uid)}/samples/${id}`),{...clean,generation:context.generation});
   const geometry=clean.mode==='hard'?window.BussoleAccountStatistics.shotGeometry(detail):null;
   if(geometry){
-    const candidate={...clean,...geometry,sampleId:id,generation:context.generation};
+    const privateShot={...clean,...geometry,sampleId:id,generation:context.generation};
+    saveHighlight(user.uid,context.generation,privateShot);
+    const candidate={...clean,destination:geometry.target.label,sampleId:id,generation:context.generation};
     await runTransaction(ref(db,`${path(user.uid)}/proShots`),previous=>{
-      const rows=Object.values(previous||{}).filter(row=>row.generation===context.generation&&window.BussoleAccountStatistics.clean(row)).map(row=>[row.sampleId,row]);
+      const rows=Object.values(previous||{}).filter(row=>row.generation===context.generation&&window.BussoleAccountStatistics.clean(row)).map(row=>{const {submission,target,...metadata}=row;return [row.sampleId,{...metadata,destination:row.destination||target?.label||'Destination not saved'}];});
       const records=Object.fromEntries(rows);records[id]=candidate;
       return Object.fromEntries(window.BussoleAccountStatistics.bestShotEntries(records).map((row,index)=>[index,records[row.id]]));
     });
@@ -135,6 +154,7 @@ export async function deleteStatistics(){
   Object.assign(changes,{[`${path(user.uid)}/samples`]:null,[`${path(user.uid)}/proShots`]:null,[`${path(user.uid)}/soloBests`]:null,[`${path(user.uid)}/dailyAttempts`]:null,[`${path(user.uid)}/profile/communityConsent`]:false,[`${path(user.uid)}/profile/leaderboardOptIn`]:false,[`${path(user.uid)}/profile/consentVersion`]:1,[`${path(user.uid)}/profile/generation`]:nextGeneration,[`friendShares/${user.uid}`]:null,[`journeyLeaderboard/${user.uid}`]:null});
   if(!data.profile?.socialEnabled)changes[`publicProfiles/${user.uid}`]=null;
   await update(ref(db),changes);
+  clearGeometry(user.uid);
 }
 async function reauthenticate(password){
   const user=current();if(password)await reauthenticateWithCredential(user,EmailAuthProvider.credential(user.email,password));else if(hasGoogle())await reauthenticateWithPopup(user,googleProvider());else throw Error('Enter your current password first.');return user;
@@ -150,6 +170,7 @@ export async function deleteAccount(password){
   const username=data.profile?.username;if(username&&await usernameOwner(username)===user.uid)changes[`usernames/${username.toLowerCase()}`]=null;
   for(const other of Object.keys(links)){changes[`connections/${other}/${user.uid}`]=null;changes[`connections/${user.uid}/${other}`]=null;}
   await update(ref(db),changes);
+  clearGeometry(user.uid);
   await deleteUser(user);
 }
 export async function community(mode='all'){
