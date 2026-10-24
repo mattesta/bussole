@@ -18,6 +18,12 @@ const {run}=require('../room-maintenance/cleanup.cjs'),{migrate}=require('../roo
  assert.equal((await db.ref('rooms/EXPIRE').get()).exists(),false);assert.equal((await db.ref('rooms/ACTIVE').get()).exists(),true);
  assert.equal((await db.ref('publicRooms/EXPIRE').get()).exists(),false);assert.equal((await db.ref('roomExpirations/EXPIRE').get()).exists(),false);
  assert.deepEqual(await run({request,secret,now}),{removed:0});
+ // Private rooms have no public directory record; deleting a missing record must succeed.
+ await db.ref('rooms/PRIVAT').set({meta:{schemaVersion:2,expiresAt:now-1}});
+ await db.ref('roomExpirations/PRIVAT').set({expiresAt:now-1});
+ assert.deepEqual(await run({request,secret,now}),{removed:1});
+ assert.equal((await db.ref('rooms/PRIVAT').get()).exists(),false);
+ assert.equal((await db.ref('roomExpirations/PRIVAT').get()).exists(),false);
  // A stale expiry entry must not grant deletion of a live room.
  await db.ref('roomExpirations/ACTIVE/expiresAt').set(now-1);
  await assert.rejects(run({request,secret,now}),{cleanupCode:'ROOM_DELETE_DENIED'});assert.equal((await db.ref('rooms/ACTIVE').get()).exists(),true);
