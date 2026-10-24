@@ -21,8 +21,10 @@ async function run({request=fetch,send=webpush.sendNotification.bind(webpush),no
   if(!/^[A-Za-z0-9_-]{1,128}$/.test(uid))continue;
   const candidates=Object.entries(devices||{}).filter(([id,d])=>/^[a-f0-9]{64}$/.test(id)&&validDevice(d)&&localTime(d.timeZone,now)?.due);
   if(!candidates.length)continue;
+  const completionPath=`accountData/${uid}/dailyAttempts/${Math.floor(now/86400000)}/score`;
   const snapshotResponse=await api(`dailyReminderJourneys/${uid}`);
   if(!snapshotResponse.ok){if(snapshotResponse.status===401||snapshotResponse.status===403){for(const [id] of candidates){const path=`dailyReminderDevices/${uid}/${id}`,live=await api(path,{headers:{'X-Firebase-ETag':'true'}});if(live.ok)await api(path,{method:'DELETE',headers:{'if-match':live.headers.get('etag')}});await api(`dailyReminderDeliveries/${uid}/${id}`,{method:'DELETE'});}}else failed++;skipped+=candidates.length;continue;}const snapshot=await snapshotResponse.json();
+  const completion=await api(completionPath);if(!completion.ok){failed++;skipped+=candidates.length;continue;}if(Number.isInteger(await completion.json())){skipped+=candidates.length;continue;}
   for(const [id,device] of candidates){
    const devicePath=`dailyReminderDevices/${uid}/${id}`,deliveryPath=`dailyReminderDeliveries/${uid}/${id}`;
    const message=payload(device,snapshot,now);if(!message){skipped++;continue;}
@@ -37,6 +39,7 @@ async function run({request=fetch,send=webpush.sendNotification.bind(webpush),no
    if(claim.status===412){skipped++;continue;}if(!claim.ok){failed++;continue;}
    const check=await api(devicePath);const stillRegistered=check.ok?await check.json():null;
    if(stillRegistered?.binding!==device.binding){skipped++;continue;}
+   const completedNow=await api(completionPath);if(!completedNow.ok){failed++;continue;}if(Number.isInteger(await completedNow.json())){skipped++;continue;}
    try{
     await send(device.subscription,JSON.stringify(message),{TTL:1800,urgency:'normal',topic:`daily-${message.date}`});
     const done=await api(deliveryPath,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...lease,sent:true,leaseUntil:0})});if(!done.ok)failed++;sent++;

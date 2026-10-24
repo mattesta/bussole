@@ -6,6 +6,7 @@ function storage(){const d={};return new Proxy(d,{get(t,k){if(k==='getItem')retu
  const {BussoleLocalGeometry:g}=await import('data:text/javascript;base64,'+Buffer.from(fs.readFileSync('private-geometry-store.js','utf8')).toString('base64'));
  const shot=n=>({sampleId:'shot-'+n,generation:'g',day:20000,mode:'hard',kind:'solo',points:n,target:{lat:20,lon:30,label:'Target'},submission:{lat:48,lon:11,heading:90,distanceMeters:10000}});
  for(let n=900;n<906;n++)g.saveHighlight('owner','g',shot(n));
+ assert.deepEqual(g.highlights(null,undefined),{});
  assert.equal(Object.keys(g.highlights('owner','g')).length,3);assert.equal(g.highlights('owner','g')['shot-905'].submission.lat,48);
  assert.deepEqual(g.highlights('other','g'),{});assert.deepEqual(g.highlights('owner','deleted-generation'),{});
  g.saveGuess('guest','ABCDEF',123,1,shot(1).submission);assert.equal(g.guess('guest','ABCDEF',123,1).lat,48);

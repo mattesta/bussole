@@ -19,7 +19,7 @@ const shotKey = uid => PREFIX + uid;
 const matchKey = (uid, room, createdAt) => `${PREFIX}match:${uid}:${room}:${createdAt}`;
 function highlights(uid, generation) {
   const value = read(shotKey(uid));
-  return value?.generation === generation ? value.shots || {} : {};
+  return value && value.generation === generation ? value.shots || {} : {};
 }
 function saveHighlight(uid, generation, shot) {
   const rows = {...highlights(uid, generation), [shot.sampleId]: shot};

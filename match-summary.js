@@ -12,8 +12,8 @@
   function marker(point,colour,label,roundNumber) {
     const element=document.createElement('button');
     element.type='button';element.className='globe-marker target summary-marker';element.style.background=colour;
-    element.textContent=String(roundNumber);
-    element.setAttribute('aria-label',`Round ${roundNumber} · ${label}`);
+    element.textContent=`${report.bestShots?'#':''}${roundNumber}`;
+    element.setAttribute('aria-label',`${report.bestShots?'Rank':'Round'} ${roundNumber} · ${label}`);
     const position=[point[1],point[0]];
     element.addEventListener('click',event=>{
       event.stopPropagation();
@@ -23,7 +23,7 @@
     markers.push(new maplibregl.Marker({element,anchor:'center',subpixelPositioning:true}).setLngLat(position).addTo(map));
   }
   function render() {
-    if(!ready)return;
+    if(!report)return;
     clear();
     const personal=view!=='room'||report.publicRoom;
     const chosen=personal?report.rounds:[report.rounds[selectedRound]];
@@ -48,27 +48,27 @@
       const results=[];
       entries.forEach((entry,index)=>{
         const item=document.createElement('li');item.style.color=entry.color;
-        if(!entry.submission) {item.textContent=`Round ${round.round} · ${entry.name} · ${round.target.label} · DNF`;byId('summaryStats').appendChild(item);return;}
+        if(!entry.submission) {item.textContent=`${report.bestShots?'#':'Round '}${round.round} · ${entry.name} · ${round.target.label} · DNF`;byId('summaryStats').appendChild(item);return;}
         const measured=geo.measure(entry.submission,round.target,round.mode);
         total+=measured.points;count++;results.push({...entry,points:measured.points});
-        lines.setLine(`route-${round.round}-${index}`,measured.route,entry.color,3.5,true);
-        lines.setLine(`error-${round.round}-${index}`,measured.errorArc,entry.errorColor,3.5);
+        lines?.setLine(`route-${round.round}-${index}`,measured.route,entry.color,3.5,true);
+        lines?.setLine(`error-${round.round}-${index}`,measured.errorArc,entry.errorColor,3.5);
         bounds.push([entry.submission.lat,entry.submission.lon],measured.contact);
         bounds.push(measured.route[Math.floor(measured.route.length/4)],measured.route[Math.floor(measured.route.length/2)],measured.route.at(-1));
         const error=measured.errorMeters>=1000?`${(measured.errorMeters/1000).toFixed(1)} km`:`${Math.round(measured.errorMeters)} m`;
-        const text=`Round ${round.round} · ${entry.name} · ${round.target.label} · ${measured.points} pts · ${error} error`;
+        const text=`${report.bestShots?'#':'Round '}${round.round} · ${entry.name} · ${round.target.label} · ${measured.points} pts · ${error} error`;
         item.textContent=text;byId('summaryStats').appendChild(item);
       });
       const best=Math.max(0,...results.map(result=>result.points));
       const colours=[...new Set(results.filter(result=>result.points===best).map(result=>result.errorColor||'#ff8587'))];
       const colour=personal?entries[0]?.errorColor||'#ff8587':colours.length>1?`linear-gradient(90deg,${colours.join(',')})`:colours[0]||'#ff8587';
-      marker(target,colour,round.target.label,round.round);
+      if(ready)marker(target,colour,round.target.label,round.round);
     });
-    byId('summaryStatus').textContent=personal?`${count} guesses · ${total} points. Tap a target to see its name.`:`${chosen[0].target.label} · All explorers’ guesses for this round.`;
+    byId('summaryStatus').textContent=personal?`${count} ${report.bestShots?'best shots':'guesses'} · ${total} points. Tap a target to see its name.`:`${chosen[0].target.label} · All explorers’ guesses for this round.`;
     if(report.partial)byId('summaryStatus').textContent+=' Some earlier rounds predate this feature.';
     const vectors=bounds.map(geo.toUnitVector),sum=vectors.reduce((a,b)=>a.map((v,i)=>v+b[i]),[0,0,0]);
     const centerVector=geo.normalizeVector(sum)||vectors[0];
-    if(centerVector) {
+    if(ready&&centerVector) {
       const center=geo.vectorToLatLng(centerVector);
       const radius=Math.max(.03,...vectors.map(vector=>geo.angleBetween(centerVector,vector)));
       map.easeTo({center:[center[1],center[0]],zoom:Math.max(0,Math.min(9,Math.log2(Math.PI/radius)-.9)),bearing:0,pitch:0,duration:650,padding:{top:Math.min(byId('summaryStatus').closest('section').getBoundingClientRect().height+20,window.innerHeight*.45),left:20,right:20,bottom:30},retainPadding:false});
@@ -98,6 +98,8 @@
       byId('statisticsMetrics').append(term,detail);
     }
   }
+  function globeError(message){byId('summaryError').textContent=message;byId('summaryError').classList.remove('hidden');byId('retrySummary').classList.remove('hidden');}
+  byId('retrySummary').onclick=()=>location.reload();
   function initialize(data) {
     if(report||!data?.rounds?.length)return;
     report=data;
@@ -110,13 +112,19 @@
       button.dataset.roundIndex=String(index);button.setAttribute('aria-label',`Round ${round.round}: ${round.target.label}`);
       button.addEventListener('click',()=>{selectedRound=index;render()});byId('summaryRound').appendChild(button);
     });
-    byId('summaryBack').textContent=report.solo?'Back to game':'Back to room';
-    byId('summaryBack').href=`./?room=${encodeURIComponent(report.roomCode||'')}&resume=1`;
+    const destination=parameters.get('return');
+    byId('summaryBack').textContent=destination==='account'?'Back to account':destination==='daily'?'Back to Daily':report.solo?'Back to Home':'Back to room';
+    byId('summaryBack').href=destination==='account'?'account.html':destination==='daily'?'./?daily=1':report.solo?'./':`./?room=${encodeURIComponent(report.roomCode||'')}&resume=1`;
+    render();
+    try{
     map=new maplibregl.Map({container:'summaryMap',attributionControl:false,renderWorldCopies:false,center:[0,20],zoom:0,maxPitch:0,pitch:0,dragRotate:false,touchZoomRotate:true,
       style:{version:8,sources:{satellite:{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,maxzoom:19}},layers:[{id:'space',type:'background',paint:{'background-color':'#020712'}},{id:'satellite',type:'raster',source:'satellite'}]}});
     map.touchZoomRotate.enableRotation();
     window.BussoleGlobeMarkerSync.attach(map,()=>markers);
-    map.on('load',()=>{map.setProjection({type:'globe'});lines=window.BussoleGlobeLines.createLayer('summary-lines');map.addLayer(lines);ready=true;render()});
+    const timeout=setTimeout(()=>globeError('The globe is taking too long to load. Your shot list and statistics are still available. Retry when connected.'),15000);
+    map.on('load',()=>{clearTimeout(timeout);try{map.setProjection({type:'globe'});lines=window.BussoleGlobeLines.createLayer('summary-lines');map.addLayer(lines);ready=true;byId('summaryError').classList.add('hidden');render();}catch{globeError('The globe could not be drawn. Your shot list and statistics are still available.');}});
+    map.on('webglcontextlost',()=>globeError('The phone released the globe’s graphics context. Tap Retry globe to reopen it.'));
+    }catch{globeError('The globe could not start on this device. Your shot list and statistics are still available.');}
   }
   byId('statisticsView').addEventListener('click',()=>{view='statistics';render()});
   byId('personalView').addEventListener('click',()=>{view='personal';render()});
@@ -125,7 +133,7 @@
     window.addEventListener('message',event=>{if(event.origin===location.origin&&event.source===parent&&event.data?.type==='bussole-match-report')initialize(event.data.report)});
     for(const link of document.querySelectorAll('.summary-links a'))link.addEventListener('click',event=>{event.preventDefault();parent.postMessage({type:link.id==='summaryBack'?'bussole-summary-close':'bussole-summary-home'},location.origin)});
   } else {
-    try{initialize(JSON.parse(sessionStorage.getItem('bussoleMatchReport')))}catch{}
+    try{initialize(JSON.parse(sessionStorage.getItem('bussoleMatchReport')))}catch{globeError('This replay could not be opened. Return to your account or Daily Challenge and try again.');}
     if(!report)byId('summaryStatus').textContent='No completed match is available on this device. Play a match first.';
   }
 })();

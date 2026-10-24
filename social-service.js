@@ -1,5 +1,5 @@
-import {auth,db,ready,loadData,ref,get,update,onValue,usernameOwner} from './account-service.js?v=9';
-import {today} from './daily-service.js?v=7';
+import {auth,db,ready,loadData,ref,get,update,onValue,onAuthStateChanged,usernameOwner} from './account-service.js?v=10';
+import {today} from './daily-service.js?v=8';
 const model=window.BussoleSocialModel;
 const verified=()=>Boolean(auth.currentUser?.emailVerified&&auth.currentUser?.email);
 function me(){if(!verified())throw Error('Sign in and verify your email first.');return auth.currentUser.uid;}
@@ -41,3 +41,29 @@ export async function resolveFriend(value){
 }
 export function parseInvite(value){try{const url=new URL(value,location.href);return url.searchParams.get('friend')||String(value).trim();}catch{return String(value).trim();}}
 export function watchConnections(callback,error){return onValue(ref(db,`connections/${me()}`),s=>callback(s.val()||{}),error);}
+
+// Only the current day's minimal score snapshot is shared, never guess errors or routes.
+export function watchDailyFriends(day,ownScore,onResults,onError){
+ let stopped=false,version=0,stopConnections,stops=[];
+ const ownUid=auth.currentUser?.uid,rows=new Map();
+ const emit=()=>{if(!stopped&&auth.currentUser?.uid===ownUid)onResults([...rows.values()].sort((a,b)=>(b.score??-1)-(a.score??-1)||a.name.localeCompare(b.name)));};
+ if(!verified()){onResults([]);return()=>{};}
+ stopConnections=watchConnections(async links=>{
+  const current=++version;stops.forEach(stop=>stop());stops=[];rows.clear();
+  if(Number.isInteger(ownScore))rows.set(ownUid,{uid:ownUid,name:'You',score:ownScore,own:true});
+  const ids=Object.entries(links).filter(([,link])=>link.state==='accepted').map(([uid])=>uid);
+  for(const uid of ids)rows.set(uid,{uid,name:'Explorer',score:null});emit();
+  await Promise.all(ids.map(async uid=>{
+   let profile;try{profile=await publicProfile(uid);}catch{}
+   if(stopped||current!==version||auth.currentUser?.uid!==ownUid)return;
+   rows.set(uid,{uid,name:profile?.name||'Explorer',score:null});emit();
+   stops.push(onValue(ref(db,`accountData/${uid}/dailyAttempts/${day}/score`),snapshot=>{
+    if(stopped||current!==version||auth.currentUser?.uid!==ownUid)return;
+    const score=snapshot.val();
+    rows.set(uid,{uid,name:profile?.name||'Explorer',score:Number.isInteger(score)?score:null});emit();
+   },()=>{if(!stopped&&current===version){rows.set(uid,{uid,name:profile?.name||'Explorer',score:null});emit();}}));
+  }));
+ },onError);
+ const stopAuth=onAuthStateChanged(auth,user=>{if(user?.uid!==ownUid){stopped=true;version++;stopConnections?.();stops.forEach(stop=>stop());onResults([]);}});
+ return()=>{stopped=true;version++;stopAuth();stopConnections?.();stops.forEach(stop=>stop());};
+}

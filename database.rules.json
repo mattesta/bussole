@@ -333,7 +333,8 @@
               ".validate": "newData.isNumber()"
             },
             "score": {
-              ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 5000"
+              ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 5000",
+              ".read": "auth != null && $day === ((now - now % 86400000) / 86400000) + '' && root.child('accountData').child($uid).child('profile/generation').exists() && (!data.parent().exists() || data.parent().child('generation').val() === root.child('accountData').child($uid).child('profile/generation').val()) && ((auth.uid === root.child('dailyReminderConfig/senderUid').val() && auth.token.firebase.sign_in_provider === 'password' && root.child('dailyReminderDevices').child($uid).exists()) || (auth.token.email_verified === true && (auth.token.firebase.sign_in_provider === 'password' || auth.token.firebase.sign_in_provider === 'google.com') && root.child('connections').child($uid).child(auth.uid).child('state').val() === 'accepted' && root.child('connections').child(auth.uid).child($uid).child('state').val() === 'accepted'))"
             },
             "$other": {
               ".validate": false

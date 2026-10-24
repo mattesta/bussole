@@ -14,7 +14,7 @@ function allowedEndpoint(endpoint){
 function validDevice(device){return Boolean(device&&typeof device.binding==='string'&&/^[a-f0-9]{32}$/.test(device.binding)&&typeof device.timeZone==='string'&&device.timeZone.length<=80&&Number.isFinite(device.updatedAt)&&allowedEndpoint(device.subscription?.endpoint)&&/^[A-Za-z0-9_-]{22}$/.test(device.subscription?.keys?.auth||'')&&/^[A-Za-z0-9_-]{87}$/.test(device.subscription?.keys?.p256dh||''));}
 function payload(device,snapshot,now){
  const time=localTime(device.timeZone,now),world=percent(snapshot,Math.floor(now/86400000));
- if(!time?.due||world===null)return null;
+ if(!time?.due||world===null||snapshot.lastDay===Math.floor(now/86400000))return null;
  return {type:'bussole-daily-reminder',binding:device.binding,date:time.date,sentAt:now,percent:world};
 }
 module.exports={percent,localTime,allowedEndpoint,validDevice,payload};

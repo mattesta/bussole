@@ -1,12 +1,17 @@
-import { inspect, start, watch } from './daily-service.js?v=7';
+import {dailyReplay,openReplay} from './daily-replay.js?v=1';
+import {auth,loadProfile} from './account-service.js?v=10';
+import {showDailyFriends} from './daily-friends-ui.js?v=1';
+import { inspect, start, watch } from './daily-service.js?v=8';
 const byId=id=>document.getElementById(id),daily=window.BussoleDaily;
-let state,stopWatch,loading=false;
+let state,stopWatch,stopFriends,loading=false;
+byId('viewDailyShots').onclick=async()=>{try{const profile=await loadProfile();openReplay(dailyReplay(auth.currentUser?.uid,profile.generation,state.day));}catch(error){byId('dailyReplayStatus').textContent=error.message;}};
 function description(day){return `The same 5 targets for everyone. Normal · 30 s timer · Blur ${daily.settings(day).blurEnabled?'on':'off'}. A new challenge at 00:00 UTC.`;}
 function active(){return window.BussoleHome.soloType()==='daily';}
 async function prepare(){
- if(loading)return;loading=true;stopWatch?.();window.BussoleDailyProgress.render(byId('dailyTravel'),null);
+ if(loading)return;loading=true;stopWatch?.();stopFriends?.();byId('dailyReplayStatus').textContent='';byId('viewDailyShots').classList.add('hidden');byId('dailyFriends').replaceChildren();window.BussoleDailyProgress.render(byId('dailyTravel'),null);
  try{
   state=await inspect();if(!active())return;
+  if(state.eligible){const profile=await loadProfile();if(!active())return;byId('viewDailyShots').classList.toggle('hidden',!dailyReplay(auth.currentUser.uid,profile.generation,state.day));stopFriends=showDailyFriends(byId('dailyFriends'),state.day,state.attempt?.score);}
   window.BussoleDailyProgress.render(byId('dailyTravel'),state.journey);
   byId('soloDescription').textContent=description(state.day);
   byId('startSoloBtn').textContent=state.eligible&&!state.attempt?'Start official challenge':'Play unranked';
@@ -31,7 +36,7 @@ async function launch(access){
  const config=daily.settings(ticket.day);
  location.href=`globe-prototype.html?integrated=1&solo=daily&day=${ticket.day}&mode=${config.mode}&timer=${config.timerSeconds}${config.blurEnabled?'&blur=1':''}`;
 }
-window.BussoleHome.registerDaily({prepare,launch,leave(){stopWatch?.();stopWatch=null;window.BussoleDailyProgress.render(byId('dailyTravel'),null);}});
+window.BussoleHome.registerDaily({prepare,launch,leave(){stopFriends?.();byId('dailyFriends').replaceChildren();byId('viewDailyShots').classList.add('hidden');byId('dailyReplayStatus').textContent='';stopWatch?.();stopWatch=null;window.BussoleDailyProgress.render(byId('dailyTravel'),null);}});
 
 // Open the Daily lobby only; the user still starts the official attempt explicitly.
 if(new URLSearchParams(location.search).get('daily')==='1'){byId('singlePlayerBtn').click();byId('soloDailyBtn').click();}

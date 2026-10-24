@@ -41,7 +41,7 @@
         <button class="primary" type="submit">Save preferences</button>
       </form>
       <section id="dailyReminderPanel" aria-label="Daily reminders">
-        <h2>Daily reminder · 17:00</h2><p>Optional, off by default. Receive the Daily Challenge and your world progress around 17:00 in this device’s time zone. Delivery may be delayed or missed.</p>
+        <h2>Daily reminder · 17:00</h2><p>Optional, off by default. Receive the Daily Challenge and your world progress around 17:00 in this device’s time zone, only if today’s official challenge is unfinished. Delivery may be delayed or missed.</p>
         <p class="muted">On iPhone or iPad, add Bussole to your Home Screen, open it there and allow notifications. Your private push subscription and time zone are stored to deliver reminders; no location is requested. The notification may show your progress on the lock screen.</p>
         <div class="account-choices"><button id="enableDailyReminder" type="button" disabled>Enable on this device</button><button id="disableDailyReminder" type="button" disabled>Turn off</button><button id="testDailyReminder" type="button" disabled>Test notification</button></div><p id="dailyReminderStatus" role="status" class="muted">Loading reminder settings…</p>
       </section>
@@ -55,8 +55,8 @@
         <div id="leaderboardView" class="hidden"><p class="muted">Balances sync when players use Bussole. Missed-day penalties apply even while offline. Global participation is optional.</p><button id="refreshLeaderboard" type="button">Refresh ranking</button><ol id="journeyRanking" class="social-list"></ol></div>
         <section id="friendStatistics" class="hidden"><button id="closeFriendStatistics" type="button">Close records</button><h3 id="friendStatisticsName"></h3><div id="friendJourney" class="daily-travel hidden"></div><ul id="friendBests"></ul><h4>Top 3 Pro shots</h4><ol id="friendProShots"></ol></section>
       </section>
-      <section id="dailyJourney" aria-label="Daily journey"><div id="dailyTravel" class="daily-travel hidden"></div><p id="dailyTravelStatus" class="muted"></p><p id="dailyAverage" class="muted"></p></section>
-      <section id="proBestShots"><h2>Top 3 Pro shots</h2><p class="muted">Your highest-scoring saved Pro guesses, ranked by points. Globe replays stay on this device and do not sync. Clearing browser data removes them. Friends see only points and destination names.</p><ol id="proBestShotList"></ol></section>
+      <section id="dailyJourney" aria-label="Daily journey"><div id="dailyTravel" class="daily-travel hidden"></div><p id="dailyTravelStatus" class="muted"></p><button id="viewDailyShots" class="hidden" type="button">View today’s Daily shots · this device</button><p id="dailyAverage" class="muted"></p></section>
+      <section id="proBestShots"><h2>Top 3 Pro shots</h2><p class="muted">Your highest-scoring saved Pro guesses, ranked by points. Globe replays stay on this device and do not sync. Clearing browser data removes them. Friends see only points and destination names.</p><button id="viewBestShots" type="button">View top 3 on one globe</button><ol id="proBestShotList"></ol></section>
       <section id="soloPersonalBests">
         <h2>Single-player personal bests</h2>
         <p class="muted">Completed 5-round games only · up to 5,000 points. Each difficulty, timer and blur combination has its own record. Practice does not set records.</p>
@@ -90,7 +90,6 @@
     <footer><a href="account-privacy.html">Account privacy</a></footer>
   </main>
   <dialog id="importBackupDialog" aria-labelledby="importBackupTitle"><h2 id="importBackupTitle">Restore on this device</h2><p id="importBackupPreview"></p><p>Existing statistics are kept. Imported details stay on this device. Official records, rankings and Daily progress are not restored from this file.</p><button id="confirmImportBackup" type="button">Restore on this device</button><button id="cancelImportBackup" type="button">Cancel</button></dialog>
-  <dialog id="privateShotDialog" aria-label="Private Pro shot globe"><button id="closePrivateShot" type="button">Close globe</button><iframe id="privateShotFrame" title="Your private Pro shot" src="about:blank"></iframe></dialog>
-  <script src="daily-challenge.js?v=2"></script><script src="daily-progress.js?v=2"></script><script src="social-model.js?v=5"></script><script src="solo-game.js?v=1"></script><script src="account-statistics.js?v=3"></script><script src="summary-charts.js?v=4"></script><script type="module" src="account.js?v=11"></script>
+  <script src="daily-challenge.js?v=2"></script><script src="daily-progress.js?v=2"></script><script src="social-model.js?v=5"></script><script src="solo-game.js?v=1"></script><script src="account-statistics.js?v=3"></script><script src="summary-charts.js?v=4"></script><script type="module" src="account.js?v=12"></script>
 </body>
 </html>

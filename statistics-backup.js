@@ -1,5 +1,5 @@
 import {saveLocalSamples} from './local-statistics.js?v=1';
-import {saveHighlight} from './private-geometry.js?v=1';
+import {saveHighlight} from './private-geometry.js?v=2';
 
 export const MAX_BACKUP_BYTES=10*1024*1024;
 const invalid=()=>Error('Choose a valid Bussole data export. Nothing has been imported.');

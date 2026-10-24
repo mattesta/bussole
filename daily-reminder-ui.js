@@ -1,5 +1,5 @@
-import {auth,onAuthStateChanged} from './account-service.js?v=9';
-import * as reminder from './daily-reminder-service.js?v=3';
+import {auth,onAuthStateChanged} from './account-service.js?v=10';
+import * as reminder from './daily-reminder-service.js?v=4';
 const byId=id=>document.getElementById(id);let config=null,version=0;
 const buttons=['enableDailyReminder','disableDailyReminder','testDailyReminder'];
 async function render(){
@@ -11,7 +11,7 @@ async function render(){
   config=await reminder.configuration();if(run!==version)return;
   const active=config&&await reminder.refreshDevice();if(run!==version)return;
   if(!config){status.textContent='Daily reminders are being prepared. No notifications are scheduled yet.';return;}
-  status.textContent=active?`On for this device · around 17:00 (${reminder.currentDevice().timeZone}).`:'Off on this device. Enable to receive the Daily and your current world progress around 17:00.';
+  status.textContent=active?`On for this device · around 17:00 (${reminder.currentDevice().timeZone}), unless today’s official Daily is complete.`:'Off on this device. Enable for a reminder around 17:00 only if today’s official Daily is unfinished.';
   byId('enableDailyReminder').disabled=Boolean(active);byId('disableDailyReminder').disabled=!active;byId('testDailyReminder').disabled=!active;
  }catch{if(run===version)status.textContent='Reminder settings are unavailable. Try again when connected.';}
 }

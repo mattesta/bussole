@@ -1,5 +1,5 @@
 // Geometry stays in this browser. No network API belongs in this module.
-import { BussoleLocalGeometry } from './private-geometry-store.js?v=1';
+import { BussoleLocalGeometry } from './private-geometry-store.js?v=2';
 export const highlights = (uid, generation) => BussoleLocalGeometry.highlights(uid, generation);
 export const saveHighlight = (uid, generation, shot) => BussoleLocalGeometry.saveHighlight(uid, generation, shot);
 export const clearGeometry = uid => BussoleLocalGeometry.clear(uid);

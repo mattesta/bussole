@@ -1,7 +1,7 @@
 import {privateRoomChannel} from './private-room-channel.js?v=1';
 import {forgetRoomKey} from './private-room-crypto.js?v=1';
 import {deleteEmptyRoom} from './room-cleanup.js?v=1';
-import {saveGuess, guess, clearMatch} from './private-geometry.js?v=1';
+import {saveGuess, guess, clearMatch} from './private-geometry.js?v=2';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js';
 import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js';
 import {
@@ -9,7 +9,7 @@ import {
   serverTimestamp, set, update
 } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js';
 import { firebaseConfig } from './firebase-config.js';
-import { beginRound, saveSample } from './account-service.js?v=9';
+import { beginRound, saveSample } from './account-service.js?v=10';
 
 const parameters = new URLSearchParams(location.search);
 const multiplayerMode = parameters.get('multiplayer') === '1';
