@@ -17,6 +17,8 @@ const fakeMap=`(()=>{
   await page.route('http://localhost/**',r=>{
    const file=new URL(r.request().url()).pathname;let body;
    if(['/account-home.js','/multiplayer.js','/globe-multiplayer.js'].includes(file))body='';
+   else if(file==='/daily-friends-ui.js')body='export function showDailyFriends(){return ()=>{}}';
+   else if(file==='/account-service.js')body='export const auth={currentUser:null};export async function loadProfile(){return {}}';
    else if(file==='/account-game.js')body='export async function completeGame(){return {saved:false}}';
    else if(file==='/daily-service.js')body="export async function inspect(){return {day:window.__testDay,eligible:false,attempt:null}};export async function start(){return {day:window.__testDay,official:false}};export async function complete(){return {saved:false}};export function watch(){return ()=>{}};";
    else if(file==='/compass.js')body="window.BussoleCompass={createTracker({onHeading}){let tick;return{start(){onHeading(30);tick=setInterval(()=>onHeading(30),20)},stop(){clearInterval(tick)}}}};";

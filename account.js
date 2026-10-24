@@ -1,20 +1,20 @@
-import {prepareBackup,restoreBackup,MAX_BACKUP_BYTES} from './statistics-backup.js?v=1';
-import {highlights} from './private-geometry.js?v=1';
-import './daily-reminder-ui.js?v=3';
-import * as accounts from './account-service.js?v=9';
-import { today } from './daily-service.js?v=7';
-import * as social from './social-service.js?v=6';
+import {dailyReplay,openReplay} from './daily-replay.js?v=1';
+import {prepareBackup,restoreBackup,MAX_BACKUP_BYTES} from './statistics-backup.js?v=2';
+import {highlights} from './private-geometry.js?v=2';
+import './daily-reminder-ui.js?v=4';
+import * as accounts from './account-service.js?v=10';
+import { today } from './daily-service.js?v=8';
+import * as social from './social-service.js?v=7';
 const byId=id=>document.getElementById(id),show=(id,visible)=>byId(id).classList.toggle('hidden',!visible);
 let loadedOwner=null,registration=false,data={},mode='all',days=0,busy=false,travelDay=null,stopConnections=null,socialScope='friends',selectedFriend=null,currentConnections={},friendRenderVersion=0;
 function message(text,error=false){byId('accountStatus').textContent=text;byId('accountStatus').classList.toggle('error',error);}
 async function action(work){
   if(busy)return;busy=true;document.querySelectorAll('button').forEach(button=>button.disabled=true);
   try{await work();}catch(error){message(accounts.friendlyError(error),true);}
-  finally{busy=false;document.querySelectorAll('button').forEach(button=>button.disabled=false);if(accounts.auth.currentUser&&!accounts.auth.currentUser.emailVerified){byId('leaderboardOptIn').disabled=true;}byId('connectGoogle').disabled=accounts.hasGoogle();window.dispatchEvent(new Event('bussole-account-refresh'));}
+  finally{busy=false;document.querySelectorAll('button').forEach(button=>button.disabled=false);if(accounts.auth.currentUser&&!accounts.auth.currentUser.emailVerified){byId('leaderboardOptIn').disabled=true;}byId('connectGoogle').disabled=accounts.hasGoogle();byId('viewBestShots').disabled=!proRecords().some(shot=>highlights(loadedOwner,data.profile?.generation)[shot.sampleId]);window.dispatchEvent(new Event('bussole-account-refresh'));}
 }
 async function refresh(){
   const user=await accounts.ready();show('accountAuth',!user);show('accountDetails',Boolean(user));
-  closeShotGlobe();
   stopConnections?.();stopConnections=null;show('friendStatistics',false);selectedFriend=null;currentConnections={};friendRenderVersion++;byId('friendList').replaceChildren();
   if(!user){data={};message('An account is optional. Guest games are not added to your history.');return;}
   byId('signedInEmail').textContent=user.email;byId('connectGoogle').textContent=accounts.hasGoogle()?'Google connected':'Connect Google';byId('connectGoogle').disabled=accounts.hasGoogle();show('emailSecurity',accounts.hasPassword());byId('googleSecurityNote').textContent=accounts.hasGoogle()?'Google is connected. Leave Current password blank to confirm sensitive changes with Google. You can add an email/password login by setting a new password.':'Connecting Google keeps this account and its statistics. Guest games are never imported.';show('verificationPanel',!user.emailVerified);
@@ -27,11 +27,12 @@ async function refresh(){
   await refreshSocial();message(data.localStatisticsError|| (user.emailVerified?'Your account is ready.':'Verify your email to start saving statistics.'),Boolean(data.localStatisticsError));
 }
 async function renderJourney(){
- const element=byId('dailyTravel'),status=byId('dailyTravelStatus');travelDay=null;
+ const element=byId('dailyTravel'),status=byId('dailyTravelStatus');travelDay=null;show('viewDailyShots',false);
  window.BussoleDailyProgress.render(element,null);byId('dailyAverage').textContent='';
  if(!accounts.auth.currentUser?.emailVerified){status.textContent='Verify your email to collect Daily kilometres.';return;}
  try{
   travelDay=await today();
+  show('viewDailyShots',Boolean(dailyReplay(loadedOwner,data.profile?.generation,travelDay)));
   window.BussoleDailyProgress.render(element,window.BussoleDailyProgress.calculate(data.dailyAttempts,travelDay,data.profile?.generation));
   const progress=window.BussoleDailyProgress.calculate(data.dailyAttempts,travelDay,data.profile?.generation);
   byId('dailyAverage').textContent=progress.completed?`Daily average: ${window.BussoleDailyProgress.number(progress.averageScore)} / 5,000 points · ${progress.completed} completed challenges. Missed and unfinished days are excluded.`:'Complete an official Daily to see your average.';
@@ -50,27 +51,29 @@ function renderBests(){
     list.append(item);
   }
 }
-function closeShotGlobe(){const frame=byId('privateShotFrame');frame.src='about:blank';byId('privateShotDialog').close();}
-function openShotGlobe(id){
- if(accounts.auth.currentUser?.uid!==loadedOwner)return;
- const shot=highlights(loadedOwner,data.profile?.generation)[id];if(!shot||shot.generation!==data.profile?.generation)return;
- const report={version:1,uid:'owner',solo:true,publicRoom:true,rounds:[{round:1,mode:'hard',target:shot.target,entries:[{uid:'owner',name:'You',color:'#e41a1c',errorColor:'#ff8587',submission:shot.submission}]}]};
- const frame=byId('privateShotFrame');frame.onload=()=>frame.contentWindow.postMessage({type:'bussole-match-report',report},location.origin);
- frame.src='match-summary.html?embedded=1';byId('privateShotDialog').showModal();
-}
-byId('closePrivateShot').onclick=closeShotGlobe;
-accounts.onAuthStateChanged(accounts.auth,closeShotGlobe);
-window.addEventListener('message',event=>{if(event.origin===location.origin&&event.source===byId('privateShotFrame').contentWindow&&['bussole-summary-close','bussole-summary-home'].includes(event.data?.type))closeShotGlobe();});
-byId('privateShotDialog').addEventListener('close',()=>{byId('privateShotFrame').onload=null;byId('privateShotFrame').src='about:blank';});
-function renderBestShots(){
- const list=byId('proBestShotList');list.replaceChildren();
+function proRecords(){
  const rows=new Map(Object.values(data.proShots||{}).map(row=>[row.sampleId,row]));
  for(const shot of Object.values(highlights(loadedOwner,data.profile?.generation)))rows.set(shot.sampleId,{sampleId:shot.sampleId,points:shot.points,destination:shot.target.label});
- const shots=[...rows.values()].sort((a,b)=>b.points-a.points||a.sampleId.localeCompare(b.sampleId)).slice(0,3);
+ return [...rows.values()].sort((a,b)=>b.points-a.points||a.sampleId.localeCompare(b.sampleId)).slice(0,3);
+}
+function openShotGlobe(){
+ if(accounts.auth.currentUser?.uid!==loadedOwner)return;
+ const local=highlights(loadedOwner,data.profile?.generation),colours=['#e41a1c','#377eb8','#4daf4a'];
+ const rounds=proRecords().flatMap((record,index)=>{
+  const shot=local[record.sampleId];return shot?[{round:index+1,mode:'hard',target:shot.target,entries:[{uid:'owner',name:'You',color:colours[index],errorColor:colours[index],submission:shot.submission}]}]:[];
+ });
+ openReplay({version:1,uid:'owner',solo:true,bestShots:true,publicRoom:true,rounds},'account');
+}
+byId('viewBestShots').onclick=()=>action(openShotGlobe);
+byId('viewDailyShots').onclick=()=>action(()=>openReplay(dailyReplay(loadedOwner,data.profile?.generation,travelDay),'account'));
+function renderBestShots(){
+ const list=byId('proBestShotList');list.replaceChildren();
+ const shots=proRecords();
+ byId('viewBestShots').disabled=!shots.some(shot=>highlights(loadedOwner,data.profile?.generation)[shot.sampleId]);
  for(const shot of shots){
   const item=document.createElement('li');
   item.textContent=`${shot.points} / 1,000 points · ${shot.destination||'Destination not saved'}`;
-  if(highlights(loadedOwner,data.profile?.generation)[shot.sampleId]){const button=document.createElement('button');button.type='button';button.textContent='View on globe · this device';button.onclick=()=>openShotGlobe(shot.sampleId);item.append(button);}
+  if(highlights(loadedOwner,data.profile?.generation)[shot.sampleId]){const button=document.createElement('button');button.type='button';button.textContent='View on globe · this device';button.onclick=()=>action(openShotGlobe);item.append(button);}
   else{const note=document.createElement('small');note.textContent='Globe replay is stored only on the device where you made this shot.';item.append(note);}
   list.append(item);
  }

@@ -1,6 +1,7 @@
+import {clearDailyReplay} from './daily-replay.js?v=1';
 import {forgetRoomKeys} from './private-room-crypto.js?v=1';
 import {saveLocalSamples,loadLocalSamples,clearLocalSamples} from './local-statistics.js?v=1';
-import {saveHighlight, clearGeometry} from './private-geometry.js?v=1';
+import {saveHighlight, clearGeometry} from './private-geometry.js?v=2';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js';
 import {
   getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
@@ -37,12 +38,13 @@ export async function google(){
  try{return account(auth.currentUser)?await linkWithPopup(auth.currentUser,googleProvider()):await signInWithPopup(auth,googleProvider());}
  catch(error){if(error.code==='auth/account-exists-with-different-credential')throw Error('This email already has an account. Sign in with its password, then choose Connect Google to keep your statistics.');throw error;}
 }
-let syncTask;
+let syncTask,syncAgain=false;
 export function scheduleSocialSync(){
- if(!syncTask)syncTask=Promise.allSettled([import('./social-service.js?v=6').then(s=>s.syncOwn()),import('./daily-reminder-service.js?v=3').then(s=>s.syncIfEnrolled())]).finally(()=>{syncTask=null;});
+ if(syncTask){syncAgain=true;return syncTask;}
+ syncTask=(async()=>{do{syncAgain=false;await Promise.allSettled([import('./social-service.js?v=7').then(s=>s.syncOwn()),import('./daily-reminder-service.js?v=4').then(s=>s.syncIfEnrolled())]);}while(syncAgain);})().finally(()=>{syncTask=null;});
  return syncTask;
 }
-export const logout=async()=>{const uid=auth.currentUser?.uid;try{sessionStorage.removeItem('bussoleMatchReport');}catch{};await import('./daily-reminder-service.js?v=3').then(m=>m.disable()).catch(()=>{});if(uid)forgetRoomKeys(uid);return signOut(auth);};
+export const logout=async()=>{const uid=auth.currentUser?.uid;try{sessionStorage.removeItem('bussoleMatchReport');}catch{};await import('./daily-reminder-service.js?v=4').then(m=>m.disable()).catch(()=>{});if(uid)forgetRoomKeys(uid);return signOut(auth);};
 export const resetPassword=email=>sendPasswordResetEmail(auth,email.trim());
 export const resendVerification=()=>sendEmailVerification(current());
 export async function refreshVerification(){const user=current();await reload(user);await user.getIdToken(true);return user.emailVerified;}
@@ -168,6 +170,7 @@ export async function deleteStatistics(){
   await update(ref(db),changes);
   await clearLocalSamples(user.uid);
   clearGeometry(user.uid);
+  clearDailyReplay(user.uid);
 }
 async function reauthenticate(password){
   const user=current();if(password)await reauthenticateWithCredential(user,EmailAuthProvider.credential(user.email,password));else if(hasGoogle())await reauthenticateWithPopup(user,googleProvider());else throw Error('Enter your current password first.');return user;
@@ -185,6 +188,7 @@ export async function deleteAccount(password){
   await update(ref(db),changes);
   await clearLocalSamples(user.uid);
   clearGeometry(user.uid);
+  clearDailyReplay(user.uid);
   forgetRoomKeys(user.uid);
   await deleteUser(user);
 }

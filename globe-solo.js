@@ -1,10 +1,13 @@
-import { completeGame } from './account-game.js?v=9';
-import * as dailyService from './daily-service.js?v=7';
+import {auth} from './account-service.js?v=10';
+import {saveDailyReplay,openReplay} from './daily-replay.js?v=1';
+import {showDailyFriends} from './daily-friends-ui.js?v=1';
+import { completeGame } from './account-game.js?v=10';
+import * as dailyService from './daily-service.js?v=8';
 const parameters=new URLSearchParams(location.search);
 if(['game','daily'].includes(parameters.get('solo'))&&parameters.get('multiplayer')!=='1'){
  const byId=id=>document.getElementById(id),show=(id,visible)=>byId(id).classList.toggle('hidden',!visible);
  const isDaily=parameters.get('solo')==='daily',daily=window.BussoleDaily;
- let game,report,saving=false,ticket,stopComparison;
+ let game,report,saving=false,ticket,stopComparison,stopFriends;
  if(isDaily){
   try{ticket=JSON.parse(sessionStorage.getItem('bussoleDailyLaunch'));sessionStorage.removeItem('bussoleDailyLaunch');}catch{}
   if(!ticket||!Number.isInteger(ticket.day)||String(ticket.day)!==parameters.get('day'))ticket={day:daily.day(Date.now()),official:false};
@@ -36,6 +39,7 @@ if(['game','daily'].includes(parameters.get('solo'))&&parameters.get('multiplaye
     const result=await dailyService.complete(ticket,game.total);
     if(!result.saved){byId('soloRecordStatus').textContent='Unranked game. No daily score submitted or kilometres earned.';return;}
     await showJourney(result.score/10);
+    stopFriends?.();stopFriends=showDailyFriends(byId('dailyFriends'),ticket.day,game.total);
     byId('soloRecordStatus').textContent='Official score saved. Loading today’s comparison…';
     stopComparison?.();stopComparison=dailyService.watch(ticket.day,game.total,ticket.entryKey,result=>{byId('soloRecordStatus').textContent=daily.describe(result,ticket.day);},()=>{byId('soloRecordStatus').textContent='Official score saved. The comparison is temporarily unavailable; reopen Daily Challenge from Home to check it.';});
     return;
@@ -58,6 +62,7 @@ if(['game','daily'].includes(parameters.get('solo'))&&parameters.get('multiplaye
   progress();showResults();show('soloSummaryBtn',game.phase==='finished');
   if(game.phase==='finished'){
    report={version:1,uid:'solo',publicRoom:true,solo:true,rounds:game.results.map(round=>({round:round.round,mode:round.mode,target:round.target,entries:[{uid:'solo',name:'You',color:'#e41a1c',errorColor:'#ff8587',submission:round.submission}]}))};
+   if(isDaily&&ticket.official&&auth.currentUser?.uid===ticket.uid&&!saveDailyReplay(ticket.uid,ticket.generation,ticket.day,report))byId('dailyReplayStatus').textContent='Your shots could not be kept for later. Allow device storage; Summary is available now.';
    saveRecord();
   }
  }
@@ -84,7 +89,7 @@ if(['game','daily'].includes(parameters.get('solo'))&&parameters.get('multiplaye
   badge.addEventListener('click',()=>{if(game.phase!=='aiming')showResults();});
   byId('soloSaveRetry').addEventListener('click',saveRecord);
   byId('soloSummaryBtn').addEventListener('click',()=>{
-   panel.classList.add('hidden');frame.src='match-summary.html?embedded=1';show('matchSummaryFrame',true);
+   try{openReplay(report,isDaily?'daily':'game');}catch(error){byId('dailyReplayStatus').textContent=error.message;}
   });
   frame.addEventListener('load',()=>{if(report)frame.contentWindow.postMessage({type:'bussole-match-report',report},location.origin);});
   window.addEventListener('message',event=>{

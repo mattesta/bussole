@@ -1,0 +1,7 @@
+// Map API facade for navigation/DOM tests; does not certify GPU rendering.
+module.exports=`(()=>{
+ const handler=()=>({enable(){},disable(){},enableRotation(){},disableRotation(){}});
+ class Map{constructor(options){if(window.__failMap)throw Error('WebGL unavailable');this.options=options;this.camera={center:options.center,zoom:options.zoom};this.canvas=document.createElement('canvas');this.canvas.style='width:100%;height:100%';document.getElementById(options.container).append(this.canvas);this.handlers={};for(const key of ['dragPan','scrollZoom','boxZoom','doubleClickZoom','keyboard','touchZoomRotate'])this[key]=handler();window.__map=this;setTimeout(()=>this.handlers.load?.forEach(fn=>fn()),0)}on(name,fn){(this.handlers[name]||=[]).push(fn);if(name==='click')this.canvas.addEventListener('click',fn);return this}off(){}setProjection(){}addLayer(layer){layer.map=this}triggerRepaint(){}getContainer(){return document.getElementById(this.options.container)}getCanvas(){return this.canvas}project(p){return{x:p[0]*10,y:p[1]*10}}stop(){}jumpTo(camera){this.camera={...camera}}easeTo(camera){this.camera={...camera}}setBearing(bearing){this.camera.bearing=bearing}}
+ class Marker{constructor(options){this.element=options.element}setLngLat(p){this.position=p;return this}getLngLat(){return this.position}addTo(map){map.getContainer().append(this.element);return this}remove(){this.element.remove()}}
+ class Popup{setLngLat(){return this}setDOMContent(){return this}addTo(){return this}remove(){}}
+ window.maplibregl={Map,Marker,Popup};})();`;

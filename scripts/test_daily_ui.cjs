@@ -36,7 +36,7 @@ const fakeMap=`(()=>{
   });
   await page.goto('http://localhost/account.html');await page.locator('#showRegister').click();await page.locator('#accountEmail').fill('daily@example.test');await page.locator('#accountPassword').fill('Explorer123!');await page.locator('#authSubmit').click();
   await page.waitForFunction(()=>document.getElementById('accountStatus').textContent.includes('Account created'));
-  const uid=await page.evaluate(async()=>(await import('./account-service.js?v=9')).auth.currentUser.uid);await admin.updateUser(uid,{emailVerified:true});await page.locator('#checkVerification').click();await page.waitForFunction(()=>document.getElementById('accountStatus').textContent==='Your account is ready.');
+  const uid=await page.evaluate(async()=>(await import('./account-service.js?v=10')).auth.currentUser.uid);await admin.updateUser(uid,{emailVerified:true});await page.locator('#checkVerification').click();await page.waitForFunction(()=>document.getElementById('accountStatus').textContent==='Your account is ready.');
   const day=Math.floor(Date.now()/86400000);
   async function openDaily(){await page.goto('http://localhost/');await page.locator('#singlePlayerBtn').click();await page.locator('#soloDailyBtn').click();await page.waitForFunction(()=>!document.getElementById('startSoloBtn').disabled);}
   await openDaily();assert.equal(await page.locator('#soloConfigControls').isVisible(),false);assert.equal(await page.locator('#startSoloBtn').textContent(),'Start official challenge');
@@ -56,13 +56,17 @@ const fakeMap=`(()=>{
   assert.equal((await db.ref(`dailyScores/${day}/${attempt.entryKey}`).get()).val(),total);assert.equal((await db.ref(`accountData/${uid}/soloBests`).get()).exists(),false);
   assert.equal(await page.locator('#dailyTravel .daily-travel-distance').textContent(),`${new Intl.NumberFormat('en-US',{maximumFractionDigits:1}).format(total/10)} km`);
   assert.match(await page.locator('#dailyTravel .daily-travel-earned').textContent(),/from this challenge/);
+  await db.ref().update({[`connections/${uid}/friend`]:{state:'accepted',requestedBy:uid},[`connections/friend/${uid}`]:{state:'accepted',requestedBy:uid},'accountData/friend/profile':{generation:'friend-generation',username:'Friend',useInRooms:false},'publicProfiles/friend':{name:'Friend'},'friendShares/friend':{generation:'friend-generation',journey:{asOfDay:day,tenths:0,lastDay:-1}},[`accountData/friend/dailyAttempts/${day}`]:{generation:'friend-generation',score:0,entryKey:'opaque',startedAt:Date.now()}});
+  await page.waitForFunction(()=>document.getElementById('dailyFriends').textContent.includes('Friend — 0 / 5,000'));
+  await db.ref(`accountData/friend/dailyAttempts/${day}/score`).set(5000);await page.waitForFunction(()=>document.getElementById('dailyFriends').textContent.includes('Friend — 5000 / 5,000'));
+  await db.ref().update({[`connections/${uid}/friend`]:null,[`connections/friend/${uid}`]:null});await page.waitForFunction(()=>!document.getElementById('dailyFriends').textContent.includes('Friend —'));
   // A second completed entry updates the open percentile immediately; ties are not wins.
   await db.ref(`dailyScores/${day}/another-random-key`).set(total);
   await page.waitForFunction(()=>document.getElementById('soloRecordStatus').textContent.includes('#1 of 2 · tied'));
   assert.match(await page.locator('#soloRecordStatus').textContent(),/higher than 0%/);await page.screenshot({path:'/tmp/bussole-daily-results.png'});
-  await page.locator('#soloSummaryBtn').click();const summary=page.frameLocator('#matchSummaryFrame');await summary.locator('#statisticsView').click();await summary.locator('#statisticsMetrics dt').first().waitFor();await summary.locator('#summaryBack').click();await page.locator('#soloGameResults').waitFor({state:'visible'});
+  await page.locator('#soloSummaryBtn').click();await page.waitForURL(/match-summary.html/);await page.locator('#statisticsView').click();await page.locator('#statisticsMetrics dt').first().waitFor();assert.equal(await page.locator('.summary-marker').count(),5);await page.locator('#summaryBack').click();await page.waitForURL(/daily=1/);await page.locator('#viewDailyShots').waitFor({state:'visible'});await page.locator('#viewDailyShots').click();await page.waitForURL(/match-summary.html/);assert.equal(await page.locator('.summary-marker').count(),5);await page.locator('#summaryBack').click();await page.waitForURL(/daily=1/);
   await db.ref(`dailyScores/${day}/${attempt.entryKey}`).remove();
-  await page.locator('#prototypeBackLink').click();await page.locator('#singlePlayerBtn').click();await page.locator('#soloDailyBtn').click();await page.waitForFunction(()=>!document.getElementById('startSoloBtn').disabled);
+  await page.goto('http://localhost/?daily=1');await page.waitForFunction(()=>!document.getElementById('startSoloBtn').disabled);
   assert.equal((await db.ref(`dailyScores/${day}/${attempt.entryKey}`).get()).val(),total);
   assert.equal(await page.locator('#startSoloBtn').textContent(),'Play unranked');assert.match(await page.locator('#dailyInfo').textContent(),new RegExp(`score: ${total}`));
   await page.locator('#startSoloBtn').click();await page.waitForURL(/solo=daily/);await page.waitForFunction(()=>!document.getElementById('showPrototypeLineBtn').disabled);assert.match(await page.locator('#dailyGameNotice').textContent(),/Unranked/);
@@ -92,7 +96,7 @@ const fakeMap=`(()=>{
   const reserved=(await db.ref(`accountData/${uid}/dailyAttempts/${day}`).get()).val();await page.reload();await page.waitForFunction(()=>document.getElementById('dailyGameNotice').textContent.includes('Unranked'));
   assert.equal((await db.ref(`accountData/${uid}/dailyAttempts/${day}`).get()).val().entryKey,reserved.entryKey);
   // Account deletion also removes a completed public contribution after reauthentication.
-  await page.evaluate(async data=>(await import('./daily-service.js?v=7')).complete({...data.reserved,uid:data.uid,day:data.day,official:true},0),{reserved,uid,day});
+  await page.evaluate(async data=>(await import('./daily-service.js?v=8')).complete({...data.reserved,uid:data.uid,day:data.day,official:true},0),{reserved,uid,day});
   assert.equal((await db.ref(`dailyScores/${day}/${reserved.entryKey}`).get()).val(),0);
   await page.goto('http://localhost/account.html');await page.locator('#currentPassword').fill('Explorer123!');await page.locator('#deleteAccount').click();await page.locator('#accountAuth').waitFor({state:'visible'});
   assert.equal((await db.ref(`dailyScores/${day}/${reserved.entryKey}`).get()).exists(),false);assert.equal((await db.ref(`accountData/${uid}`).get()).exists(),false);
