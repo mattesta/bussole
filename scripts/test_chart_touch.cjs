@@ -22,12 +22,12 @@ const root=require('node:path').resolve(__dirname,'..');
   await send('touchMove',await pos(20));assert.equal(await page.locator('#angle .chart-selected-stroke').count(),1);assert.equal(await page.evaluate(()=>scrollY),startScroll);
   await page.screenshot({path:'/tmp/bussole-touch-angle.png'});await send('touchEnd');assert.equal(await page.locator('#angle .chart-selected-stroke').count(),0);assert.equal(await page.locator('#angle .chart-inspection-label').getAttribute('visibility'),'hidden');
   await page.locator('#distance').scrollIntoViewIfNeeded();
-  await send('touchStart',await point('distance',92,70));assert.match(await page.locator('#distance .chart-inspection-label').textContent(),/Paris/);
-  await send('touchMove',await point('distance',94.72,70));assert.match(await page.locator('#distance .chart-inspection-label').textContent(),/Rome/);
-  await send('touchMove',await point('distance',120,70));assert.equal(await page.locator('#distance .chart-selected-stroke').count(),0);
-  await send('touchMove',await point('distance',296,70));await page.screenshot({path:'/tmp/bussole-touch-distance.png'});
+  await send('touchStart',await point('distance',92,140));assert.match(await page.locator('#distance .chart-inspection-label').textContent(),/Paris/);
+  await send('touchMove',await point('distance',94.72,140));assert.match(await page.locator('#distance .chart-inspection-label').textContent(),/Rome/);
+  await send('touchMove',await point('distance',120,140));assert.equal(await page.locator('#distance .chart-selected-stroke').count(),0);
+  await send('touchMove',await point('distance',296,140));await page.screenshot({path:'/tmp/bussole-touch-distance.png'});
   const bounds=await page.locator('#distance svg').evaluate(svg=>[...svg.querySelectorAll('.chart-inspection-text')].map(t=>{const b=t.getBBox();return[b.x,b.x+b.width,b.y,b.y+b.height]}));
-  assert.ok(bounds.every(([left,right,top,bottom])=>left>=0&&right<=320&&top>=0&&bottom<=132));
+  assert.ok(bounds.every(([left,right,top,bottom])=>left>=0&&right<=320&&top>=0&&bottom<=202));
   await send('touchCancel');assert.equal(await page.locator('#distance .chart-selected-stroke').count(),0);
   // Scroll starts normally in empty SVG space instead of snapping to a guess.
   await page.locator('#angle').scrollIntoViewIfNeeded();const before=await page.evaluate(()=>scrollY);const empty=await point('angle',290,100);

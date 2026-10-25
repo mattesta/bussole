@@ -20,13 +20,14 @@ assert.equal(kind(chart.angle([],null),'chart-guess-ray').length,0);
 for(const figure of [d,a,chart.distance([],null),chart.angle([],null)]){assert.equal(figure.children[0].attrs.role,'img');assert.doesNotMatch(JSON.stringify(figure),/NaN|Infinity/);}
 // Touch inspection uses the actual stroke, never empty areas or the extended highlight.
 const svg=d.children[0],touch=(x,y)=>({touches:[{clientX:x,clientY:y}],preventDefault(){this.prevented=true}});
-svg.events.touchstart(touch(24,70));assert.equal(kind(d,'chart-selected-stroke').length,1);assert.equal(Number(kind(d,'chart-selected-stroke')[0].attrs.y2),34);
+svg.events.touchstart(touch(24,140));assert.equal(kind(d,'chart-selected-stroke').length,1);assert.equal(Number(kind(d,'chart-selected-stroke')[0].attrs.y2),90);
 assert.ok(kind(d,'chart-inspection-text').some(n=>n.textContent==='A <safe> target'));
-svg.events.touchmove(touch(120,70));assert.equal(kind(d,'chart-selected-stroke').length,0);
-svg.events.touchmove(touch(296,70));assert.equal(Number(kind(d,'chart-selected-stroke')[0].attrs.x1),296);
+svg.events.touchmove(touch(120,140));assert.equal(kind(d,'chart-selected-stroke').length,0);
+svg.events.touchmove(touch(296,140));assert.equal(Number(kind(d,'chart-selected-stroke')[0].attrs.x1),296);
+const box=kind(d,'chart-inspection-box')[0];assert.ok(Number(box.attrs.y)+Number(box.attrs.height)<=Number(dots[1].attrs.y1)-24);
 svg.events.touchend();assert.equal(kind(d,'chart-selected-stroke').length,0);
-svg.events.touchstart(touch(24,34));assert.equal(kind(d,'chart-selected-stroke').length,0); // An extended endpoint is outside the original tick.
-svg.events.touchcancel();svg.events.touchstart(touch(30,70));assert.equal(kind(d,'chart-selected-stroke').length,0);svg.events.touchstart(touch(28,70));assert.equal(kind(d,'chart-selected-stroke').length,1);svg.events.touchcancel();assert.equal(kind(d,'chart-selected-stroke').length,0);
+svg.events.touchstart(touch(24,90));assert.equal(kind(d,'chart-selected-stroke').length,0); // An extended endpoint is outside the original tick.
+svg.events.touchcancel();svg.events.touchstart(touch(30,140));assert.equal(kind(d,'chart-selected-stroke').length,0);svg.events.touchstart(touch(28,140));assert.equal(kind(d,'chart-selected-stroke').length,1);svg.events.touchcancel();assert.equal(kind(d,'chart-selected-stroke').length,0);
 const angleSvg=a.children[0];angleSvg.events.touchstart(touch(200,128));assert.equal(kind(a,'chart-selected-stroke').length,1);
 assert.equal(Number(kind(a,'chart-selected-stroke')[0].attrs.x2),268);
 angleSvg.events.touchmove(touch(220,188));assert.equal(kind(a,'chart-selected-stroke').length,0);
