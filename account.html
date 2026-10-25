@@ -8,10 +8,11 @@
   <link rel="stylesheet" href="daily-progress.css?v=1">
 <link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#080e18">
 <link rel="stylesheet" href="account-navigation.css?v=1">
+<link rel="stylesheet" href="link-buttons.css?v=1">
 </head>
 <body class="account-page">
   <main class="account-card">
-    <header><h1>My account</h1><a href="./">Home</a></header>
+    <header><h1>My account</h1><a href="./" class="app-link">Home</a></header>
     <p id="accountStatus" role="status" aria-live="polite">Loading your account…</p>
     <section id="accountAuth" class="hidden">
       <div class="account-choices" role="group" aria-label="Account access"><button id="showLogin" class="selected" type="button">Sign in</button><button id="showRegister" type="button">Create account</button></div>
@@ -20,11 +21,11 @@
       <form id="authForm">
         <label>Email<input id="accountEmail" type="email" autocomplete="email" required maxlength="254"></label>
         <label>Password<input id="accountPassword" type="password" autocomplete="current-password" required></label>
-        <p id="registerPrivacy" class="muted hidden">Your email stays private. Account statistics contain errors, difficulty, score and date, without your location, targets or routes. <a href="account-privacy.html">How your data is used</a></p>
+        <p id="registerPrivacy" class="muted hidden">Your email stays private. Account statistics contain errors, difficulty, score and date, without your location, targets or routes. <a href="account-privacy.html" class="app-link">How your data is used</a></p>
         <button id="authSubmit" class="primary" type="submit">Sign in</button>
       </form>
       <button id="resetPassword" class="text-button" type="button">Forgot password?</button>
-      <p><a href="./">Continue as guest</a></p>
+      <p><a href="./" class="app-link">Continue as guest</a></p>
     </section>
     <section id="accountDetails" class="hidden">
       <p id="signedInEmail" class="muted"></p><button id="connectGoogle" type="button">Connect Google</button><p id="googleSecurityNote" class="muted"></p>
@@ -59,7 +60,7 @@
       <section id="dailyJourney" aria-label="Daily journey"><div id="dailyTravel" class="daily-travel hidden"></div><p id="dailyTravelStatus" class="muted"></p><button id="viewDailyShots" class="hidden" type="button">View today’s Daily shots · this device</button><p id="dailyAverage" class="muted"></p></section>
       <section id="proBestShots"><h2>Top 3 Pro shots</h2><p class="muted">Your highest-scoring saved Pro guesses, ranked by points. Globe replays stay on this device and do not sync. Clearing browser data removes them. Friends see only points and destination names.</p><button id="viewBestShots" type="button">View top 3 on one globe</button><ol id="proBestShotList"></ol></section>
       <section id="soloPersonalBests">
-        <h2>Single-player personal bests</h2>
+        <h2>Singleplayer personal bests</h2>
         <p class="muted">Completed 5-round games only · up to 5,000 points. Each difficulty, timer and blur combination has its own record. Practice does not set records.</p>
         <ul id="soloBestList"></ul>
       </section>
@@ -88,10 +89,10 @@
 <p class="muted">Changing phone? Export on the old device, then sign in to the same account and import the JSON on the new one. Import adds local statistics and available Pro replays; cloud records and Daily progress stay as they are. The file can contain private locations: keep it somewhere safe.</p>
       </section>
     </section>
-    <footer><a href="account-privacy.html">Account privacy</a></footer>
+    <footer><a href="account-privacy.html" class="app-link">Account privacy</a></footer>
   </main>
   <dialog id="importBackupDialog" aria-labelledby="importBackupTitle"><h2 id="importBackupTitle">Restore on this device</h2><p id="importBackupPreview"></p><p>Existing statistics are kept. Imported details stay on this device. Official records, rankings and Daily progress are not restored from this file.</p><button id="confirmImportBackup" type="button">Restore on this device</button><button id="cancelImportBackup" type="button">Cancel</button></dialog>
   <script src="daily-challenge.js?v=2"></script><script src="daily-progress.js?v=2"></script><script src="social-model.js?v=5"></script><script src="solo-game.js?v=1"></script><script src="account-statistics.js?v=3"></script><script src="summary-charts.js?v=4"></script><script type="module" src="account.js?v=14"></script>
-<script src="account-navigation.js?v=1"></script>
+<script src="account-navigation.js?v=2"></script>
 </body>
 </html>
