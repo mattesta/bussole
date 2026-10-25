@@ -58,9 +58,9 @@ function proRecords(){
 }
 function openShotGlobe(){
  if(accounts.auth.currentUser?.uid!==loadedOwner)return;
- const local=highlights(loadedOwner,data.profile?.generation),colours=['#e41a1c','#377eb8','#4daf4a'];
+ const local=highlights(loadedOwner,data.profile?.generation),colours=['#FFD700','#C0C0C0','#CD7F32'],errorColours=['rgba(255,215,0,0.45)','rgba(192,192,192,0.45)','rgba(205,127,50,0.45)'];
  const rounds=proRecords().flatMap((record,index)=>{
-  const shot=local[record.sampleId];return shot?[{round:index+1,mode:'hard',target:shot.target,entries:[{uid:'owner',name:'You',color:colours[index],errorColor:colours[index],submission:shot.submission}]}]:[];
+  const shot=local[record.sampleId];return shot?[{round:index+1,mode:'hard',target:shot.target,entries:[{uid:'owner',name:'You',color:colours[index],errorColor:errorColours[index],submission:shot.submission}]}]:[];
  });
  openReplay({version:1,uid:'owner',solo:true,bestShots:true,publicRoom:true,rounds},'account');
 }
@@ -73,8 +73,7 @@ function renderBestShots(){
  for(const shot of shots){
   const item=document.createElement('li');
   item.textContent=`${shot.points} / 1,000 points · ${shot.destination||'Destination not saved'}`;
-  if(highlights(loadedOwner,data.profile?.generation)[shot.sampleId]){const button=document.createElement('button');button.type='button';button.textContent='View on globe · this device';button.onclick=()=>action(openShotGlobe);item.append(button);}
-  else{const note=document.createElement('small');note.textContent='Globe replay is stored only on the device where you made this shot.';item.append(note);}
+  if(!highlights(loadedOwner,data.profile?.generation)[shot.sampleId]){const note=document.createElement('small');note.textContent='Globe replay is stored only on the device where you made this shot.';item.append(note);}
   list.append(item);
  }
  if(!shots.length){const item=document.createElement('li');item.textContent='No saved Pro guesses yet.';list.append(item);}
