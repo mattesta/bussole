@@ -124,7 +124,7 @@
   }
   function interactive(kind,samples,mean){
     samples=valid(samples);
-    const isAngle=kind==='angle',height=isAngle?252:132;
+    const isAngle=kind==='angle',height=isAngle?252:202;
     const title=isAngle?'Angular errors relative to the target: negative left, positive right':'Relative distance errors: short to the left, long to the right, target at zero';
     const {figure:chart,svg}=figure(kind,height,title,
       `${isAngle?'Rays':'Ticks'}: guesses · White: target · Red: mean. Hold a stroke to inspect. Pinch to zoom; move two fingers to explore.`);
@@ -147,14 +147,14 @@
       let segments;
       if(!isAngle){
         const x=value=>160+(value-center)/half*136;
-        line(svg,24,70,296,70,'chart-axis');
-        for(const value of ticks(min,max)){const at=x(value);line(svg,at,65,at,75,'chart-axis');label(svg,at,118,`${signed(value)}%`);}
-        if(min<=0&&max>=0){line(svg,x(0),45,x(0),86,'chart-target');label(svg,x(0),23,'Target · 0%');}
+        line(svg,24,140,296,140,'chart-axis');
+        for(const value of ticks(min,max)){const at=x(value);line(svg,at,135,at,145,'chart-axis');label(svg,at,188,`${signed(value)}%`);}
+        if(min<=0&&max>=0){line(svg,x(0),115,x(0),156,'chart-target');label(svg,x(0),23,'Target · 0%');}
         else label(svg,160,23,'Relative distance error');
-        segments=visible.map(sample=>[x(sample.error),64,x(sample.error),76]);
+        segments=visible.map(sample=>[x(sample.error),118,x(sample.error),146]);
         visible.forEach((sample,i)=>describe(line(svg,...segments[i],'chart-guess-tick'),sample,'%'));
-        inspection=inspect(svg,visible,segments,i=>[x(visible[i].error),76,x(visible[i].error),34],'%');
-        if(Number.isFinite(mean)&&mean>=min&&mean<=max){const at=x(mean);line(svg,at,71,at,93,'chart-mean-stem');const mark=node('path',{d:`M${at} 91l6 7-6 7-6-7z`,class:'chart-mean-dot'});mark.append(node('title',{},`Mean distance bias: ${signed(mean)}%`));svg.append(mark);}
+        inspection=inspect(svg,visible,segments,i=>[x(visible[i].error),146,x(visible[i].error),90],'%');
+        if(Number.isFinite(mean)&&mean>=min&&mean<=max){const at=x(mean);line(svg,at,141,at,163,'chart-mean-stem');const mark=node('path',{d:`M${at} 161l6 7-6 7-6-7z`,class:'chart-mean-dot'});mark.append(node('title',{},`Mean distance bias: ${signed(mean)}%`));svg.append(mark);}
       }else{
         const full=zoom===1,cx=160,cy=full?128:216,radius=full?86:130;
         // At overview the true circle is retained. Zoom opens an angular window
@@ -180,7 +180,7 @@
         svg.append(node('circle',{cx,cy,r:3,class:'chart-origin'}));
       }
       inspection();
-      if(!samples.length)label(svg,160,isAngle?166:103,isAngle?'No valid angle guesses.':'No valid Pro distance guesses.');
+      if(!samples.length)label(svg,160,isAngle?166:173,isAngle?'No valid angle guesses.':'No valid Pro distance guesses.');
     }
     const midpoint=touches=>(touches[0].clientX+touches[1].clientX)/2;
     const gap=touches=>Math.hypot(touches[0].clientX-touches[1].clientX,touches[0].clientY-touches[1].clientY);

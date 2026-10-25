@@ -25,7 +25,7 @@ const root=require('node:path').resolve(__dirname,'..');
   await page.locator('#angle').getByRole('button',{name:'Reset chart zoom'}).click();assert.equal(await page.locator('#angle .chart-guess-ray').count(),7);
   await pinch('distance');assert.ok(Number(await page.locator('#distance svg').getAttribute('data-zoom'))>2.9);assert.equal(await page.locator('#distance .chart-guess-tick').count(),2);assert.match(await page.locator('#distance svg').textContent(),/20%/);await page.screenshot({path:'/tmp/bussole-zoom-distance.png'});
   const beforeLabels=await page.locator('#distance svg').textContent();
-  await touches('touchStart',[await point('distance',100,70),await point('distance',220,70)]);await touches('touchMove',[await point('distance',40,70),await point('distance',160,70)]);await touches('touchEnd');assert.notEqual(await page.locator('#distance svg').textContent(),beforeLabels);
+  await touches('touchStart',[await point('distance',100,140),await point('distance',220,140)]);await touches('touchMove',[await point('distance',40,140),await point('distance',160,140)]);await touches('touchEnd');assert.notEqual(await page.locator('#distance svg').textContent(),beforeLabels);
   await page.locator('#distance').getByRole('button',{name:'Reset chart zoom'}).click();assert.equal(await page.locator('#distance .chart-guess-tick').count(),5);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   assert.deepEqual(errors,[]);console.log('Native chart zoom passed: two-finger pinch and pan, detailed original-unit ticks, upper angular window, inspection after transformation, reset and mobile overflow.');
