@@ -1,0 +1,17 @@
+/* Navigation remains native links, presented consistently as touch-friendly buttons. */
+a.app-link,#accountBack.app-link {
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  box-sizing:border-box;min-height:44px;max-width:100%;padding:10px 16px;
+  border:1px solid #cbd5e1;border-radius:12px;background:#101a29;
+  color:#f1f5f9;font:inherit;font-size:14px;line-height:1.4;
+  text-align:center;text-decoration:none;overflow-wrap:anywhere;vertical-align:middle;
+  cursor:pointer;touch-action:manipulation;
+}
+a.app-link:visited{color:#f1f5f9}
+a.app-link:hover{background:#223047;border-color:#fff}
+a.app-link:focus-visible{outline:2px solid #fff;outline-offset:3px}
+a.app-link:active{background:#2d3b52}
+.account-hub a.app-link{display:grid;justify-content:stretch;text-align:left;padding:18px;min-height:76px}
+.account-home-link.app-link{width:fit-content;margin:16px auto 0;display:flex}
+.summary-links{display:flex;flex-wrap:wrap;gap:10px}
+.explorer-dialog a.app-link{margin:4px 4px 4px 0}

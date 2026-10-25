@@ -49,6 +49,7 @@
   <link rel="stylesheet" href="player-blur.css?v=1">
   <link rel="stylesheet" href="daily-progress.css?v=1">
 <link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#080e18">
+<link rel="stylesheet" href="link-buttons.css?v=1">
 </head>
 
 <body>
@@ -64,7 +65,7 @@
       </g>
     </svg>
     <span>Returning to the room…</span>
-    <a href="./">Home</a>
+    <a href="./" class="app-link">Home</a>
   </div>
 
   <!-- ================= START MENU ================= -->
@@ -76,7 +77,7 @@
     </p>
 
     <div id="homePlayChoice" class="home-play-choice">
-      <button id="singlePlayerBtn" class="home-play-button" type="button">Single-player</button>
+      <button id="singlePlayerBtn" class="home-play-button" type="button">Singleplayer</button>
       <button id="multiplayerBtn" class="home-play-button" type="button">Multiplayer</button>
     </div>
     <section id="singlePlayerPanel" class="single-player-panel hidden">
@@ -92,7 +93,7 @@
         <div id="soloConfigControls">
         <fieldset class="choice-field solo-difficulty"><legend>Difficulty</legend>
           <input id="soloMode" type="hidden" value="medium">
-          <div class="choice-buttons" data-choice-input="soloMode" role="group" aria-label="Single-player difficulty">
+          <div class="choice-buttons" data-choice-input="soloMode" role="group" aria-label="Singleplayer difficulty">
             <button type="button" data-choice-value="easy">Easy</button>
             <button type="button" data-choice-value="medium">Normal</button>
             <button type="button" data-choice-value="hard">Pro</button>
@@ -106,7 +107,7 @@
           <label><span>Blur around player</span><input type="checkbox" id="blurCheckbox"></label>
         </div>
         </div>
-        <div id="dailyDetails" class="hidden"><p id="dailyInfo" role="status"></p><p><a href="account-privacy.html#daily">Daily challenge privacy</a></p></div>
+        <div id="dailyDetails" class="hidden"><p id="dailyInfo" role="status"></p><p><a href="account-privacy.html#daily" class="app-link">Daily challenge privacy</a></p></div>
         <button id="viewDailyShots" type="button" class="hidden">View today’s shots · this device</button><p id="dailyReplayStatus" role="status"></p><section id="dailyFriends"></section><p id="dailyComparison" class="hidden"></p>
         <p id="soloRecordNote">Personal bests are saved for verified accounts, separately for each difficulty, timer and blur setting.</p>
         <button id="startSoloBtn" class="home-play-button solo-start" type="button">Start game</button>
@@ -116,7 +117,7 @@
 
     </section>
 
-    <a id="accountLink" class="account-home-link" href="account.html" aria-busy="true">Account…</a>
+    <a id="accountLink" class="account-home-link app-link" href="account.html" aria-busy="true">Account…</a>
 
     <footer id="credits">
       By M Bonatesta
@@ -210,10 +211,10 @@
     <h2 id="explorerTitle"></h2>
     <figure id="explorerFigure" class="explorer-figure hidden">
       <img id="explorerImage" alt="">
-      <figcaption><a id="explorerImageSource" target="_blank" rel="noopener noreferrer">Image source and credits ↗</a> <a id="explorerImageLicense" class="hidden" target="_blank" rel="noopener noreferrer"></a></figcaption>
+      <figcaption><a id="explorerImageSource" target="_blank" rel="noopener noreferrer" class="app-link">Image source and credits ↗</a> <a id="explorerImageLicense" class="hidden app-link" target="_blank" rel="noopener noreferrer"></a></figcaption>
     </figure>
     <p id="explorerBiography"></p>
-    <a id="explorerWikipedia" target="_blank" rel="noopener noreferrer">Read more on Wikipedia ↗</a>
+    <a id="explorerWikipedia" target="_blank" rel="noopener noreferrer" class="app-link">Read more on Wikipedia ↗</a>
   </dialog>
   <div id="roomCountdown" class="round-countdown hidden" role="timer"></div>
   <div id="roomTargetBanner" class="room-target-banner hidden" aria-live="polite"></div>
