@@ -58,7 +58,7 @@ function proRecords(){
 }
 function openShotGlobe(){
  if(accounts.auth.currentUser?.uid!==loadedOwner)return;
- const local=highlights(loadedOwner,data.profile?.generation),colours=['#FFD700','#C0C0C0','#CD7F32'],errorColours=['rgba(255,215,0,0.45)','rgba(192,192,192,0.45)','rgba(205,127,50,0.45)'];
+ const local=highlights(loadedOwner,data.profile?.generation),colours=['#FFD700','#C0C0C0','#CD7F32'],errorColours=['#FFF0A3','#E6E6E6','#E8BE94'];
  const rounds=proRecords().flatMap((record,index)=>{
   const shot=local[record.sampleId];return shot?[{round:index+1,mode:'hard',target:shot.target,entries:[{uid:'owner',name:'You',color:colours[index],errorColor:errorColours[index],submission:shot.submission}]}]:[];
  });
