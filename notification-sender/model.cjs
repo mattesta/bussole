@@ -6,7 +6,7 @@ function percent(snapshot,day){
  return Math.max(0,snapshot.tenths-penalty(after)+penalty(before))/10/EARTH_KM*100;
 }
 function localTime(timeZone,now){
- try{const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now).map(p=>[p.type,p.value]));return {date:`${parts.year}-${parts.month}-${parts.day}`,due:parts.hour==='17'&&Number(parts.minute)<45};}catch{return null;}
+ try{const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'}).formatToParts(now).map(p=>[p.type,p.value]));return {date:`${parts.year}-${parts.month}-${parts.day}`,due:Number(parts.hour)>=17&&Number(parts.hour)<24};}catch{return null;}
 }
 function allowedEndpoint(endpoint){
  try{const url=new URL(endpoint);return url.protocol==='https:'&&!url.username&&!url.password&&!url.port&&!url.hash&&endpoint.length<=4096&&(url.hostname==='fcm.googleapis.com'||url.hostname==='updates.push.services.mozilla.com'||url.hostname.endsWith('.push.apple.com')||url.hostname==='web.push.apple.com'||url.hostname.endsWith('.notify.windows.com'));}catch{return false;}

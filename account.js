@@ -1,7 +1,7 @@
 import {dailyReplay,openReplay} from './daily-replay.js?v=1';
 import {prepareBackup,restoreBackup,MAX_BACKUP_BYTES} from './statistics-backup.js?v=2';
 import {highlights} from './private-geometry.js?v=2';
-import './daily-reminder-ui.js?v=4';
+import './daily-reminder-ui.js?v=5';
 import * as accounts from './account-service.js?v=10';
 import { today } from './daily-service.js?v=8';
 import * as social from './social-service.js?v=7';
