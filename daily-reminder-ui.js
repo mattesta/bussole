@@ -11,7 +11,7 @@ async function render(){
   config=await reminder.configuration();if(run!==version)return;
   const active=config&&await reminder.refreshDevice();if(run!==version)return;
   if(!config){status.textContent='Daily reminders are being prepared. No notifications are scheduled yet.';return;}
-  status.textContent=active?`On for this device · around 17:00 (${reminder.currentDevice().timeZone}), unless today’s official Daily is complete.`:'Off on this device. Enable for a reminder around 17:00 only if today’s official Daily is unfinished.';
+  status.textContent=active?`On for this device · 17:00 to midnight (${reminder.currentDevice().timeZone}), unless today’s official Daily is complete.`:'Off on this device. Enable for a reminder 17:00 to midnight only if today’s official Daily is unfinished.';
   byId('enableDailyReminder').disabled=Boolean(active);byId('disableDailyReminder').disabled=!active;byId('testDailyReminder').disabled=!active;
  }catch{if(run===version)status.textContent='Reminder settings are unavailable. Try again when connected.';}
 }

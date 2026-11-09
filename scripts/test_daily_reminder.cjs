@@ -2,7 +2,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const context={window:{}};vm.runInNewContext(fs.readFileSync('daily-progress.js','utf8'),context);const calculate=context.window.BussoleDailyProgress.calculate;
 for(const date of ['2026-07-01T15:00:00Z','2026-12-01T16:00:00Z'])assert.equal(model.localTime('Europe/Berlin',Date.parse(date)).due,true);
 assert.equal(model.localTime('Europe/Berlin',Date.parse('2026-10-22T14:59:00Z')).due,false);
-assert.equal(model.localTime('Europe/Berlin',Date.parse('2026-10-22T15:45:00Z')).due,false);
+for(const [date,due] of [['2026-11-05T15:59:00Z',false],['2026-11-05T17:40:00Z',true],['2026-11-05T22:59:59Z',true],['2026-11-05T23:00:00Z',false]])assert.equal(model.localTime('Europe/Berlin',Date.parse(date)).due,due);
 assert.equal(model.localTime('Invalid/Zone',Date.now()),null);
 assert.equal(model.localTime('America/New_York',Date.parse('2026-07-01T21:00:00Z')).due,true);
 for(const url of ['http://fcm.googleapis.com/x','https://fcm.googleapis.com.evil.test/x','https://127.0.0.1/x','https://web.push.apple.com@evil.test/x','https://web.push.apple.com:8443/x','https://evil.test/x'])assert.equal(model.allowedEndpoint(url),false);
