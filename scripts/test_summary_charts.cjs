@@ -35,3 +35,12 @@ angleSvg.events.touchmove(touch(100,128));assert.equal(Number(kind(a,'chart-sele
 angleSvg.events.touchend();assert.equal(kind(a,'chart-selected-stroke').length,0);
 const historical=chart.angle([{error:20}],20);historical.children[0].events.touchstart(touch(180,73));assert.ok(kind(historical,'chart-inspection-text').some(n=>n.textContent==='Guess'));
 console.log('Summary charts: normalized zero, exact signed positions, coincident ticks, outliers, full-circle rays, touch hit thresholds, release/cancel cleanup, historical privacy, undefined means, empty data and safe labels passed.');
+
+{
+ const trend=chart.trend([{day:1,error:42,count:2},{day:3,error:12,count:1}]);
+ assert.deepEqual(kind(trend,'chart-label').map(n=>n.textContent).filter(s=>s.endsWith('%')),['0%','10%','20%','30%','40%','50%']);
+ const path=walk(trend).find(n=>n.tag==='path');
+ assert.equal((path.attrs.d.match(/M/g)||[]).length,2);
+ const angle=chart.trend([{day:1,error:179,count:2},{day:2,error:-179,count:2}],'angleError');
+ assert.equal((walk(angle).find(n=>n.tag==='path').attrs.d.match(/M/g)||[]).length,2);
+}

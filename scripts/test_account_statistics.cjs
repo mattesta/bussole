@@ -26,3 +26,14 @@ const replay={submission:{lat:48,lon:11,heading:90,distanceMeters:20000,secret:'
 assert.equal(model.shotGeometry(replay).target.label,'Venice');assert.doesNotMatch(JSON.stringify(model.shotGeometry(replay)),/secret/);
 assert.equal(model.shotGeometry({...replay,submission:{...replay.submission,lat:91}}),null);
 assert.equal(model.shotGeometry({...replay,target:{...replay.target,label:''}}),null);
+
+{
+ const stats=require('../account-statistics.js'),day=86400000;
+ const row=(d,relativeError,angleError,distanceError,mode='hard')=>({day:d,mode,kind:'solo',points:500,relativeError,angleError,distanceError});
+ const rows=[row(1,40,179,-12),row(7,20,-179,4),row(8,10,-179,8),row(8,0,0,0,'easy')];
+ const options={now:8*day,days:2,mode:'hard'};
+ assert.deepEqual(stats.weeklyTrend(rows,options),[{day:7,error:30,count:2},{day:8,error:15,count:2}]);
+ assert.deepEqual(stats.weeklyTrend(rows,{...options,metric:'distanceError'}).map(p=>p.error),[-4,6]);
+ assert.deepEqual(stats.weeklyTrend(rows,{...options,metric:'angleError'}).map(p=>p.error),[-180,-179]);
+ assert.deepEqual(stats.weeklyTrend([row(7,10,0,2),row(7,10,-180,2)],{...options,metric:'angleError'}),[]);
+}
