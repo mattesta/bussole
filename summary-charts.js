@@ -205,7 +205,38 @@
     },{capture:true});
     draw();return chart;
   }
+  function trend(points){
+    const {figure:chart,svg}=figure('trend',156,'Seven-day rolling mean relative error','Lower is better. Each point averages guesses from that day and the previous six days (UTC). Days without guesses in that window are blank.');
+    if(!points.length){label(svg,160,75,'No saved errors for this period.');return chart;}
+    const first=points[0],last=points.at(-1),span=last.day-first.day;
+    const peak=points.reduce((max,p)=>Math.max(max,p.error),1);
+    const step=tickStep(peak),ceiling=Math.ceil(peak/step)*step;
+    const x=p=>span?48+252*(p.day-first.day)/span:174;
+    const y=value=>116-94*value/ceiling;
+    for(const value of [0,ceiling/2,ceiling]){
+      line(svg,48,y(value),300,y(value),'chart-axis');label(svg,42,y(value)+3,number(value)+'%','end');
+    }
+    const date=new Intl.DateTimeFormat('en',{month:'short',day:'numeric',timeZone:'UTC'});
+    const formatDay=day=>date.format(day*86400000);
+    label(svg,x(first),138,formatDay(first.day),span?'start':'middle');
+    if(span)label(svg,300,138,formatDay(last.day),'end');
+    let path='',previous;
+    for(const point of points){
+      path+=(previous?.day===point.day-1?' L':' M')+x(point)+' '+y(point.error);
+      previous=point;
+    }
+    svg.appendChild(node('path',{d:path.trim(),fill:'none',stroke:'#81d4fa','stroke-width':2}));
+    for(let i=0;i<points.length;i++){
+      const p=points[i];
+      if(i>0&&i<points.length-1&&points[i-1].day===p.day-1&&points[i+1].day===p.day+1)continue;
+      svg.appendChild(node('circle',{cx:x(p),cy:y(p.error),r:3,fill:'#81d4fa'}));
+    }
+    const description=document.createElement('p');
+    description.textContent=points.length===1?` ${formatDay(last.day)}: ${number(last.error)}% · ${last.count} guesses.`:`First: ${number(first.error)}% · Latest: ${number(last.error)}% (${last.count} guesses in the latest window).`;
+    chart.lastChild.appendChild(description);
+    return chart;
+  }
   const distance=(samples,mean)=>interactive('distance',samples,mean);
   const angle=(samples,mean)=>interactive('angle',samples,mean);
-  root.BussoleSummaryCharts={distance,angle};
+  root.BussoleSummaryCharts={distance,angle,trend};
 })(window);

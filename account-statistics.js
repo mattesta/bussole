@@ -24,6 +24,22 @@
     const minimum=days?Math.floor(now/DAY)-days+1:-Infinity;
     return Object.values(values||{}).map(clean).filter(value=>value&&value.day>=minimum&&(mode==='all'||value.mode===mode));
   }
+  function weeklyTrend(values,{mode='all',days=0,now=Date.now()}={}) {
+    const today=Math.floor(now/DAY),daily=new Map();
+    for(const row of select(values,{mode,days:days?days+6:0,now})){
+      if(!finite(row.relativeError)||row.day>today)continue;
+      const bucket=daily.get(row.day)||{sum:0,count:0};
+      bucket.sum+=row.relativeError;bucket.count++;daily.set(row.day,bucket);
+    }
+    const minimum=days?today-days+1:0,windows=new Map();
+    for(const [day,bucket] of daily){
+      for(let end=Math.max(day,minimum);end<=Math.min(day+6,today);end++){
+        const window=windows.get(end)||{sum:0,count:0};
+        window.sum+=bucket.sum;window.count+=bucket.count;windows.set(end,window);
+      }
+    }
+    return [...windows].sort(([a],[b])=>a-b).map(([day,{sum,count}])=>({day,error:sum/count,count}));
+  }
   const mean=values=>values.length?values.reduce((sum,value)=>sum+value,0)/values.length:null;
   function summarize(values) {
     const samples=select(values),angles=samples.filter(s=>finite(s.angleError)).map(s=>s.angleError);
@@ -42,6 +58,6 @@
     if(!a||!t||![a.lat,a.lon,a.heading,a.distanceMeters,t.lat,t.lon].every(finite)||Math.abs(a.lat)>90||Math.abs(t.lat)>90||Math.abs(a.lon)>180||Math.abs(t.lon)>180||a.heading<0||a.heading>=360||a.distanceMeters<0||a.distanceMeters>100000000||typeof t.label!=='string'||!t.label.trim()||t.label.length>300)return null;
     return {submission:{lat:a.lat,lon:a.lon,heading:a.heading,distanceMeters:a.distanceMeters},target:{lat:t.lat,lon:t.lon,label:t.label}};
   }
-  const api={sample,clean,select,summarize,bestShots,bestShotEntries,shotGeometry,compareShots};
+  const api={sample,clean,select,summarize,weeklyTrend,bestShots,bestShotEntries,shotGeometry,compareShots};
   if(typeof module==='object'&&module.exports)module.exports=api;else root.BussoleAccountStatistics=api;
 })(typeof window==='object'?window:globalThis);
