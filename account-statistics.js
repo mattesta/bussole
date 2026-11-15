@@ -24,29 +24,33 @@
     const minimum=days?Math.floor(now/DAY)-days+1:-Infinity;
     return Object.values(values||{}).map(clean).filter(value=>value&&value.day>=minimum&&(mode==='all'||value.mode===mode));
   }
-  function weeklyTrend(values,{mode='all',days=0,now=Date.now()}={}) {
+  function weeklyTrend(values,{mode='all',days=0,now=Date.now(),metric='relativeError'}={}) {
+    const circular=metric==='angleError';
     const today=Math.floor(now/DAY),daily=new Map();
     for(const row of select(values,{mode,days:days?days+6:0,now})){
-      if(!finite(row.relativeError)||row.day>today)continue;
-      const bucket=daily.get(row.day)||{sum:0,count:0};
-      bucket.sum+=row.relativeError;bucket.count++;daily.set(row.day,bucket);
+      const value=row[metric];
+      if(!finite(value)||row.day>today)continue;
+      const bucket=daily.get(row.day)||{sum:0,y:0,count:0};
+      bucket.sum+=circular?Math.cos(value*Math.PI/180):value;
+      if(circular)bucket.y+=Math.sin(value*Math.PI/180);bucket.count++;daily.set(row.day,bucket);
     }
     const minimum=days?today-days+1:0,windows=new Map();
     for(const [day,bucket] of daily){
       for(let end=Math.max(day,minimum);end<=Math.min(day+6,today);end++){
-        const window=windows.get(end)||{sum:0,count:0};
-        window.sum+=bucket.sum;window.count+=bucket.count;windows.set(end,window);
+        const window=windows.get(end)||{sum:0,y:0,count:0};
+        window.sum+=bucket.sum;window.y+=bucket.y;window.count+=bucket.count;windows.set(end,window);
       }
     }
-    return [...windows].sort(([a],[b])=>a-b).map(([day,{sum,count}])=>({day,error:sum/count,count}));
+    return [...windows].sort(([a],[b])=>a-b).map(([day,{sum,y,count}])=>({day,error:circular?direction(sum,y,count):sum/count,count})).filter(point=>point.error!==null);
   }
+  const direction=(x,y,count)=>count&&Math.hypot(x,y)/count>=1e-6?((Math.atan2(y,x)*180/Math.PI+540)%360)-180:null;
   const mean=values=>values.length?values.reduce((sum,value)=>sum+value,0)/values.length:null;
   function summarize(values) {
     const samples=select(values),angles=samples.filter(s=>finite(s.angleError)).map(s=>s.angleError);
     const distances=samples.filter(s=>finite(s.distanceError)).map(s=>s.distanceError);
     const x=angles.reduce((sum,a)=>sum+Math.cos(a*Math.PI/180),0),y=angles.reduce((sum,a)=>sum+Math.sin(a*Math.PI/180),0);
     return {count:samples.length,relativeError:mean(samples.filter(s=>finite(s.relativeError)).map(s=>s.relativeError)),
-      absoluteAngle:mean(angles.map(Math.abs)),angleBias:angles.length&&Math.hypot(x,y)/angles.length>=1e-6?((Math.atan2(y,x)*180/Math.PI+540)%360)-180:null,
+      absoluteAngle:mean(angles.map(Math.abs)),angleBias:direction(x,y,angles.length),
       absoluteDistance:mean(distances.map(Math.abs)),distanceBias:mean(distances),
       angleSamples:angles.map(error=>({error})),distanceSamples:distances.map(error=>({error}))};
   }

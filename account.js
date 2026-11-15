@@ -89,7 +89,9 @@ function metric(list,label,value,unit,signed=false,explanation='',chart){
 function renderStatistics(){
   const now=Date.now(),filters={mode,days,now};
   const rows=window.BussoleAccountStatistics.select(data.samples,filters);
-  byId('weeklyTrend').replaceChildren(window.BussoleSummaryCharts.trend(window.BussoleAccountStatistics.weeklyTrend(data.samples,filters)));
+  for(const [id,metric] of [['weeklyTrend','relativeError'],['weeklyAngleTrend','angleError'],['weeklyDistanceTrend','distanceError']]){
+    byId(id).replaceChildren(window.BussoleSummaryCharts.trend(window.BussoleAccountStatistics.weeklyTrend(data.samples,{...filters,metric}),metric));
+  }
   const stats=window.BussoleAccountStatistics.summarize(rows),list=byId('personalMetrics');list.replaceChildren();
   byId('personalStatsCount').textContent=`${stats.count} completed ${stats.count===1?'guess':'guesses'}${stats.count?'':' — your future verified games will appear here'}.`;
   metric(list,'Mean relative error',stats.relativeError,'%',false,'Final error relative to target distance.');
